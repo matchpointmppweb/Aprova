@@ -2,6 +2,14 @@
  * CSS global portado quase 1:1 de Mockup.html (AD-4) — mesmas variáveis,
  * classes e regras do mockup aprovado. Não é um novo design system: mudanças
  * visuais devem passar pelo mockup como referência.
+ *
+ * --forest/--forest-2/--pine/--pine-dark/--sage/--sage-pale (paleta) e
+ * --paper/--paper-2/--white/--ink/--ink-soft/--line/--line-strong (modo) são
+ * sobrescritas em runtime por src/lib/paletas.ts (Conta.paletaDeCores,
+ * server-side) e src/lib/modo-aparencia.ts (localStorage, client-side) —
+ * Story 1.5. Os valores abaixo são só o default "verde-floresta"/claro; se
+ * mudar aqui, mude também lá (duas fontes do mesmo valor, de propósito —
+ * ver Review Triage Log da Story 1.5).
  */
 :root{
   --ink:#152219;
@@ -322,6 +330,8 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 }
 .palette-card:hover{border-color:var(--line-strong);}
 .palette-card.selected{border-color:var(--pine);}
+.palette-card:disabled{opacity:0.5;cursor:not-allowed;}
+.palette-card:disabled:hover{border-color:var(--line);}
 .palette-swatches{display:flex;height:52px;}
 .palette-swatches span{flex:1;}
 .palette-card-body{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}

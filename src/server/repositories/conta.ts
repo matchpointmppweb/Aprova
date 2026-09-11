@@ -48,6 +48,10 @@ export async function atualizarConta(
     cnpj: string;
     planoContratado: PlanoContratado;
     status: StatusConta;
+    // Aparência (CAP-11 / AD-11, Story 1.5) — validado contra
+    // src/lib/paletas.ts antes de chegar aqui (atualizarPaletaAction);
+    // este repositório não valida a chave, só grava.
+    paletaDeCores: string;
   }>,
 ) {
   const resultado = await prisma.conta.updateMany({

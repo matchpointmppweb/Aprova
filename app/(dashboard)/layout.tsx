@@ -1,5 +1,6 @@
 import { Sidebar } from "@/src/components/shell/sidebar";
 import { Topbar } from "@/src/components/shell/topbar";
+import { resolverPaleta } from "@/src/lib/paletas";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 
 // Casca autenticada (topbar/sidebar/breadcrumb) — toda rota fora de (auth)
@@ -11,8 +12,19 @@ export default async function DashboardLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const usuario = await exigirUsuarioAutenticado();
 
+  // Paleta da Conta (CAP-11 / AD-11, Story 1.5): resolverPaleta cai para
+  // PALETA_PADRAO se o valor salvo não bater com nenhuma chave conhecida
+  // (ex. dado legado/corrompido) — nunca quebra o layout. Renderizada como
+  // <style> (em vez de inline por elemento) porque sobrescreve, pra toda a
+  // árvore (topbar/sidebar/botões), as variáveis --forest/--pine/... que o
+  // :root de globals.css já declara com os valores de "verde-floresta"
+  // (Code Map). Nunca se aplica a app/(plataforma) (Boundaries — Never):
+  // aquele layout não importa este componente.
+  const paleta = resolverPaleta(usuario.conta.paletaDeCores);
+
   return (
     <>
+      <style>{`:root{--forest:${paleta.forest};--forest-2:${paleta.forest2};--pine:${paleta.pine};--pine-dark:${paleta.pineDark};--sage:${paleta.sage};--sage-pale:${paleta.sagePale};}`}</style>
       <Topbar nome={usuario.nome} papel={usuario.perfilAcesso.nome} />
       <Sidebar />
       <div className="main">{children}</div>
