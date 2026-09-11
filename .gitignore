@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Ambiente e segredos
+.env
+.env.local
+.env.*.local
+
+# Prisma
+prisma/*.db
+
+# Build/logs
+*.log
+.DS_Store
+.vercel
+
+# BMad (artefatos de planejamento não precisam ir pro repo de código)
+.claude/
+_bmad/
+_bmad-output/
