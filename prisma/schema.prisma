@@ -51,6 +51,15 @@ enum StatusAtivo {
   Vendido
 }
 
+/// Status de ItemRevisional (Story 3.1) — mesmo padrão de StatusTipoAtivo:
+/// "excluir" nunca é DELETE físico (AD-10), é atualizarItemRevisional(...,
+/// {status:"Arquivado"}) pela mesma função de repositório usada pela edição
+/// comum.
+enum StatusItemRevisional {
+  Ativo
+  Arquivado
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -85,10 +94,11 @@ model Conta {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  usuarios     Usuario[]
-  perfisAcesso PerfilAcesso[]
-  tiposDeAtivo TipoAtivo[]
-  ativos       Ativo[]
+  usuarios         Usuario[]
+  perfisAcesso     PerfilAcesso[]
+  tiposDeAtivo     TipoAtivo[]
+  ativos           Ativo[]
+  itensRevisionais ItemRevisional[]
 
   @@map("contas")
 }
@@ -281,4 +291,39 @@ model Ativo {
   @@unique([contaId, codigo])
   @@index([tipoAtivoId])
   @@map("ativos")
+}
+
+// ---------------------------------------------------------------------------
+// ItemRevisional (Story 3.1) — verificações/tarefas com controle de medição
+// que compõem os planos revisionais (Epic 3/Story 3.2 depende deste modelo
+// existir primeiro). Os 3 controles (diasPadrao/kmPadrao/horasPadrao) são
+// colunas numéricas opcionais: não-nulo significa "este controle está
+// selecionado" (sem flag booleana separada) — ao menos um dos três precisa
+// ser não-nulo e positivo, validado na Server Action (o banco não impõe "ao
+// menos 1 de 3" sozinho). Sem exclusão física (AD-10): "excluir" é só mudar
+// `status` para Arquivado, pela mesma função de repositório usada pela
+// edição comum (atualizarItemRevisional).
+// ---------------------------------------------------------------------------
+
+model ItemRevisional {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nome        String
+  descricao   String?
+  /// "A cada N dias" — não-nulo significa que este controle está selecionado.
+  diasPadrao  Int?
+  /// "A cada N km" — não-nulo significa que este controle está selecionado.
+  kmPadrao    Int?
+  /// "A cada N horas" — não-nulo significa que este controle está
+  /// selecionado.
+  horasPadrao Int?
+  status      StatusItemRevisional @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, nome])
+  @@map("itens_revisionais")
 }
