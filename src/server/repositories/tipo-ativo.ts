@@ -10,15 +10,14 @@ import { prisma } from "./db";
 // atualizarPerfilAcesso), usando updateMany({where:{id,contaId}}) para
 // mutação cross-tenant-safe.
 //
-// A coluna "Ativos vinculados" da listagem é fixa em 0 nesta story (Intent/
-// Boundaries) — não há relação `Ativo[]` a contar ainda. A Story 2.2, ao
-// criar o modelo Ativo, deve trocar esse 0 fixo por uma contagem real
-// (include: { _count: { select: { ativos: true } } }, mesmo padrão de
-// listarPerfisAcessoCompleto).
+// A coluna "Ativos vinculados" da listagem passou a usar contagem real
+// (Story 2.2, ao criar o modelo Ativo) — include: { _count: { select: {
+// ativos: true } } }, mesmo padrão de listarPerfisAcessoCompleto.
 
 export async function listarTiposAtivo(contaId: string) {
   return prisma.tipoAtivo.findMany({
     where: { contaId },
+    include: { _count: { select: { ativos: true } } },
     orderBy: { nome: "asc" },
   });
 }

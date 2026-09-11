@@ -41,6 +41,16 @@ enum StatusTipoAtivo {
   Arquivado
 }
 
+/// Status de Ativo (Story 2.2). "Excluir" nunca é DELETE físico (AD-10): é
+/// atualizarAtivo(...,{status:"Inativo"}) pela mesma função de repositório
+/// usada pela edição comum — Boundaries da story.
+enum StatusAtivo {
+  Ativo
+  Inativo
+  Bloqueado
+  Vendido
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -78,6 +88,7 @@ model Conta {
   usuarios     Usuario[]
   perfisAcesso PerfilAcesso[]
   tiposDeAtivo TipoAtivo[]
+  ativos       Ativo[]
 
   @@map("contas")
 }
@@ -232,6 +243,42 @@ model TipoAtivo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  ativos Ativo[]
+
   @@unique([contaId, nome])
   @@map("tipos_de_ativo")
+}
+
+// ---------------------------------------------------------------------------
+// Ativo (Story 2.2) — núcleo do produto: cada ativo cadastrado pertence a um
+// TipoAtivo e a uma Conta. Sem exclusão física (AD-10): "excluir" é só mudar
+// `status` para Inativo, pela mesma função de repositório usada pela edição
+// comum (atualizarAtivo). `codigo` é gerado na criação ("AT-" + sequencial
+// de 4 dígitos por conta, dentro de uma transação Serializable) e nunca
+// reaproveita o `id` (cuid) como identificador visível.
+// ---------------------------------------------------------------------------
+
+model Ativo {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nome        String
+  tipoAtivoId String
+  tipoAtivo   TipoAtivo @relation(fields: [tipoAtivoId], references: [id])
+  localizacao String
+  /// Opcional (Boundaries) — exibido no sub-text da coluna "Ativo" da
+  /// listagem quando preenchido.
+  numeroSerie String?
+  /// Formato "AT-0001" — sequencial por conta, sem ano embutido (diferente
+  /// do código de Emissão). Gerado uma única vez na criação.
+  codigo      String
+  status      StatusAtivo @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, codigo])
+  @@index([tipoAtivoId])
+  @@map("ativos")
 }

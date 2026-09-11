@@ -21,9 +21,8 @@ const BADGE_POR_STATUS: Record<StatusTipoAtivo, { tom: TomBadge; label: string }
 //
 // Busca e filtro de status são 100% client-side sobre a lista já carregada
 // (Boundaries: nenhuma Server Action é chamada ao alternar filtro/busca). A
-// coluna "Ativos vinculados" é fixa em "0" nesta story (Intent/Boundaries) —
-// a Story 2.2 troca isso por uma contagem real quando o modelo Ativo
-// existir.
+// coluna "Ativos vinculados" passou a usar a contagem real de
+// tipo._count.ativos (Story 2.2).
 export function TabelaTipos({
   tipos,
   podeCriar,
@@ -127,7 +126,7 @@ export function TabelaTipos({
                       <div className="primary-text">{tipo.nome}</div>
                     </td>
                     <td className="muted">{tipo.descricao ?? "—"}</td>
-                    <td>0</td>
+                    <td>{tipo._count.ativos}</td>
                     <td>
                       <StatusBadge tom={badge.tom} label={badge.label} />
                     </td>
