@@ -55,7 +55,10 @@ enum Modulo {
 model Conta {
   id              String          @id @default(cuid())
   nome            String
-  cnpj            String
+  /// Único em toda a plataforma (Boundaries da Story 1.4 — gestão de contas
+  /// pelo operador de plataforma) — constraint nova; antes desta story nunca
+  /// era possível criar uma 2ª Conta pela UI para alcançar a colisão.
+  cnpj            String          @unique
   planoContratado PlanoContratado @default(Essencial)
   status          StatusConta     @default(Ativa)
   /// Configuração de Aparência (CAP-11 / AD-11) — por conta, edição restrita

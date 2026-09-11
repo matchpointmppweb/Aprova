@@ -132,6 +132,10 @@ async function main() {
     throw new Error("[seed] Perfil Administrador não foi criado.");
   }
 
+  // isPlataformaOperador: true — sem isso, ninguém no banco consegue acessar
+  // a área de Contas do operador de plataforma (app/(plataforma), Story
+  // 1.4). Independente do PerfilAcesso/can() (AD-13): este é o único
+  // usuário do seed com o flag, exatamente para destravar essa área.
   const usuarioAdmin = await prisma.usuario.create({
     data: {
       nome: adminNome,
@@ -140,6 +144,7 @@ async function main() {
       status: "Ativo",
       contaId: conta.id,
       perfilAcessoId: perfilAdministrador.id,
+      isPlataformaOperador: true,
     },
   });
 

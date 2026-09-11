@@ -35,3 +35,20 @@ export async function exigirUsuarioAutenticado() {
 
   return usuario;
 }
+
+// Gate exclusivo da área segregada do operador de plataforma
+// (app/(plataforma), Story 1.4, AD-13) — nunca can()/PerfilAcesso, nunca o
+// enum Modulo.contas. Mesmo padrão de exigirUsuarioAutenticado() para sessão
+// inválida/usuário inativo (redireciona a /login), mas com um segundo
+// critério: autenticado e ativo, porém sem isPlataformaOperador, não é um
+// caso de sessão inválida — é acesso negado a esta área específica,
+// então redireciona para "/" em vez de derrubar a sessão.
+export async function exigirOperadorDePlataforma() {
+  const usuario = await exigirUsuarioAutenticado();
+
+  if (!usuario.isPlataformaOperador) {
+    redirect("/");
+  }
+
+  return usuario;
+}
