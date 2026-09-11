@@ -33,6 +33,14 @@ enum StatusUsuario {
   Inativo
 }
 
+/// Status de TipoAtivo (Story 2.1) — "arquivar" é só mudar este campo para
+/// Arquivado pelo próprio formulário de edição; não há exclusão física
+/// nesta tela (Boundaries da story).
+enum StatusTipoAtivo {
+  Ativo
+  Arquivado
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -69,6 +77,7 @@ model Conta {
 
   usuarios     Usuario[]
   perfisAcesso PerfilAcesso[]
+  tiposDeAtivo TipoAtivo[]
 
   @@map("contas")
 }
@@ -202,4 +211,27 @@ model PermissaoModulo {
 
   @@unique([perfilAcessoId, modulo])
   @@map("permissoes_de_modulo")
+}
+
+// ---------------------------------------------------------------------------
+// TipoAtivo (Story 2.1) — categorias usadas para classificar ativos
+// (Epic 2/3 dependem deste modelo existir primeiro). Sem exclusão física:
+// "arquivar" é só mudar `status` para Arquivado pelo próprio formulário de
+// edição. O modelo `Ativo` (Story 2.2) é quem vai referenciar TipoAtivo e
+// trocar a contagem fixa "0" da listagem por uma contagem real.
+// ---------------------------------------------------------------------------
+
+model TipoAtivo {
+  id        String          @id @default(cuid())
+  contaId   String
+  conta     Conta           @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  nome      String
+  descricao String?
+  status    StatusTipoAtivo @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, nome])
+  @@map("tipos_de_ativo")
 }
