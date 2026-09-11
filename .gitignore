@@ -22,3 +22,8 @@ prisma/*.db
 .claude/
 _bmad/
 _bmad-output/
+
+# TypeScript / Next.js gerados
+*.tsbuildinfo
+next-env.d.ts
+/coverage

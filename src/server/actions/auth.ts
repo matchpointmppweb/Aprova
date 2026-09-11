@@ -1,0 +1,133 @@
+"use server";
+
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import {
+  buscarUsuarioAutenticado,
+  registrarUltimoAcesso,
+} from "@/src/server/repositories/usuario";
+import { auth } from "@/src/server/auth";
+import type { UsuarioSessao } from "@/src/server/auth/tipos";
+import type { EstadoAcaoAuth } from "./auth-estado";
+
+const ERRO_CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
+
+// Given e-mail ou senha errados -> mensagem de erro genérica (Boundaries:
+// "mensagens de erro de login/reset nunca revelam se o e-mail existe").
+export async function entrarAction(
+  _estadoAnterior: EstadoAcaoAuth,
+  formData: FormData,
+): Promise<EstadoAcaoAuth> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const senha = String(formData.get("senha") ?? "");
+  const manterConectado = formData.get("manterConectado") === "on";
+
+  if (!email || !senha) {
+    return { ok: false, error: "Informe e-mail e senha." };
+  }
+
+  let usuarioSessao: UsuarioSessao | null = null;
+  try {
+    const resultado = await auth.api.signInEmail({
+      body: { email, password: senha, rememberMe: manterConectado },
+    });
+    usuarioSessao = resultado.user as unknown as UsuarioSessao;
+  } catch {
+    return { ok: false, error: ERRO_CREDENCIAIS_INVALIDAS };
+  }
+
+  // Usuario.status/Conta.status não são checados pelo Better Auth — um
+  // usuário Inativo ou uma conta com pagamento pendente não autentica,
+  // mesmo com senha correta. A sessão já foi criada em signInEmail, então
+  // revogamos antes de recusar.
+  const usuario = await buscarUsuarioAutenticado(
+    usuarioSessao.id,
+    usuarioSessao.contaId,
+  );
+  if (!usuario || usuario.status !== "Ativo" || usuario.conta.status !== "Ativa") {
+    await auth.api.signOut({ headers: await headers() }).catch(() => {});
+    return { ok: false, error: ERRO_CREDENCIAIS_INVALIDAS };
+  }
+
+  // Falha ao registrar o último acesso não deve barrar o login.
+  await registrarUltimoAcesso(usuario.id, usuario.contaId).catch(() => {});
+
+  redirect("/");
+}
+
+// Given e-mail existente ou não -> mesma resposta de sucesso na tela (sem
+// enumeration); o próprio Better Auth já responde de forma indistinguível
+// nos dois casos.
+export async function solicitarResetSenhaAction(
+  _estadoAnterior: EstadoAcaoAuth,
+  formData: FormData,
+): Promise<EstadoAcaoAuth> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) {
+    return { ok: false, error: "Informe seu e-mail." };
+  }
+
+  try {
+    await auth.api.requestPasswordReset({
+      body: { email, redirectTo: "/redefinir-senha" },
+    });
+  } catch {
+    // Ignorado de propósito: a resposta ao usuário é sempre a mesma,
+    // exista o e-mail ou não.
+  }
+
+  return {
+    ok: true,
+    message:
+      "Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.",
+  };
+}
+
+export async function redefinirSenhaAction(
+  _estadoAnterior: EstadoAcaoAuth,
+  formData: FormData,
+): Promise<EstadoAcaoAuth> {
+  const token = String(formData.get("token") ?? "");
+  const novaSenha = String(formData.get("novaSenha") ?? "");
+  const confirmarSenha = String(formData.get("confirmarSenha") ?? "");
+
+  if (!token) {
+    return {
+      ok: false,
+      error: "Link de redefinição inválido ou expirado. Solicite um novo.",
+    };
+  }
+  if (novaSenha.length < 8) {
+    return { ok: false, error: "A senha deve ter pelo menos 8 caracteres." };
+  }
+  if (novaSenha !== confirmarSenha) {
+    return { ok: false, error: "As senhas não coincidem." };
+  }
+
+  try {
+    await auth.api.resetPassword({ body: { newPassword: novaSenha, token } });
+  } catch {
+    // Nunca expõe detalhe interno/stack (Boundaries) — mensagem genérica.
+    return {
+      ok: false,
+      error:
+        "Não foi possível redefinir sua senha. O link pode ter expirado — solicite um novo.",
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Senha redefinida com sucesso. Você já pode entrar com a nova senha.",
+  };
+}
+
+export async function sairAction() {
+  try {
+    await auth.api.signOut({ headers: await headers() });
+  } catch {
+    // Sessão já pode estar expirada/inválida — mesmo assim, sempre manda
+    // de volta para o login.
+  }
+  redirect("/login");
+}

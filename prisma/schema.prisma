@@ -1,0 +1,202 @@
+// Schema Prisma — Raiz
+// Fonte de verdade do modelo de dados (AD-5 da arquitetura).
+// Escopo desta story (1.1): entidades mínimas para login, recuperação de
+// senha e casca do painel (AD-13) — Conta, Usuario, PerfilAcesso/PermissaoModulo
+// — mais as tabelas exigidas pelo Better Auth (Session, Account, Verification).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PlanoContratado {
+  Essencial
+  Corporativo
+}
+
+enum StatusConta {
+  Ativa
+  PagamentoPendente
+}
+
+enum StatusUsuario {
+  Ativo
+  ConvitePendente
+  Inativo
+}
+
+/// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
+/// acesso (Consistency Conventions da arquitetura). "contas" existe como
+/// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
+enum Modulo {
+  ativos
+  tipos
+  itens
+  planos
+  emissao
+  usuarios
+  contas
+  perfil
+  aparencia
+}
+
+// ---------------------------------------------------------------------------
+// Conta (tenant) — raiz do isolamento multi-tenant (AD-1)
+// ---------------------------------------------------------------------------
+
+model Conta {
+  id              String          @id @default(cuid())
+  nome            String
+  cnpj            String
+  planoContratado PlanoContratado @default(Essencial)
+  status          StatusConta     @default(Ativa)
+  /// Configuração de Aparência (CAP-11 / AD-11) — por conta, edição restrita
+  /// a Administrador via can('editar','aparencia').
+  paletaDeCores   String          @default("verde-floresta")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  usuarios     Usuario[]
+  perfisAcesso PerfilAcesso[]
+
+  @@map("contas")
+}
+
+// ---------------------------------------------------------------------------
+// Usuario — também é o modelo "user" do Better Auth (credentials + sessão em
+// banco). O campo `name` exigido pelo Better Auth é mapeado para `nome`
+// (server/auth/index.ts: user.fields.name = "nome"); contaId,
+// perfilAcessoId, isPlataformaOperador, status e ultimoAcesso são
+// registrados como additionalFields para sobreviver ao parse de saída do
+// Better Auth e ficarem disponíveis via auth.api.getSession() (AD-1: sessão
+// carrega contaId).
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id            String  @id @default(cuid())
+  nome          String
+  email         String
+  emailVerified Boolean @default(false)
+  image         String?
+
+  status               StatusUsuario @default(Ativo)
+  ultimoAcesso         DateTime?
+  /// Independente do PerfilAcesso (AD-13) — gate exclusivo da área de Contas
+  /// (CAP-8, Story 1.4). Só os operadores da plataforma Raiz têm `true`.
+  isPlataformaOperador Boolean       @default(false)
+
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  perfilAcessoId String
+  perfilAcesso   PerfilAcesso @relation(fields: [perfilAcessoId], references: [id])
+
+  sessions Session[]
+  accounts Account[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, email])
+  @@map("usuarios")
+}
+
+// ---------------------------------------------------------------------------
+// Tabelas do Better Auth (sessão em banco, credentials, reset de senha)
+// ---------------------------------------------------------------------------
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sessoes")
+}
+
+model Account {
+  id      String  @id @default(cuid())
+  userId  String
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "credential" para login por e-mail/senha; providers sociais ficam para
+  /// uma story futura.
+  providerId String
+  accountId  String
+  /// Hash da senha (só preenchido para providerId = "credential").
+  password   String?
+
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+  @@map("contas_de_login")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verificacoes")
+}
+
+// ---------------------------------------------------------------------------
+// PerfilAcesso / PermissaoModulo (CAP-9) — matriz de permissões por módulo
+// (perfis-de-acesso.md). Edição de perfis é escopo da Story 1.3; aqui só o
+// necessário para o seed dos 4 perfis padrão e o vínculo do Usuario.
+// ---------------------------------------------------------------------------
+
+model PerfilAcesso {
+  id        String  @id @default(cuid())
+  contaId   String
+  conta     Conta   @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  nome      String
+  descricao String?
+
+  permissoes PermissaoModulo[]
+  usuarios   Usuario[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, nome])
+  @@map("perfis_de_acesso")
+}
+
+model PermissaoModulo {
+  id             String       @id @default(cuid())
+  perfilAcessoId String
+  perfilAcesso   PerfilAcesso @relation(fields: [perfilAcessoId], references: [id], onDelete: Cascade)
+  modulo         Modulo
+  criar          Boolean      @default(false)
+  editar         Boolean      @default(false)
+  excluir        Boolean      @default(false)
+
+  @@unique([perfilAcessoId, modulo])
+  @@map("permissoes_de_modulo")
+}
