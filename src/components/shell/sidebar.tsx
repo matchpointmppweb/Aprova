@@ -12,6 +12,21 @@ function ChevIcon() {
   );
 }
 
+// Rotas do grupo Configurações — usadas tanto para decidir se o grupo já
+// nasce aberto (pathname atual cai dentro dele) quanto, em conjunto com
+// ehRotaAtiva, para o estado "active" de cada item.
+const ROTAS_CONFIGURACOES = ["/usuarios", "/perfil-acesso", "/aparencia"];
+
+// "/" só é ativo em si mesmo (senão toda rota "ativaria" o Início); as
+// demais casam exato ou com separador de sub-rota (ex. /usuarios/123), nunca
+// por prefixo puro — senão uma rota futura como /usuarios-arquivados também
+// acenderia o item "Usuários".
+function ehRotaAtiva(pathname: string, href: string) {
+  return href === "/"
+    ? pathname === "/"
+    : pathname === href || pathname.startsWith(href + "/");
+}
+
 // Navegação portada de Mockup.html (#view-app .sidebar, AD-4). "Contas" foi
 // deliberadamente omitido: é área segregada do operador de plataforma
 // (AD-13), nunca visível para o Administrador de uma conta-cliente, e sua
@@ -20,14 +35,20 @@ function ChevIcon() {
 export function Sidebar() {
   const pathname = usePathname();
   const [cadastrosAberto, setCadastrosAberto] = useState(true);
-  const [configAberto, setConfigAberto] = useState(false);
+  // Configurações nasce fechado por padrão, mas abre automaticamente quando
+  // a rota atual é um de seus itens (ex. /usuarios) — antes desta story
+  // nenhuma rota real existia sob Configurações, então isso nunca era
+  // observável.
+  const [configAberto, setConfigAberto] = useState(() =>
+    ROTAS_CONFIGURACOES.some((rota) => ehRotaAtiva(pathname, rota)),
+  );
 
   return (
     <div className="sidebar">
       <div className="side-group">
         <Link
           href="/"
-          className={`side-item nav-item${pathname === "/" ? " active" : ""}`}
+          className={`side-item nav-item${ehRotaAtiva(pathname, "/") ? " active" : ""}`}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 11l9-8 9 8" />
@@ -54,15 +75,18 @@ export function Sidebar() {
           <ChevIcon />
         </button>
         <div className={`side-sub${cadastrosAberto ? "" : " hidden"}`}>
-          <Link href="/ativos" className="side-item nav-item">Ativos</Link>
-          <Link href="/tipos" className="side-item nav-item">Tipos</Link>
-          <Link href="/itens-revisionais" className="side-item nav-item">Itens revisionais</Link>
-          <Link href="/planos-revisionais" className="side-item nav-item">Planos revisionais</Link>
+          <Link href="/ativos" className={`side-item nav-item${ehRotaAtiva(pathname, "/ativos") ? " active" : ""}`}>Ativos</Link>
+          <Link href="/tipos" className={`side-item nav-item${ehRotaAtiva(pathname, "/tipos") ? " active" : ""}`}>Tipos</Link>
+          <Link href="/itens-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/itens-revisionais") ? " active" : ""}`}>Itens revisionais</Link>
+          <Link href="/planos-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/planos-revisionais") ? " active" : ""}`}>Planos revisionais</Link>
         </div>
       </div>
 
       <div className="side-group">
-        <Link href="/emissao" className="side-item nav-item">
+        <Link
+          href="/emissao"
+          className={`side-item nav-item${ehRotaAtiva(pathname, "/emissao") ? " active" : ""}`}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 2L11 13" />
             <path d="M22 2l-7 20-4-9-9-4 20-7z" />
@@ -86,9 +110,9 @@ export function Sidebar() {
           <ChevIcon />
         </button>
         <div className={`side-sub${configAberto ? "" : " hidden"}`}>
-          <Link href="/usuarios" className="side-item nav-item">Usuários</Link>
-          <Link href="/perfil-acesso" className="side-item nav-item">Perfil de acesso</Link>
-          <Link href="/aparencia" className="side-item nav-item">Aparência</Link>
+          <Link href="/usuarios" className={`side-item nav-item${ehRotaAtiva(pathname, "/usuarios") ? " active" : ""}`}>Usuários</Link>
+          <Link href="/perfil-acesso" className={`side-item nav-item${ehRotaAtiva(pathname, "/perfil-acesso") ? " active" : ""}`}>Perfil de acesso</Link>
+          <Link href="/aparencia" className={`side-item nav-item${ehRotaAtiva(pathname, "/aparencia") ? " active" : ""}`}>Aparência</Link>
         </div>
       </div>
     </div>

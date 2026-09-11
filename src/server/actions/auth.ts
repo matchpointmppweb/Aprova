@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
+  ativarUsuarioConvidado,
   buscarUsuarioAutenticado,
   registrarUltimoAcesso,
 } from "@/src/server/repositories/usuario";
@@ -39,15 +40,39 @@ export async function entrarAction(
 
   // Usuario.status/Conta.status não são checados pelo Better Auth — um
   // usuário Inativo ou uma conta com pagamento pendente não autentica,
-  // mesmo com senha correta. A sessão já foi criada em signInEmail, então
-  // revogamos antes de recusar.
+  // mesmo com senha correta. Um usuário ConvitePendente autentica
+  // normalmente (só chega aqui se já definiu senha via link de convite —
+  // signInEmail já validou a senha acima) e é promovido a Ativo abaixo. A
+  // sessão já foi criada em signInEmail, então revogamos antes de recusar.
   const usuario = await buscarUsuarioAutenticado(
     usuarioSessao.id,
     usuarioSessao.contaId,
   );
-  if (!usuario || usuario.status !== "Ativo" || usuario.conta.status !== "Ativa") {
+  const statusPermiteLogin =
+    usuario?.status === "Ativo" || usuario?.status === "ConvitePendente";
+  if (!usuario || !statusPermiteLogin || usuario.conta.status !== "Ativa") {
     await auth.api.signOut({ headers: await headers() }).catch(() => {});
     return { ok: false, error: ERRO_CREDENCIAIS_INVALIDAS };
+  }
+
+  // Given um usuário com status "Convite pendente" que já definiu sua senha
+  // via link, when faz login pela primeira vez -> status muda para "Ativo"
+  // automaticamente (I/O Matrix desta story). Se a promoção falhar, não
+  // redireciona para "/" — o guard de app/(dashboard)/layout.tsx exige
+  // status "Ativo" e mandaria o usuário de volta para /login sem explicação
+  // nenhuma. Melhor devolver um erro claro aqui e desfazer a sessão recém
+  // criada.
+  if (usuario.status === "ConvitePendente") {
+    try {
+      await ativarUsuarioConvidado(usuario.id, usuario.contaId);
+    } catch {
+      await auth.api.signOut({ headers: await headers() }).catch(() => {});
+      return {
+        ok: false,
+        error:
+          "Não foi possível concluir seu primeiro acesso. Tente novamente.",
+      };
+    }
   }
 
   // Falha ao registrar o último acesso não deve barrar o login.

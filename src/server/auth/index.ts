@@ -5,7 +5,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 
 import { prisma } from "@/src/server/repositories/db";
-import { logarLinkDeResetDeSenha } from "./email";
+import { logarLinkDeDefinicaoDeSenha } from "./email";
 
 /**
  * Better Auth — credentials (e-mail/senha), sessão em banco (revogável,
@@ -56,8 +56,10 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       // Modo desenvolvimento (decisão confirmada para esta story): loga o
       // link no console/terminal em vez de enviar via Resend. A integração
-      // real do Resend é uma história/tarefa futura.
-      await logarLinkDeResetDeSenha(user.email, url);
+      // real do Resend é uma história/tarefa futura. Este mesmo callback é
+      // acionado tanto por "esqueci minha senha" quanto pelo convite de
+      // usuário (Story 1.2, via auth.api.requestPasswordReset).
+      await logarLinkDeDefinicaoDeSenha(user.email, url);
     },
   },
   plugins: [
