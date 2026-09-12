@@ -60,6 +60,17 @@ enum StatusItemRevisional {
   Arquivado
 }
 
+/// Status de PlanoRevisional (Story 3.2) — mesmo padrão de
+/// StatusItemRevisional: "excluir" nunca é DELETE físico (AD-10), é
+/// atualizarPlano(...,{status:"Arquivado"}) pela mesma função de repositório
+/// usada pela edição comum. Este é o único status persistido do plano — "No
+/// prazo"/"Vence em breve" NUNCA são persistidos, sempre computados on-read
+/// por resolverAtivosDoPlano (AD-8, Boundaries da story).
+enum StatusPlanoRevisional {
+  Ativo
+  Arquivado
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -94,11 +105,12 @@ model Conta {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  usuarios         Usuario[]
-  perfisAcesso     PerfilAcesso[]
-  tiposDeAtivo     TipoAtivo[]
-  ativos           Ativo[]
-  itensRevisionais ItemRevisional[]
+  usuarios          Usuario[]
+  perfisAcesso      PerfilAcesso[]
+  tiposDeAtivo      TipoAtivo[]
+  ativos            Ativo[]
+  itensRevisionais  ItemRevisional[]
+  planosRevisionais PlanoRevisional[]
 
   @@map("contas")
 }
@@ -134,6 +146,8 @@ model Usuario {
 
   sessions Session[]
   accounts Account[]
+
+  planosComoResponsavel PlanoRevisional[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -254,6 +268,7 @@ model TipoAtivo {
   updatedAt DateTime @updatedAt
 
   ativos Ativo[]
+  planos PlanoRevisional[]
 
   @@unique([contaId, nome])
   @@map("tipos_de_ativo")
@@ -275,7 +290,7 @@ model Ativo {
 
   nome        String
   tipoAtivoId String
-  tipoAtivo   TipoAtivo @relation(fields: [tipoAtivoId], references: [id])
+  tipoAtivo   TipoAtivo   @relation(fields: [tipoAtivoId], references: [id])
   localizacao String
   /// Opcional (Boundaries) — exibido no sub-text da coluna "Ativo" da
   /// listagem quando preenchido.
@@ -287,6 +302,8 @@ model Ativo {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  planos PlanoRevisional[]
 
   @@unique([contaId, codigo])
   @@index([tipoAtivoId])
@@ -324,6 +341,87 @@ model ItemRevisional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  planoItens PlanoItemRevisional[]
+
   @@unique([contaId, nome])
   @@map("itens_revisionais")
+}
+
+// ---------------------------------------------------------------------------
+// PlanoRevisional / PlanoItemRevisional (Story 3.2) — regra de periodicidade
+// de revisão vinculada a UM Ativo OU UM Tipo de ativo (XOR validado na Server
+// Action, o banco só garante a nulidade individual de cada FK), com os itens
+// revisionais selecionados que compõem o plano. Sem exclusão física
+// (AD-10): "excluir" é só mudar `status` para Arquivado, pela mesma função
+// de repositório usada pela edição comum (atualizarPlano). Criação/edição de
+// plano+itens é sempre uma única prisma.$transaction (AD-9), com lock
+// otimista via `updatedAt` esperado na edição.
+//
+// "No prazo"/"Vence em breve" e a "próxima revisão" NUNCA são colunas
+// persistidas aqui — sempre computadas on-read por
+// resolverAtivosDoPlano(contaId, planoId?) em
+// src/server/repositories/plano.ts (AD-8), a única função que expande um
+// plano-por-tipo para os ativos daquele tipo.
+// ---------------------------------------------------------------------------
+
+model PlanoRevisional {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nome String
+
+  /// Vínculo XOR com tipoAtivoId: exatamente um dos dois é não-nulo, nunca
+  /// os dois, nunca nenhum — validado na Server Action (Boundaries).
+  ativoId String?
+  ativo   Ativo?  @relation(fields: [ativoId], references: [id])
+
+  /// Vínculo XOR com ativoId — plano-por-tipo cobre todos os Ativo daquele
+  /// tipoAtivoId, expandido em tempo de leitura por resolverAtivosDoPlano
+  /// (AD-8), nunca persistido como uma linha por ativo.
+  tipoAtivoId String?
+  tipoAtivo   TipoAtivo? @relation(fields: [tipoAtivoId], references: [id])
+
+  responsavelId String
+  responsavel   Usuario @relation(fields: [responsavelId], references: [id])
+
+  status StatusPlanoRevisional @default(Ativo)
+
+  itens PlanoItemRevisional[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, nome])
+  @@index([ativoId])
+  @@index([tipoAtivoId])
+  @@index([responsavelId])
+  @@map("planos_revisionais")
+}
+
+// Linha de junção plano<->item revisional selecionado, com valores de
+// sobrescrita opcionais por controle. Uma linha só pode sobrescrever
+// (diasOverride/kmOverride/horasOverride) um controle que o próprio
+// ItemRevisional já tem selecionado (não-nulo) — validado na Server Action
+// contra o item real, nunca imposto pelo banco. onDelete: Cascade é só o que
+// permite as linhas de item sumirem se o plano pai for removido — o plano
+// pai em si nunca é DELETE físico (AD-10), então isso nunca dispara na
+// prática.
+model PlanoItemRevisional {
+  id      String          @id @default(cuid())
+  planoId String
+  plano   PlanoRevisional @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  itemRevisionalId String
+  itemRevisional   ItemRevisional @relation(fields: [itemRevisionalId], references: [id])
+
+  /// Sobrescreve ItemRevisional.diasPadrao só para este plano, se não-nulo.
+  diasOverride  Int?
+  /// Sobrescreve ItemRevisional.kmPadrao só para este plano, se não-nulo.
+  kmOverride    Int?
+  /// Sobrescreve ItemRevisional.horasPadrao só para este plano, se não-nulo.
+  horasOverride Int?
+
+  @@unique([planoId, itemRevisionalId])
+  @@map("plano_itens_revisionais")
 }
