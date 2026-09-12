@@ -3,8 +3,21 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { criarEmissaoAction, editarEmissaoAction } from "@/src/server/actions/emissao";
-import { estadoInicialAcaoEmissao, mensagemDeErro } from "@/src/server/actions/emissao-estado";
+import { StatusBadge } from "@/src/components/shared/status-badge";
+import {
+  aprovarEmissaoAction,
+  criarEmissaoAction,
+  editarEmissaoAction,
+  enviarParaAnaliseAction,
+  reenviarEmissaoAction,
+  reprovarEmissaoAction,
+} from "@/src/server/actions/emissao";
+import {
+  estadoInicialAcaoEmissao,
+  mensagemDeErro,
+  type EstadoAcaoEmissao,
+} from "@/src/server/actions/emissao-estado";
+import { BADGE_POR_STATUS } from "./tipos";
 import type {
   AtivoOpcao,
   EmissaoListagem,
@@ -27,6 +40,221 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar emissão"}
       </button>
+    </div>
+  );
+}
+
+// useFormStatus só funciona num componente descendente do <form> que a
+// action pertence — mesmo motivo de Acoes acima e de BotaoExcluirSubmit em
+// tabela-planos.tsx.
+function SubmitTransicao({
+  label,
+  pendingLabel,
+  variante,
+}: {
+  label: string;
+  pendingLabel: string;
+  variante: "btn-primary" | "btn-ghost" | "btn-subtle";
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <button className={`btn ${variante}`} type="submit" disabled={pending}>
+      {pending ? pendingLabel : label}
+    </button>
+  );
+}
+
+// Um form isolado por transição (Code Map) — mesmo padrão de BotaoExcluir/
+// BotaoExcluirSubmit em tabela-planos.tsx: useActionState próprio (nunca
+// compartilha o `estado`/formAction do form principal de Salvar), só com
+// emissaoId+updatedAt como payload. Ação bem-sucedida chama onSucesso (fecha
+// o modal e revalida), igual ao form principal.
+function BotaoTransicao({
+  acao,
+  emissao,
+  label,
+  pendingLabel,
+  variante,
+  onSucesso,
+}: {
+  acao: (estadoAnterior: EstadoAcaoEmissao, formData: FormData) => Promise<EstadoAcaoEmissao>;
+  emissao: EmissaoListagem;
+  label: string;
+  pendingLabel: string;
+  variante: "btn-primary" | "btn-ghost" | "btn-subtle";
+  onSucesso: () => void;
+}) {
+  const [estado, formAction] = useActionState(acao, estadoInicialAcaoEmissao);
+
+  useEffect(() => {
+    if (estado.ok) {
+      onSucesso();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado]);
+
+  const erro = mensagemDeErro(estado.error);
+
+  return (
+    <form action={formAction} style={{ display: "inline-block" }}>
+      <input type="hidden" name="emissaoId" value={emissao.id} />
+      <input type="hidden" name="updatedAt" value={emissao.updatedAt.toISOString()} />
+      <SubmitTransicao label={label} pendingLabel={pendingLabel} variante={variante} />
+      {erro ? (
+        <div className="form-error" style={{ marginTop: 8, marginBottom: 0 }}>
+          {erro}
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
+// useFormStatus só funciona num componente descendente do <form> — mesmo
+// motivo de SubmitTransicao acima. Usado pelo Cancelar de FormReprovar, que
+// (diferente do Cancelar de Acoes, dentro do mesmo <form> que o Salvar) fica
+// no MESMO form que o botão de Confirmar reprovação, então também precisa
+// desabilitar enquanto a reprovação está em voo.
+function CancelarTransicao({ onCancelar }: { onCancelar: () => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <button className="btn btn-ghost" type="button" onClick={onCancelar} disabled={pending}>
+      Cancelar
+    </button>
+  );
+}
+
+// Textarea revelado no cliente (toggle local) em vez de window.prompt() —
+// Design Notes: o app nunca usou prompt nativo (só confirm() para exclusão),
+// um textarea inline mantém a mesma linguagem visual do resto do produto.
+function FormReprovar({
+  emissao,
+  onSucesso,
+  onCancelar,
+}: {
+  emissao: EmissaoListagem;
+  onSucesso: () => void;
+  onCancelar: () => void;
+}) {
+  const [estado, formAction] = useActionState(reprovarEmissaoAction, estadoInicialAcaoEmissao);
+
+  useEffect(() => {
+    if (estado.ok) {
+      onSucesso();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado]);
+
+  const erro = mensagemDeErro(estado.error);
+
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="emissaoId" value={emissao.id} />
+      <input type="hidden" name="updatedAt" value={emissao.updatedAt.toISOString()} />
+      <div className="f">
+        <label htmlFor="emissao-motivo-reprovacao">Motivo da reprovação</label>
+        <textarea id="emissao-motivo-reprovacao" name="motivo" rows={3} required />
+      </div>
+      {erro ? <div className="form-error">{erro}</div> : null}
+      <div className="row" style={{ gap: 10, marginTop: 10 }}>
+        <SubmitTransicao label="Confirmar reprovação" pendingLabel="Reprovando..." variante="btn-primary" />
+        <CancelarTransicao onCancelar={onCancelar} />
+      </div>
+    </form>
+  );
+}
+
+// Botões contextuais de EmAnalise (Code Map): Aprovar direto, ou Reprovar
+// que revela o textarea de motivo (FormReprovar) — toggle local, nunca os
+// dois forms montados ao mesmo tempo.
+function AcoesEmAnalise({
+  emissao,
+  onSucesso,
+}: {
+  emissao: EmissaoListagem;
+  onSucesso: () => void;
+}) {
+  const [mostrarReprovar, setMostrarReprovar] = useState(false);
+
+  if (mostrarReprovar) {
+    return (
+      <FormReprovar
+        emissao={emissao}
+        onSucesso={onSucesso}
+        onCancelar={() => setMostrarReprovar(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="row" style={{ gap: 10 }}>
+      <BotaoTransicao
+        acao={aprovarEmissaoAction}
+        emissao={emissao}
+        label="Aprovar"
+        pendingLabel="Aprovando..."
+        variante="btn-primary"
+        onSucesso={onSucesso}
+      />
+      <button className="btn btn-ghost" type="button" onClick={() => setMostrarReprovar(true)}>
+        Reprovar
+      </button>
+    </div>
+  );
+}
+
+// Bloco "Status" da aba Geral (Story 4.2, Code Map): badge do status atual
+// (mesmo mapa de tabela-emissao.tsx, via tipos.ts) + motivoReprovacao visível
+// sempre que preenchido (não só quando Reprovado — depois de um reenvio a
+// emissão já está de volta em EmAnalise, mas o motivo da reprovação anterior
+// continua no banco e é exatamente o que quem está revisando o reenvio quer
+// ver) + botões contextuais por status (Rascunho -> enviar; EmAnalise ->
+// aprovar/reprovar; Reprovado -> reenviar; Emitido -> nenhum, nenhum AC pede
+// bloqueio de itens neste status — Design Notes). Só renderizado em modo
+// edição: uma emissão em criação ainda não tem id/updatedAt persistidos para
+// nenhuma transição operar sobre.
+function BlocoStatus({
+  emissao,
+  onSucesso,
+}: {
+  emissao: EmissaoListagem;
+  onSucesso: () => void;
+}) {
+  const badge = BADGE_POR_STATUS[emissao.status];
+
+  return (
+    <div className="status-block" style={{ marginBottom: 20 }}>
+      <div className="form-row-label">Status</div>
+      <div className="row" style={{ gap: 10, marginBottom: 10 }}>
+        <StatusBadge tom={badge.tom} label={badge.label} />
+      </div>
+      {emissao.motivoReprovacao ? (
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 12px" }}>
+          Motivo da última reprovação: {emissao.motivoReprovacao}
+        </p>
+      ) : null}
+      {emissao.status === "Rascunho" ? (
+        <BotaoTransicao
+          acao={enviarParaAnaliseAction}
+          emissao={emissao}
+          label="Enviar para análise"
+          pendingLabel="Enviando..."
+          variante="btn-subtle"
+          onSucesso={onSucesso}
+        />
+      ) : null}
+      {emissao.status === "EmAnalise" ? (
+        <AcoesEmAnalise emissao={emissao} onSucesso={onSucesso} />
+      ) : null}
+      {emissao.status === "Reprovado" ? (
+        <BotaoTransicao
+          acao={reenviarEmissaoAction}
+          emissao={emissao}
+          label="Reenviar para análise"
+          pendingLabel="Reenviando..."
+          variante="btn-subtle"
+          onSucesso={onSucesso}
+        />
+      ) : null}
     </div>
   );
 }
@@ -341,6 +569,25 @@ export function ModalEmissao({
         {erro ? (
           <div className="form-error" style={{ margin: "16px 24px 0" }}>
             {erro}
+          </div>
+        ) : null}
+
+        {emissao ? (
+          // Fora do <form> de Salvar (abaixo): cada transição é um form
+          // isolado (Code Map) e HTML não permite <form> aninhado — mesmo
+          // motivo pelo qual este bloco não pode viver dentro do
+          // modal-tab-panel "geral", que é descendente do form principal.
+          // Visibilidade por classe ".hidden" (mesmo padrão dos outros
+          // modal-tab-panel), NUNCA um `aba === "geral" ? ... : null` que
+          // desmonta o componente: uma transição em voo tem seu próprio
+          // useActionState/useEffect (BotaoTransicao/FormReprovar) que só
+          // dispara onSucesso quando o estado resolve — se o usuário troca
+          // de aba enquanto a Server Action ainda está pendente, desmontar
+          // perderia esse efeito mesmo com a mutação já concluída no
+          // servidor (revalidatePath já rodou), deixando o modal com estado
+          // visualmente desatualizado.
+          <div className={`modal-tab-panel${aba === "geral" ? "" : " hidden"}`} style={{ padding: "16px 24px 0" }}>
+            <BlocoStatus emissao={emissao} onSucesso={onSucesso} />
           </div>
         ) : null}
 

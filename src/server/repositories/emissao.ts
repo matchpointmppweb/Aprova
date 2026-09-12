@@ -261,3 +261,55 @@ export async function atualizarEmissao(
     throw erro;
   }
 }
+
+export type ResultadoAtualizarStatusEmissao =
+  | { ok: true }
+  | { ok: false; motivo: "nao-encontrado" | "conflito" | "status-invalido" };
+
+// Transição pontual de status (Story 4.2: enviar/aprovar/reprovar/reenviar)
+// — updateMany escopado por {id, contaId, updatedAt: esperado, status:
+// origemEsperada} (AD-1 + lock otimista AD-9 + validação do estado de
+// origem esperado na MESMA cláusula where). Sem transação composta aqui
+// (Code Map): nenhuma linha de item é tocada por nenhuma das 4 transições.
+// 0 linhas afetadas não distingue por si só o motivo — reconsulta fora da
+// atualização abortada (mesmo padrão de atualizarEmissao) para decidir entre
+// três motivos: "não encontrado" (id de outra conta/inexistente),
+// "status-invalido" (o status atual já não é mais o de origem esperado —
+// ex.: tentou aprovar uma emissão que não está mais EmAnalise) e "conflito"
+// (o status de origem ainda bate, mas o updatedAt mudou por outra edição
+// concorrente, ex. edição de itens). `motivoReprovacao` só é gravado quando
+// informado (reprovarEmissaoAction) — as outras 3 transições não tocam o
+// campo, preservando o histórico da última reprovação (Boundaries/CAP-5).
+export async function atualizarStatusEmissao(
+  contaId: string,
+  id: string,
+  updatedAtEsperado: Date,
+  statusOrigemEsperado: StatusEmissao,
+  novoStatus: StatusEmissao,
+  motivoReprovacao?: string,
+): Promise<ResultadoAtualizarStatusEmissao> {
+  const resultado = await prisma.emissao.updateMany({
+    where: { id, contaId, updatedAt: updatedAtEsperado, status: statusOrigemEsperado },
+    data: {
+      status: novoStatus,
+      ...(motivoReprovacao !== undefined ? { motivoReprovacao } : {}),
+    },
+  });
+
+  if (resultado.count > 0) {
+    return { ok: true };
+  }
+
+  const atual = await prisma.emissao.findFirst({
+    where: { id, contaId },
+    select: { status: true },
+  });
+
+  if (!atual) {
+    return { ok: false, motivo: "nao-encontrado" };
+  }
+  if (atual.status !== statusOrigemEsperado) {
+    return { ok: false, motivo: "status-invalido" };
+  }
+  return { ok: false, motivo: "conflito" };
+}

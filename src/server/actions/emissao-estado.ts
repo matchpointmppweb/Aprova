@@ -21,6 +21,14 @@ export const estadoInicialAcaoEmissao: EstadoAcaoEmissao = { ok: false };
 export const ERRO_CONFLITO_EDICAO =
   "Conflito de edição — os dados foram alterados por outra pessoa. Recarregue e tente de novo.";
 
+// Mensagem exibida quando uma transição de status (Story 4.2) é tentada a
+// partir de um estado de origem que já não é mais o atual (ex.: aprovar uma
+// emissão que não está mais EmAnalise) — distinto de ERRO_CONFLITO_EDICAO
+// (que cobre updatedAt divergente com o status de origem ainda batendo,
+// I/O Matrix: "Transição inválida").
+export const ERRO_TRANSICAO_INVALIDA =
+  "Esta emissão já mudou de status. Recarregue e tente de novo.";
+
 // Achata o erro (string única ou array de erros por campo) numa mensagem
 // exibível na UI, sem expor detalhe interno (Boundaries: erros nunca expõem
 // detalhe de constraint/banco). Mesma função de plano-estado.ts.

@@ -375,7 +375,8 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .modal-grid .f-full{grid-column:1 / -1;}
 .f label{display:block;font-size:12px;font-weight:500;margin-bottom:6px;color:var(--ink-soft);}
-.f input,.f select{width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:var(--radius-s);font-size:13.5px;font-family:inherit;background:var(--white);color:var(--ink);}
+.f input,.f select,.f textarea{width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:var(--radius-s);font-size:13.5px;font-family:inherit;background:var(--white);color:var(--ink);}
+.f textarea{resize:vertical;min-height:72px;}
 .radio-row{display:flex;gap:18px;padding:2px 0 4px;}
 .radio-row label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);font-weight:400;}
 

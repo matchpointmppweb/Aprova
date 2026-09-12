@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 
-import { StatusBadge, type TomBadge } from "@/src/components/shared/status-badge";
+import { StatusBadge } from "@/src/components/shared/status-badge";
 import { ModalEmissao } from "./modal-emissao";
+import { BADGE_POR_STATUS } from "./tipos";
 import type { AtivoOpcao, EmissaoListagem, ItemRevisionalOpcao, PlanoOpcao, UsuarioOpcao } from "./tipos";
 
 type FiltroStatus = "all" | "rascunho" | "em-analise" | "emitido" | "reprovado";
-
-const BADGE_POR_STATUS: Record<EmissaoListagem["status"], { tom: TomBadge; label: string }> = {
-  Rascunho: { tom: "neutral", label: "Rascunho" },
-  EmAnalise: { tom: "warn", label: "Em análise" },
-  Emitido: { tom: "ok", label: "Emitido" },
-  Reprovado: { tom: "off", label: "Reprovado" },
-};
 
 const FILTRO_POR_STATUS: Record<Exclude<FiltroStatus, "all">, EmissaoListagem["status"]> = {
   rascunho: "Rascunho",

@@ -1,5 +1,6 @@
 "use server";
 
+import type { StatusEmissao } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { can } from "@/src/server/auth/can";
@@ -7,6 +8,7 @@ import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
 import {
   atualizarEmissao,
+  atualizarStatusEmissao,
   buscarEmissao,
   criarEmissao,
   type DadosEditarEmissao,
@@ -19,7 +21,9 @@ import { listarUsuarios } from "@/src/server/repositories/usuario";
 import {
   calcularValorEsperado,
   ERRO_CONFLITO_EDICAO,
+  ERRO_TRANSICAO_INVALIDA,
   validarCamposGerais,
+  type ErroDeValidacao,
   type EstadoAcaoEmissao,
   type ItemRevisionalReal,
 } from "./emissao-estado";
@@ -74,6 +78,26 @@ function lerCamposGerais(formData: FormData) {
   const dataEmissaoBruta = String(formData.get("dataEmissao") ?? "").trim();
   const dataEmissao = parseDataEmissao(dataEmissaoBruta);
   return { ativoId, planoId, responsavelId, dataEmissao };
+}
+
+// emissaoId + updatedAt são os únicos campos comuns a toda ação que opera
+// sobre uma emissão JÁ EXISTENTE (Code Map) — editarEmissaoAction e as 4
+// transições de status de Story 4.2 leem/validam exatamente o mesmo par de
+// campos ocultos, então vivem numa única função em vez de duplicadas em
+// cada Server Action.
+function lerIdentificacaoEmissao(formData: FormData) {
+  const emissaoId = String(formData.get("emissaoId") ?? "").trim();
+  const updatedAtBruto = String(formData.get("updatedAt") ?? "").trim();
+
+  const erros: ErroDeValidacao[] = [];
+  if (!emissaoId) erros.push({ field: "emissaoId", message: "Emissão inválida." });
+
+  const updatedAtEsperado = updatedAtBruto ? new Date(updatedAtBruto) : null;
+  if (!updatedAtEsperado || Number.isNaN(updatedAtEsperado.getTime())) {
+    erros.push({ field: "updatedAt", message: "Emissão inválida." });
+  }
+
+  return { emissaoId, updatedAtEsperado, erros };
 }
 
 // O <select> de ativo/plano/responsável no formulário já só lista opções da
@@ -244,17 +268,13 @@ export async function editarEmissaoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const emissaoId = String(formData.get("emissaoId") ?? "").trim();
-  const updatedAtBruto = String(formData.get("updatedAt") ?? "").trim();
   const campos = lerCamposGerais(formData);
-
-  const erros = validarCamposGerais(campos);
-  if (!emissaoId) erros.push({ field: "emissaoId", message: "Emissão inválida." });
-
-  const updatedAtEsperado = updatedAtBruto ? new Date(updatedAtBruto) : null;
-  if (!updatedAtEsperado || Number.isNaN(updatedAtEsperado.getTime())) {
-    erros.push({ field: "updatedAt", message: "Emissão inválida." });
-  }
+  const {
+    emissaoId,
+    updatedAtEsperado,
+    erros: errosDeIdentificacao,
+  } = lerIdentificacaoEmissao(formData);
+  const erros = [...validarCamposGerais(campos), ...errosDeIdentificacao];
 
   if (erros.length > 0) {
     return { ok: false, error: erros };
@@ -264,6 +284,16 @@ export async function editarEmissaoAction(
   if (!emissaoAtual) {
     // Emissão não encontrada nesta conta (AD-1) — nunca expõe detalhe.
     return { ok: false, error: ERRO_GENERICO };
+  }
+
+  // Story 4.2: correção de itens/campos gerais só é permitida com a emissão
+  // em Rascunho (antes de enviar para análise) ou Reprovado (correção
+  // pós-reprovação, antes de reenviar) — os 2 únicos estados editáveis do
+  // fluxo de aprovação. Sem este guard, uma emissão EmAnalise ou já Emitida
+  // continuaria livremente editável por baixo do workflow de status
+  // introduzido por esta story.
+  if (emissaoAtual.status !== "Rascunho" && emissaoAtual.status !== "Reprovado") {
+    return { ok: false, error: ERRO_TRANSICAO_INVALIDA };
   }
 
   const { erros: errosDeReferencia, plano: planoSelecionado } = await referenciasValidas(
@@ -320,4 +350,113 @@ export async function editarEmissaoAction(
 
   revalidatePath("/emissao");
   return { ok: true };
+}
+
+// Miolo comum às 4 transições pontuais de status (Story 4.2) — cada action
+// exportada abaixo só fixa a origem/destino esperados (e, na reprovação,
+// exige o motivo). Não é o "único Server Action dispatcher" vetado pelo
+// Boundaries: o cliente nunca escolhe a transição por parâmetro, cada botão
+// da UI chama uma das 4 funções exportadas, que aqui só compartilham a
+// sequência idêntica exigirUsuarioAutenticado -> can(editar,'emissao') ->
+// ler emissaoId/updatedAt(+motivo) -> atualizarStatusEmissao -> mapear
+// motivo de falha (Code Map).
+async function executarTransicaoStatus(
+  formData: FormData,
+  statusOrigemEsperado: StatusEmissao,
+  novoStatus: StatusEmissao,
+  opcoes?: { exigirMotivo?: boolean },
+): Promise<EstadoAcaoEmissao> {
+  const usuarioSessao = await exigirUsuarioAutenticado();
+
+  // A matriz de perfis não distingue 'aprovar'/'reprovar'/'enviar'/
+  // 'reenviar' de 'editar' (Boundaries) — mesmo gate único de
+  // editarEmissaoAction, chamado antes de qualquer leitura de campo (AD-2).
+  const autorizado = await can(usuarioSessao, "editar", "emissao");
+  if (!autorizado) {
+    return { ok: false, error: ERRO_SEM_PERMISSAO };
+  }
+
+  const { emissaoId, updatedAtEsperado, erros } = lerIdentificacaoEmissao(formData);
+
+  let motivo: string | undefined;
+  if (opcoes?.exigirMotivo) {
+    motivo = String(formData.get("motivo") ?? "").trim();
+    if (!motivo) {
+      erros.push({ field: "motivo", message: "Informe o motivo da reprovação." });
+    }
+  }
+
+  if (erros.length > 0) {
+    return { ok: false, error: erros };
+  }
+
+  try {
+    const resultado = await atualizarStatusEmissao(
+      usuarioSessao.contaId,
+      emissaoId,
+      updatedAtEsperado as Date,
+      statusOrigemEsperado,
+      novoStatus,
+      motivo,
+    );
+
+    if (!resultado.ok) {
+      if (resultado.motivo === "conflito") {
+        return { ok: false, error: ERRO_CONFLITO_EDICAO };
+      }
+      if (resultado.motivo === "status-invalido") {
+        return { ok: false, error: ERRO_TRANSICAO_INVALIDA };
+      }
+      // Emissão não encontrada nesta conta (AD-1) — nunca expõe detalhe.
+      return { ok: false, error: ERRO_GENERICO };
+    }
+  } catch {
+    return { ok: false, error: ERRO_GENERICO };
+  }
+
+  revalidatePath("/emissao");
+  return { ok: true };
+}
+
+// Given emissão em Rascunho e can(editar,'emissao'), when enviada para
+// análise -> status vira EmAnalise. Origem fixa (Rascunho): tentar enviar
+// uma emissão que já não está mais em Rascunho cai em "status-invalido"
+// (ERRO_TRANSICAO_INVALIDA), nada muda (I/O Matrix).
+export async function enviarParaAnaliseAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  return executarTransicaoStatus(formData, "Rascunho", "EmAnalise");
+}
+
+// Given emissão em EmAnalise e can(editar,'emissao'), when aprovada ->
+// status vira Emitido (I/O Matrix).
+export async function aprovarEmissaoAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  return executarTransicaoStatus(formData, "EmAnalise", "Emitido");
+}
+
+// Given emissão em EmAnalise, motivo não-vazio e can(editar,'emissao'), when
+// reprovada -> status vira Reprovado e motivoReprovacao é gravado (I/O
+// Matrix). Motivo vazio -> erro de validação de campo antes de qualquer
+// leitura no banco, nada muda.
+export async function reprovarEmissaoAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  return executarTransicaoStatus(formData, "EmAnalise", "Reprovado", { exigirMotivo: true });
+}
+
+// Given emissão Reprovada e can(editar,'emissao'), when reenviada -> status
+// volta a EmAnalise na MESMA emissão; `motivoReprovacao` nunca é limpo aqui
+// (atualizarStatusEmissao só grava o campo quando `motivoReprovacao` é
+// passado, e esta transição nunca passa — Boundaries/CAP-5: o histórico da
+// reprovação anterior fica visível até uma reprovação futura o sobrescrever).
+export async function reenviarEmissaoAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  return executarTransicaoStatus(formData, "Reprovado", "EmAnalise");
 }

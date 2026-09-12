@@ -1,5 +1,7 @@
 import type { StatusAtivo, StatusEmissao, StatusItemRevisional, StatusPlanoRevisional } from "@prisma/client";
 
+import type { TomBadge } from "@/src/components/shared/status-badge";
+
 // Forma mínima usada pela tabela/modal de Emissão — estruturalmente
 // compatível com o retorno de listarEmissoes()/buscarEmissao() (server/
 // repositories/emissao.ts), sem acoplar os componentes client ao tipo
@@ -32,9 +34,25 @@ export interface EmissaoListagem {
   responsavel: { id: string; nome: string };
   dataEmissao: Date;
   status: StatusEmissao;
+  // Preenchido só a partir de uma reprovação (Story 4.2); continua null
+  // para emissões que nunca foram reprovadas. Sobrevive a um reenvio
+  // (voltar a EmAnalise) — só uma nova reprovação futura o sobrescreve.
+  motivoReprovacao: string | null;
   itens: ItemExecutadoListagem[];
   updatedAt: Date;
 }
+
+// Badge de status da Emissão (Story 4.1: tabela; Story 4.2: reusado também
+// no bloco Status do ModalEmissao — Code Map, "reusar StatusBadge/mapa de
+// tabela-emissao.tsx"). Vive em tipos.ts (em vez de em tabela-emissao.tsx,
+// que importa ModalEmissao) para as duas telas reusarem a mesma constante
+// sem criar um import circular entre tabela-emissao.tsx e modal-emissao.tsx.
+export const BADGE_POR_STATUS: Record<StatusEmissao, { tom: TomBadge; label: string }> = {
+  Rascunho: { tom: "neutral", label: "Rascunho" },
+  EmAnalise: { tom: "warn", label: "Em análise" },
+  Emitido: { tom: "ok", label: "Emitido" },
+  Reprovado: { tom: "off", label: "Reprovado" },
+};
 
 export interface AtivoOpcao {
   id: string;
