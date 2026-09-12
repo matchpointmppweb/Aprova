@@ -1,0 +1,323 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { can } from "@/src/server/auth/can";
+import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
+import { listarAtivos } from "@/src/server/repositories/ativo";
+import {
+  atualizarEmissao,
+  buscarEmissao,
+  criarEmissao,
+  type DadosEditarEmissao,
+  type DadosItemExecutadoExistente,
+  type DadosItemExecutadoNovo,
+} from "@/src/server/repositories/emissao";
+import { listarItensRevisionais } from "@/src/server/repositories/item-revisional";
+import { buscarPlano } from "@/src/server/repositories/plano";
+import { listarUsuarios } from "@/src/server/repositories/usuario";
+import {
+  calcularValorEsperado,
+  ERRO_CONFLITO_EDICAO,
+  validarCamposGerais,
+  type EstadoAcaoEmissao,
+  type ItemRevisionalReal,
+} from "./emissao-estado";
+
+const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
+// Nunca expõe detalhe de constraint/banco (Boundaries) — inclusive uma
+// eventual colisão de código sob concorrência que tenha esgotado as
+// tentativas de retry (I/O Matrix: "falha genérica após esgotar").
+const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
+
+// Campo numérico opcional (usado só para os campos de medição
+// itemMedicaoDias/Km/Horas): string vazia/ausente -> null; valor inválido
+// (NaN/decimal) também vira null. Mesmo padrão de lerCampoNumerico em
+// actions/plano.ts — um input `disabled` (item não marcado como executado)
+// nunca é enviado pelo browser, então cai neste mesmo caminho de null.
+// Negativo também vira null: o `min={0}` do input é só client-side (Boundaries
+// nunca confia em validação do cliente), e 0 é uma medição válida (ex.: item
+// recém-trocado lido em 0km), só valor abaixo de zero não faz sentido para
+// nenhum dos três controles.
+function lerCampoNumerico(formData: FormData, nome: string): number | null {
+  const bruto = String(formData.get(nome) ?? "").trim();
+  if (!bruto) return null;
+  const valor = Number(bruto);
+  return Number.isFinite(valor) && Number.isInteger(valor) && valor >= 0 ? valor : null;
+}
+
+// Input type="date" manda "YYYY-MM-DD" — fixa meia-noite local (evita o
+// shift de fuso horário que "YYYY-MM-DDT00:00:00Z" causaria em fusos
+// negativos, empurrando a data um dia para trás). `new Date(...)` sozinho
+// não rejeita um dia de calendário inexistente (ex. "2024-02-30" normaliza
+// silenciosamente para 1º de março) — confirma aqui que ano/mês/dia do
+// resultado batem com os componentes originais da string; se não bater,
+// trata como data ausente (mesmo erro de validação de "Informe a data de
+// emissão").
+function parseDataEmissao(bruto: string): Date | null {
+  if (!bruto) return null;
+  const data = new Date(`${bruto}T00:00:00`);
+  if (Number.isNaN(data.getTime())) return null;
+
+  const [anoStr, mesStr, diaStr] = bruto.split("-");
+  const bateComOriginal =
+    data.getFullYear() === Number(anoStr) &&
+    data.getMonth() + 1 === Number(mesStr) &&
+    data.getDate() === Number(diaStr);
+  return bateComOriginal ? data : null;
+}
+
+function lerCamposGerais(formData: FormData) {
+  const ativoId = String(formData.get("ativoId") ?? "").trim();
+  const planoId = String(formData.get("planoId") ?? "").trim();
+  const responsavelId = String(formData.get("responsavelId") ?? "").trim();
+  const dataEmissaoBruta = String(formData.get("dataEmissao") ?? "").trim();
+  const dataEmissao = parseDataEmissao(dataEmissaoBruta);
+  return { ativoId, planoId, responsavelId, dataEmissao };
+}
+
+// O <select> de ativo/plano/responsável no formulário já só lista opções da
+// própria conta, mas a Server Action é o guard real (AD-1) — nunca confia
+// num id vindo do cliente sem checar contra os dados reais da conta (I/O
+// Matrix: "Ativo/Plano de outra conta" -> erro de validação de campo). Mesmo
+// padrão de vinculoEResponsavelValidos em actions/plano.ts.
+async function referenciasValidas(
+  contaId: string,
+  campos: { ativoId: string; planoId: string; responsavelId: string },
+) {
+  const [ativos, plano, usuarios] = await Promise.all([
+    listarAtivos(contaId),
+    buscarPlano(contaId, campos.planoId),
+    listarUsuarios(contaId),
+  ]);
+
+  const erros: { field: string; message: string }[] = [];
+  if (campos.ativoId && !ativos.some((ativo) => ativo.id === campos.ativoId)) {
+    erros.push({ field: "ativoId", message: "Selecione um ativo válido." });
+  }
+  if (campos.planoId && !plano) {
+    erros.push({ field: "planoId", message: "Selecione um plano revisional válido." });
+  }
+  if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
+    erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
+  }
+  return { erros, plano };
+}
+
+async function buscarItensReaisPorId(contaId: string) {
+  const itens = await listarItensRevisionais(contaId);
+  const mapa = new Map<string, ItemRevisionalReal>();
+  for (const item of itens) {
+    mapa.set(item.id, {
+      id: item.id,
+      nome: item.nome,
+      diasPadrao: item.diasPadrao,
+      kmPadrao: item.kmPadrao,
+      horasPadrao: item.horasPadrao,
+    });
+  }
+  return mapa;
+}
+
+// Monta o snapshot de itens executados a partir dos itens ATUAIS do plano
+// (Intent: "lista de itens executados espelhando os itens do plano no
+// momento da criação") — uma linha por item do plano, nunca um subconjunto
+// escolhido no cliente (checklist fixo, Code Map). Usado na criação e na
+// troca de plano da edição (Boundaries).
+function montarItensNovos(
+  itensDoPlano: { itemRevisionalId: string; diasOverride: number | null; kmOverride: number | null; horasOverride: number | null }[],
+  itensReaisPorId: Map<string, ItemRevisionalReal>,
+  formData: FormData,
+): DadosItemExecutadoNovo[] {
+  return itensDoPlano.map((itemDoPlano) => {
+    const id = itemDoPlano.itemRevisionalId;
+    const itemReal = itensReaisPorId.get(id);
+    const valorEsperado = calcularValorEsperado(itemDoPlano, itemReal);
+    return {
+      itemRevisionalId: id,
+      executado: Boolean(formData.get(`itemExecutado-${id}`)),
+      ...valorEsperado,
+      medicaoDias: lerCampoNumerico(formData, `itemMedicaoDias-${id}`),
+      medicaoKm: lerCampoNumerico(formData, `itemMedicaoKm-${id}`),
+      medicaoHoras: lerCampoNumerico(formData, `itemMedicaoHoras-${id}`),
+      observacao: String(formData.get(`itemObs-${id}`) ?? "").trim() || null,
+    };
+  });
+}
+
+// Atualiza as linhas EXISTENTES da emissão (Boundaries: edição sem trocar o
+// plano nunca é delete+recreate) — itera sobre os itens já persistidos da
+// própria emissão (nunca sobre o plano, que pode ter mudado de itens desde a
+// criação), preservando o progresso já registrado. valorEsperado* nunca é
+// lido/reenviado aqui — é o snapshot imutável, o repositório nunca o toca
+// neste fluxo.
+function montarItensExistentes(
+  itensDaEmissao: { itemRevisionalId: string }[],
+  formData: FormData,
+): DadosItemExecutadoExistente[] {
+  return itensDaEmissao.map((item) => {
+    const id = item.itemRevisionalId;
+    return {
+      itemRevisionalId: id,
+      executado: Boolean(formData.get(`itemExecutado-${id}`)),
+      medicaoDias: lerCampoNumerico(formData, `itemMedicaoDias-${id}`),
+      medicaoKm: lerCampoNumerico(formData, `itemMedicaoKm-${id}`),
+      medicaoHoras: lerCampoNumerico(formData, `itemMedicaoHoras-${id}`),
+      observacao: String(formData.get(`itemObs-${id}`) ?? "").trim() || null,
+    };
+  });
+}
+
+// Given usuário autenticado com can(criar,'emissao') e ativo/plano/
+// responsável/data válidos da própria conta, when cria uma emissão -> ela
+// nasce em Rascunho com código "EM-{ano}-{seq}" único (retry-on-P2002 em
+// criarEmissao) e os itens executados espelham os itens atuais do plano
+// escolhido, cada um com snapshot do valor esperado, gravados numa única
+// transação junto com a emissão (AD-9, I/O Matrix).
+export async function criarEmissaoAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  const usuarioSessao = await exigirUsuarioAutenticado();
+
+  // AD-2: can() chamado no servidor antes de qualquer efeito, gate próprio
+  // de 'criar' — nunca reaproveita o resultado de 'editar'.
+  const autorizado = await can(usuarioSessao, "criar", "emissao");
+  if (!autorizado) {
+    return { ok: false, error: ERRO_SEM_PERMISSAO };
+  }
+
+  const campos = lerCamposGerais(formData);
+  const erros = validarCamposGerais(campos);
+  if (erros.length > 0) {
+    return { ok: false, error: erros };
+  }
+
+  const { erros: errosDeReferencia, plano } = await referenciasValidas(
+    usuarioSessao.contaId,
+    campos,
+  );
+  if (errosDeReferencia.length > 0) {
+    return { ok: false, error: errosDeReferencia };
+  }
+  // plano nunca é null aqui: campos.planoId não é vazio (validarCamposGerais
+  // já barrou isso) e referenciasValidas já confirmou que existe na conta.
+  const planoAtual = plano!;
+
+  const itensReaisPorId = await buscarItensReaisPorId(usuarioSessao.contaId);
+  const itens = montarItensNovos(planoAtual.itens, itensReaisPorId, formData);
+
+  try {
+    await criarEmissao(usuarioSessao.contaId, {
+      ativoId: campos.ativoId,
+      planoId: campos.planoId,
+      responsavelId: campos.responsavelId,
+      dataEmissao: campos.dataEmissao as Date,
+      itens,
+    });
+  } catch {
+    return { ok: false, error: ERRO_GENERICO };
+  }
+
+  revalidatePath("/emissao");
+  return { ok: true };
+}
+
+// Given usuário autenticado com can(editar,'emissao') e `updatedAt` que bate
+// com o valor atual da emissão, when edita ativo/plano/responsável/data/
+// itens -> se o plano vinculado NÃO mudou, as linhas de item existentes são
+// atualizadas in-place por itemRevisionalId (progresso preservado); se
+// mudou, as linhas antigas são descartadas e um novo snapshot é gerado a
+// partir dos itens atuais do novo plano (Boundaries, I/O Matrix). Se
+// `updatedAt` enviado não bater (edição concorrente no meio), nada muda e
+// retorna o erro de conflito de lock otimista (AD-9). Um id de emissão de
+// outra conta nunca é encontrado (transação escopada por {id,contaId},
+// AD-1).
+export async function editarEmissaoAction(
+  _estadoAnterior: EstadoAcaoEmissao,
+  formData: FormData,
+): Promise<EstadoAcaoEmissao> {
+  const usuarioSessao = await exigirUsuarioAutenticado();
+
+  const autorizado = await can(usuarioSessao, "editar", "emissao");
+  if (!autorizado) {
+    return { ok: false, error: ERRO_SEM_PERMISSAO };
+  }
+
+  const emissaoId = String(formData.get("emissaoId") ?? "").trim();
+  const updatedAtBruto = String(formData.get("updatedAt") ?? "").trim();
+  const campos = lerCamposGerais(formData);
+
+  const erros = validarCamposGerais(campos);
+  if (!emissaoId) erros.push({ field: "emissaoId", message: "Emissão inválida." });
+
+  const updatedAtEsperado = updatedAtBruto ? new Date(updatedAtBruto) : null;
+  if (!updatedAtEsperado || Number.isNaN(updatedAtEsperado.getTime())) {
+    erros.push({ field: "updatedAt", message: "Emissão inválida." });
+  }
+
+  if (erros.length > 0) {
+    return { ok: false, error: erros };
+  }
+
+  const emissaoAtual = await buscarEmissao(usuarioSessao.contaId, emissaoId);
+  if (!emissaoAtual) {
+    // Emissão não encontrada nesta conta (AD-1) — nunca expõe detalhe.
+    return { ok: false, error: ERRO_GENERICO };
+  }
+
+  const { erros: errosDeReferencia, plano: planoSelecionado } = await referenciasValidas(
+    usuarioSessao.contaId,
+    campos,
+  );
+  if (errosDeReferencia.length > 0) {
+    return { ok: false, error: errosDeReferencia };
+  }
+  const planoAtual = planoSelecionado!;
+
+  const trocouPlano = campos.planoId !== emissaoAtual.planoId;
+
+  let dados: DadosEditarEmissao;
+  if (trocouPlano) {
+    const itensReaisPorId = await buscarItensReaisPorId(usuarioSessao.contaId);
+    dados = {
+      trocouPlano: true,
+      ativoId: campos.ativoId,
+      planoId: campos.planoId,
+      responsavelId: campos.responsavelId,
+      dataEmissao: campos.dataEmissao as Date,
+      itens: montarItensNovos(planoAtual.itens, itensReaisPorId, formData),
+    };
+  } else {
+    dados = {
+      trocouPlano: false,
+      ativoId: campos.ativoId,
+      planoId: campos.planoId,
+      responsavelId: campos.responsavelId,
+      dataEmissao: campos.dataEmissao as Date,
+      itens: montarItensExistentes(emissaoAtual.itens, formData),
+    };
+  }
+
+  try {
+    const resultado = await atualizarEmissao(
+      usuarioSessao.contaId,
+      emissaoId,
+      updatedAtEsperado as Date,
+      dados,
+    );
+
+    if (!resultado.ok) {
+      if (resultado.motivo === "conflito") {
+        return { ok: false, error: ERRO_CONFLITO_EDICAO };
+      }
+      // Emissão não encontrada nesta conta (AD-1) — nunca expõe detalhe.
+      return { ok: false, error: ERRO_GENERICO };
+    }
+  } catch {
+    return { ok: false, error: ERRO_GENERICO };
+  }
+
+  revalidatePath("/emissao");
+  return { ok: true };
+}

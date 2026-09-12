@@ -71,6 +71,21 @@ enum StatusPlanoRevisional {
   Arquivado
 }
 
+/// Status de Emissao (Story 4.1). Nasce sempre em Rascunho — o avanço
+/// Rascunho->EmAnalise->Emitido/Reprovado é a Story 4.2, que ainda não
+/// existe (Boundaries: nesta story não há nenhuma lógica de avanço, nem
+/// campo de Status editável no modal). Diferente de
+/// StatusAtivo/StatusTipoAtivo/StatusItemRevisional/StatusPlanoRevisional,
+/// não tem um valor de arquivamento — AD-10 não vincula Emissao (CAP-5) à
+/// sua regra de soft-delete, então "excluir" fica fora de escopo (Design
+/// Notes, deferred-work.md).
+enum StatusEmissao {
+  Rascunho
+  EmAnalise
+  Emitido
+  Reprovado
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -111,6 +126,7 @@ model Conta {
   ativos            Ativo[]
   itensRevisionais  ItemRevisional[]
   planosRevisionais PlanoRevisional[]
+  emissoes          Emissao[]
 
   @@map("contas")
 }
@@ -147,7 +163,8 @@ model Usuario {
   sessions Session[]
   accounts Account[]
 
-  planosComoResponsavel PlanoRevisional[]
+  planosComoResponsavel   PlanoRevisional[]
+  emissoesComoResponsavel Emissao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -303,7 +320,8 @@ model Ativo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  planos PlanoRevisional[]
+  planos   PlanoRevisional[]
+  emissoes Emissao[]
 
   @@unique([contaId, codigo])
   @@index([tipoAtivoId])
@@ -341,7 +359,8 @@ model ItemRevisional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  planoItens PlanoItemRevisional[]
+  planoItens             PlanoItemRevisional[]
+  itensExecutadosEmissao ItemExecutadoEmissao[]
 
   @@unique([contaId, nome])
   @@map("itens_revisionais")
@@ -387,7 +406,8 @@ model PlanoRevisional {
 
   status StatusPlanoRevisional @default(Ativo)
 
-  itens PlanoItemRevisional[]
+  itens    PlanoItemRevisional[]
+  emissoes Emissao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -424,4 +444,111 @@ model PlanoItemRevisional {
 
   @@unique([planoId, itemRevisionalId])
   @@map("plano_itens_revisionais")
+}
+
+// ---------------------------------------------------------------------------
+// Emissao / ItemExecutadoEmissao (Story 4.1) — primeiro registro de que uma
+// manutenção foi de fato executada, vinculado a um Ativo + PlanoRevisional +
+// responsável + data. `codigo` ("EM-{ano}-{seq}") é gerado na criação por
+// retry-on-P2002 contra `@@unique([contaId, ano, seq])` (nunca `select max`/
+// transação Serializable — técnica deliberadamente diferente da de
+// Ativo.codigo, Boundaries da story). `ano` é o ano de `dataEmissao` (campo
+// de negócio), não a data de criação no servidor (Design Notes). Emissão +
+// itens executados são sempre gravados numa única prisma.$transaction
+// (AD-9), tanto na criação quanto na edição, com `updatedAt` como lock
+// otimista na edição (mesmo padrão de atualizarPlano).
+//
+// Nasce sempre com status Rascunho — o avanço de status (Rascunho->Em
+// análise->Emitido/Reprovado, incluindo o preenchimento de
+// `motivoReprovacao`) é a Story 4.2, que ainda não existe (Boundaries: nesta
+// story não há lógica de avanço nenhuma).
+//
+// Sem exclusão física NEM soft-delete nesta story (Never/Design Notes): AD-10
+// não vincula Emissao (CAP-5) à sua regra de arquivamento, StatusEmissao não
+// tem um valor de arquivamento, e nenhum AC pede isso — gap deferido em
+// _bmad-output/implementation-artifacts/deferred-work.md.
+// ---------------------------------------------------------------------------
+
+model Emissao {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  ativoId String
+  ativo   Ativo  @relation(fields: [ativoId], references: [id])
+
+  planoId String
+  plano   PlanoRevisional @relation(fields: [planoId], references: [id])
+
+  responsavelId String
+  responsavel   Usuario @relation(fields: [responsavelId], references: [id])
+
+  /// Campo de negócio — data em que a manutenção foi/será executada. É esta
+  /// data (não a de criação no servidor) que decide o `ano` do código
+  /// (Design Notes: mais coerente com numeração de documento, evita códigos
+  /// fora de ordem em emissões retroativas perto de virada de ano).
+  dataEmissao DateTime
+
+  /// Formato "EM-{ano}-{seq}" — gerado uma única vez na criação, nunca
+  /// recalculado na edição.
+  codigo String
+  ano    Int
+  seq    Int
+
+  status           StatusEmissao @default(Rascunho)
+  /// Preenchido só a partir da Story 4.2 (fluxo de reprovação) — nesta story
+  /// fica sempre null.
+  motivoReprovacao String?
+
+  itens ItemExecutadoEmissao[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, ano, seq])
+  @@index([ativoId])
+  @@index([planoId])
+  @@index([responsavelId])
+  @@map("emissoes")
+}
+
+// Linha de item executado, espelhando os itens do PlanoRevisional vigente no
+// momento da criação da Emissao (Intent) — uma linha por item do plano,
+// nunca um subconjunto escolhido pelo usuário (a aba Itens do modal é um
+// checklist fixo, Code Map). `valorEsperadoDias/Km/Horas` é o snapshot do
+// valor esperado no momento em que o item entra na emissão
+// (PlanoItemRevisional.override ?? ItemRevisional.padrao) — uma edição
+// posterior ao Plano/Item revisional de origem NUNCA altera esse snapshot
+// (Boundaries). `medicaoDias/Km/Horas` é o valor medido de fato, preenchido
+// junto com `executado`/`observacao` conforme a manutenção é registrada.
+//
+// onDelete: Cascade é o que permite as linhas somerem se a Emissao pai for
+// removida — a Emissao pai em si nunca é DELETE físico nesta story (Never),
+// então isso nunca dispara na prática hoje.
+model ItemExecutadoEmissao {
+  id        String  @id @default(cuid())
+  emissaoId String
+  emissao   Emissao @relation(fields: [emissaoId], references: [id], onDelete: Cascade)
+
+  itemRevisionalId String
+  itemRevisional   ItemRevisional @relation(fields: [itemRevisionalId], references: [id])
+
+  executado Boolean @default(false)
+
+  /// Snapshot imutável do valor esperado no momento em que o item entrou na
+  /// emissão (Boundaries) — nunca recalculado a partir do Plano/Item atual.
+  valorEsperadoDias  Int?
+  valorEsperadoKm    Int?
+  valorEsperadoHoras Int?
+
+  /// Valor medido de fato ao registrar a execução — comparável ao snapshot
+  /// acima, mas uma coluna totalmente separada.
+  medicaoDias  Int?
+  medicaoKm    Int?
+  medicaoHoras Int?
+
+  observacao String?
+
+  @@unique([emissaoId, itemRevisionalId])
+  @@map("itens_executados_emissao")
 }
