@@ -178,7 +178,10 @@ export type ResolucaoAtivoDoPlano = {
   pendente: boolean;
 };
 
-const MS_POR_DIA = 24 * 60 * 60 * 1000;
+// Exportado (não só local) porque o painel inicial (Story 4.3) também
+// precisa converter dias<->ms ao formatar "Vence em N dias" a partir de
+// `proximaData` — mesma constante, nunca redeclarada em outro arquivo.
+export const MS_POR_DIA = 24 * 60 * 60 * 1000;
 const JANELA_VENCE_EM_BREVE_DIAS = 7;
 
 // Fórmula de agendamento (Design Notes / Boundaries, decisão confirmada sem
