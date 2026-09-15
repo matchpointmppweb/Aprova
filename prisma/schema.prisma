@@ -94,6 +94,23 @@ enum StatusLocal {
   Inativo
 }
 
+/// Status de Cargo (Story 5.3) — mesmo padrão de StatusLocal: "excluir"
+/// nunca é DELETE físico (AD-10), é atualizarCargo(...,{status:"Inativo"})
+/// pela mesma função de repositório usada pela edição comum.
+enum StatusCargo {
+  Ativo
+  Inativo
+}
+
+/// Status de Funcao (Story 5.3) — mesmo padrão de StatusCargo/StatusLocal:
+/// "excluir" nunca é DELETE físico (AD-10), é
+/// atualizarFuncao(...,{status:"Inativo"}) pela mesma função de repositório
+/// usada pela edição comum.
+enum StatusFuncao {
+  Ativo
+  Inativo
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -105,6 +122,8 @@ enum Modulo {
   emissao
   locais
   empresas
+  cargos
+  funcoes
   usuarios
   contas
   perfil
@@ -139,6 +158,8 @@ model Conta {
   emissoes          Emissao[]
   locais            Local[]
   empresas          Empresa[]
+  cargos            Cargo[]
+  funcoes           Funcao[]
 
   @@map("contas")
 }
@@ -623,4 +644,46 @@ model Empresa {
 
   @@unique([contaId, razaoSocial])
   @@map("empresas")
+}
+
+// ---------------------------------------------------------------------------
+// Cargo / Funcao (Story 5.3) — dois cadastros independentes e estruturalmente
+// idênticos (um único campo `descricao` + `status`), pré-requisito da Story
+// 5.4 (Pessoa), que referencia os dois por FK separadas. Deliberadamente sem
+// nenhuma abstração/tabela compartilhada entre os dois (Boundaries/Never da
+// story) — mesma convenção do projeto de não abstrair prematuramente entre
+// entidades parecidas (Tipos vs. Locais vs. Itens revisionais). Sem exclusão
+// física (AD-10): "excluir" é só mudar `status` para Inativo, pela mesma
+// função de repositório usada pela edição comum (atualizarCargo/
+// atualizarFuncao) — mesmo padrão de Local.
+// ---------------------------------------------------------------------------
+
+model Cargo {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  descricao String
+  status    StatusCargo @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, descricao])
+  @@map("cargos")
+}
+
+model Funcao {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  descricao String
+  status    StatusFuncao @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, descricao])
+  @@map("funcoes")
 }
