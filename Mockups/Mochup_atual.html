@@ -1,0 +1,2242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raiz — Gestão de Ativos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#152219;
+    --ink-soft:#3F4F46;
+    --forest:#173A2C;
+    --forest-2:#1F4D3A;
+    --pine:#2C6E4F;
+    --pine-dark:#215839;
+    --sage:#8FCBA6;
+    --sage-pale:#DCEEE1;
+    --paper:#F5F8F5;
+    --paper-2:#EEF3EE;
+    --white:#FFFFFF;
+    --line:#DEE7DE;
+    --line-strong:#C7D5C9;
+    --amber:#B98A2E;
+    --amber-bg:#FBF1DE;
+    --red:#B14A3C;
+    --red-bg:#FBEAE7;
+    --radius-s:4px;
+    --radius-m:8px;
+    --shadow-1: 0 1px 2px rgba(21,34,25,0.06);
+    --shadow-2: 0 8px 24px rgba(21,34,25,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'IBM Plex Sans', sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    font-size:14px;
+    -webkit-font-smoothing:antialiased;
+    transition:background .2s ease, color .2s ease;
+  }
+  h1,h2,h3,.brand-font{font-family:'Space Grotesk', sans-serif;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  ::selection{background:var(--sage-pale);}
+
+  /* ---------- utility ---------- */
+  .hidden{display:none !important;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .muted{color:var(--ink-soft);}
+  .row{display:flex;align-items:center;}
+  .grow{flex:1;}
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:9px 16px;border-radius:var(--radius-m);
+    font-size:13.5px;font-weight:500;border:1px solid transparent;
+    cursor:pointer;transition:background .15s ease, border-color .15s ease;
+    white-space:nowrap;
+  }
+  .btn svg{width:15px;height:15px;flex:none;}
+  .btn-primary{background:var(--pine);color:#fff;}
+  .btn-primary:hover{background:var(--pine-dark);}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line-strong);}
+  .btn-ghost:hover{background:var(--paper-2);}
+  .btn-subtle{background:var(--paper-2);color:var(--ink);}
+  .btn-subtle:hover{background:var(--line);}
+  .btn-sm{padding:6px 12px;font-size:12.5px;}
+
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:3px 9px;border-radius:100px;font-size:12px;font-weight:500;
+    line-height:1.6;
+  }
+  .tag-dot{width:6px;height:6px;border-radius:50%;flex:none;}
+  .tag-ok{background:var(--sage-pale);color:var(--pine-dark);}
+  .tag-ok .tag-dot{background:var(--pine);}
+  .tag-warn{background:var(--amber-bg);color:var(--amber);}
+  .tag-warn .tag-dot{background:var(--amber);}
+  .tag-off{background:var(--red-bg);color:var(--red);}
+  .tag-off .tag-dot{background:var(--red);}
+  .tag-neutral{background:var(--paper-2);color:var(--ink-soft);}
+  .tag-neutral .tag-dot{background:var(--ink-soft);}
+
+  /* ---------- LOGIN ---------- */
+  #view-login{
+    min-height:100vh;display:flex;
+  }
+  .login-brand{
+    width:44%;min-width:380px;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(143,203,166,0.16), transparent 45%),
+      linear-gradient(160deg, var(--forest) 0%, #0E2A20 100%);
+    position:relative;overflow:hidden;
+    display:flex;flex-direction:column;justify-content:space-between;
+    padding:48px;color:#fff;
+  }
+  .login-brand svg.grid-art{position:absolute;inset:0;width:100%;height:100%;opacity:0.5;}
+  .login-brand-top{position:relative;z-index:1;display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    width:30px;height:30px;border-radius:7px;background:var(--sage);
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .brand-mark svg{width:17px;height:17px;color:var(--forest);}
+  .brand-name{font-size:18px;font-weight:600;letter-spacing:0.2px;}
+  .login-brand-mid{position:relative;z-index:1;max-width:360px;}
+  .login-brand-mid h1{font-size:30px;line-height:1.28;font-weight:600;margin:0 0 14px;}
+  .login-brand-mid p{color:#C7DED0;line-height:1.65;margin:0;font-size:14.5px;}
+  .login-brand-bottom{position:relative;z-index:1;display:flex;gap:28px;}
+  .login-stat b{display:block;font-size:20px;font-family:'Space Grotesk',sans-serif;}
+  .login-stat span{font-size:12px;color:#9FC6AE;}
+
+  .login-form-wrap{
+    flex:1;display:flex;align-items:center;justify-content:center;background:var(--white);
+  }
+  .login-form{width:100%;max-width:360px;padding:24px;}
+  .login-form h2{font-size:22px;margin:0 0 6px;font-weight:600;}
+  .login-form p.lede{color:var(--ink-soft);margin:0 0 30px;font-size:13.5px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12.5px;font-weight:500;margin-bottom:6px;color:var(--ink-soft);}
+  .field input{
+    width:100%;padding:10px 12px;border:1px solid var(--line-strong);
+    border-radius:var(--radius-m);font-size:14px;font-family:inherit;
+    background:var(--paper);color:var(--ink);
+  }
+  .field input:focus{outline:2px solid var(--sage);outline-offset:0;border-color:var(--pine);}
+  .field-row{display:flex;align-items:center;justify-content:space-between;margin:2px 0 20px;font-size:13px;}
+  .field-row label{display:flex;align-items:center;gap:7px;color:var(--ink-soft);font-weight:400;}
+  .login-submit{width:100%;justify-content:center;padding:11px;font-size:14px;}
+  .login-foot{margin-top:26px;font-size:12.5px;color:var(--ink-soft);text-align:center;}
+
+  /* ---------- APP SHELL ---------- */
+  #view-app{display:none;min-height:100vh;}
+  #view-app.active{display:flex;}
+
+  .topbar{
+    position:fixed;top:0;left:0;right:0;height:58px;z-index:30;
+    background:var(--forest);color:#fff;
+    display:flex;align-items:center;padding:0 18px;gap:14px;
+  }
+  .topbar .brand-mark{width:26px;height:26px;border-radius:6px;}
+  .topbar .brand-mark svg{width:14px;height:14px;}
+  .topbar-title{font-weight:600;font-size:15px;letter-spacing:0.2px;}
+  .topbar-search{
+    margin-left:24px;display:flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);
+    border-radius:var(--radius-m);padding:7px 12px;width:260px;color:#BFE0CD;
+  }
+  .topbar-search svg{width:14px;height:14px;flex:none;}
+  .topbar-search input{
+    background:transparent;border:none;outline:none;color:#fff;font-size:13px;
+    width:100%;font-family:inherit;
+  }
+  .topbar-search input::placeholder{color:#9BC2AC;}
+  .topbar-icon{
+    width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    color:#C7DED0;cursor:pointer;position:relative;margin-left:auto;
+  }
+  .topbar-icon:hover{background:rgba(255,255,255,0.08);}
+  .topbar-icon svg{width:17px;height:17px;}
+  .topbar-icon .dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--sage);}
+  .topbar-user{display:flex;align-items:center;gap:9px;padding-left:14px;border-left:1px solid rgba(255,255,255,0.14);cursor:pointer;}
+  .avatar{
+    width:28px;height:28px;border-radius:50%;background:var(--sage);color:var(--forest);
+    display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex:none;
+  }
+  .topbar-user .name{font-size:13px;font-weight:500;line-height:1.2;}
+  .topbar-user .role{font-size:11px;color:#9FC6AE;line-height:1.2;}
+
+  .sidebar{
+    position:fixed;top:58px;left:0;bottom:0;width:224px;z-index:20;
+    background:var(--forest-2);color:#DDEDE2;overflow-y:auto;
+    padding:14px 10px 20px;
+  }
+  .side-group{margin-bottom:2px;}
+  .side-label{
+    font-size:11px;text-transform:uppercase;letter-spacing:0.06em;
+    color:#7FA890;padding:14px 10px 6px;font-weight:500;
+  }
+  .side-item{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    padding:9px 10px;border-radius:7px;border:none;background:transparent;
+    color:#D3E7DA;font-size:13.5px;cursor:pointer;font-family:inherit;
+    margin-bottom:1px;
+  }
+  .side-item svg{width:16px;height:16px;flex:none;opacity:0.85;}
+  .side-item:hover{background:rgba(255,255,255,0.06);}
+  .side-item.active{background:var(--sage);color:var(--forest);font-weight:600;}
+  .side-item.active svg{opacity:1;}
+  .side-item .chev{margin-left:auto;width:13px;height:13px;transition:transform .15s ease;opacity:0.7;}
+  .side-item.expanded .chev{transform:rotate(90deg);}
+  .side-sub{padding-left:14px;margin-bottom:4px;}
+  .side-sub .side-item{font-size:13px;padding:7px 10px 7px 26px;position:relative;}
+  .side-sub .side-item::before{
+    content:'';position:absolute;left:14px;top:50%;width:6px;height:1px;background:#5F8770;
+  }
+
+  .main{
+    margin-left:224px;margin-top:58px;padding:26px 32px 60px;width:calc(100% - 224px);
+  }
+  .crumb{font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;}
+  .crumb b{color:var(--ink);font-weight:500;}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;}
+  .page-head h1{font-size:22px;margin:0;font-weight:600;}
+  .page-head p{margin:4px 0 0;color:var(--ink-soft);font-size:13.5px;}
+
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  .kpi{
+    background:var(--white);border:1px solid var(--line);border-radius:var(--radius-m);
+    padding:16px 18px;
+  }
+  .kpi .k-label{font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;}
+  .kpi .k-value{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600;}
+  .kpi .k-delta{font-size:12px;margin-top:6px;color:var(--pine-dark);}
+  .kpi .k-delta.down{color:var(--red);}
+
+  .panel-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:8px;}
+  .panel{background:var(--white);border:1px solid var(--line);border-radius:var(--radius-m);overflow:hidden;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);}
+  .panel-head h3{font-size:14.5px;margin:0;font-weight:600;}
+  .panel-head a{font-size:12.5px;color:var(--pine-dark);text-decoration:none;font-weight:500;}
+  .panel-body{padding:6px 18px 14px;}
+
+  .mini-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line);}
+  .mini-row:last-child{border-bottom:none;}
+  .mini-row .icon-sq{
+    width:32px;height:32px;border-radius:7px;background:var(--sage-pale);color:var(--pine-dark);
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .mini-row .icon-sq svg{width:16px;height:16px;}
+  .mini-row .txt{flex:1;min-width:0;}
+  .mini-row .txt .t1{font-size:13px;font-weight:500;}
+  .mini-row .txt .t2{font-size:12px;color:var(--ink-soft);}
+  .mini-row .side{font-size:12px;color:var(--ink-soft);text-align:right;flex:none;}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .search-box{
+    display:flex;align-items:center;gap:8px;background:var(--white);
+    border:1px solid var(--line-strong);border-radius:var(--radius-m);
+    padding:8px 12px;width:280px;
+  }
+  .search-box svg{width:14px;height:14px;color:var(--ink-soft);flex:none;}
+  .search-box input{border:none;outline:none;background:transparent;font-size:13px;width:100%;font-family:inherit;}
+  .filter-chip{
+    padding:8px 13px;border:1px solid var(--line-strong);border-radius:var(--radius-m);
+    font-size:13px;background:var(--white);color:var(--ink-soft);display:flex;gap:6px;align-items:center;cursor:pointer;
+  }
+  .filter-chip svg{width:12px;height:12px;}
+  .status-select{
+    padding:8px 13px;border:1px solid var(--line-strong);border-radius:var(--radius-m);
+    font-size:13px;background:var(--white);color:var(--ink-soft);font-family:inherit;cursor:pointer;
+  }
+
+  table{width:100%;border-collapse:collapse;background:var(--white);}
+  .table-wrap{border:1px solid var(--line);border-radius:var(--radius-m);overflow:hidden;}
+  thead th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;
+    color:var(--ink-soft);font-weight:500;padding:11px 16px;background:var(--paper-2);
+    border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr[data-row]:nth-of-type(odd) td{background:var(--white);}
+  tbody tr[data-row]:nth-of-type(even) td{background:var(--paper-2);}
+  tbody tr[data-row]:hover td{background:var(--sage-pale);}
+  td.code{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-soft);}
+  td .primary-text{font-weight:500;}
+  td .sub-text{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+  .row-actions{display:flex;gap:4px;justify-content:flex-end;}
+  .icon-btn{
+    width:28px;height:28px;border-radius:6px;border:none;background:transparent;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);
+  }
+  .icon-btn:hover{background:var(--line);color:var(--ink);}
+  .icon-btn svg{width:15px;height:15px;}
+
+  .table-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:12.5px;color:var(--ink-soft);border-top:1px solid var(--line);background:var(--paper-2);}
+  .pager{display:flex;gap:4px;}
+  .pager button{width:26px;height:26px;border:1px solid var(--line-strong);background:var(--white);border-radius:6px;font-size:12px;cursor:pointer;color:var(--ink-soft);}
+  .pager button.active{background:var(--pine);border-color:var(--pine);color:#fff;}
+
+  .avatar-sm{width:26px;height:26px;border-radius:50%;background:var(--sage-pale);color:var(--pine-dark);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none;}
+  .cell-user{display:flex;align-items:center;gap:9px;}
+
+  .perm-badges{display:flex;flex-wrap:wrap;gap:5px;}
+  .perm-badges .tag{font-size:11px;padding:2px 8px;}
+
+  /* inline edit / create rows */
+  tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
+  .inline-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .inline-form .f{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px;}
+  .inline-form .f label{font-size:11.5px;color:var(--ink-soft);font-weight:500;}
+  .inline-form .f input,.inline-form .f select{
+    padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius-s);
+    font-size:13px;font-family:inherit;background:var(--white);color:var(--ink);
+  }
+  .inline-form .actions{display:flex;gap:8px;flex:none;}
+  .form-row-label{font-size:11.5px;font-weight:600;color:var(--pine-dark);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;}
+
+  /* Aparência (settings) */
+  .palette-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+  .palette-card{
+    border:2px solid var(--line);border-radius:var(--radius-m);overflow:hidden;
+    background:var(--white);cursor:pointer;transition:border-color .15s ease;
+  }
+  .palette-card:hover{border-color:var(--line-strong);}
+  .palette-card.selected{border-color:var(--pine);}
+  .palette-swatches{display:flex;height:52px;}
+  .palette-swatches span{flex:1;}
+  .palette-card-body{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+  .palette-card-body .pname{font-size:13.5px;font-weight:500;}
+  .palette-check{
+    width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);flex:none;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .palette-card.selected .palette-check{background:var(--pine);border-color:var(--pine);}
+  .palette-check svg{width:11px;height:11px;color:#fff;display:none;}
+  .palette-card.selected .palette-check svg{display:block;}
+
+  .mode-toggle{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--radius-m);overflow:hidden;}
+  .mode-btn{padding:9px 20px;border:none;background:var(--white);color:var(--ink-soft);font-size:13.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;}
+  .mode-btn+.mode-btn{border-left:1px solid var(--line-strong);}
+  .mode-btn.active{background:var(--pine);color:#fff;}
+  .settings-section{margin-bottom:30px;}
+  .settings-section h3{font-size:15px;margin:0 0 4px;}
+  .settings-section p{margin:0 0 16px;color:var(--ink-soft);font-size:13px;}
+
+  /* ---------- MODAL (robust forms) ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(10,18,14,0.5);z-index:200;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .modal{
+    background:var(--white);border-radius:var(--radius-m);width:760px;max-width:100%;
+    max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-2);
+  }
+  .modal-header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .modal-header h2{font-size:17px;margin:0;font-weight:600;}
+  .modal-close{width:30px;height:30px;border:none;background:transparent;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);}
+  .modal-close:hover{background:var(--paper-2);color:var(--ink);}
+  .modal-close svg{width:16px;height:16px;}
+  .modal-tabs{display:flex;gap:2px;padding:0 24px;background:var(--paper-2);border-bottom:1px solid var(--line);}
+  .modal-tab-btn{padding:12px 6px;margin-right:20px;border:none;background:transparent;font-size:13.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;}
+  .modal-tab-btn.active{color:var(--pine-dark);border-bottom-color:var(--pine);}
+  .modal-body{padding:22px 24px;overflow-y:auto;flex:1;}
+  .modal-tab-panel.hidden{display:none;}
+  .modal-footer{padding:14px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;background:var(--paper-2);}
+  .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .modal-grid .f-full{grid-column:1 / -1;}
+  .f label{display:block;font-size:12px;font-weight:500;margin-bottom:6px;color:var(--ink-soft);}
+  .f input,.f select{width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:var(--radius-s);font-size:13.5px;font-family:inherit;background:var(--white);color:var(--ink);}
+  .radio-row{display:flex;gap:18px;padding:2px 0 4px;}
+  .radio-row label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);font-weight:400;}
+
+  .item-row{
+    display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-check{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:500;min-width:210px;flex:1;}
+  .item-check input{width:16px;height:16px;flex:none;}
+  .item-badges{display:flex;gap:5px;flex:none;}
+  .item-fields{display:flex;gap:10px;flex:none;}
+  .item-fields .f{width:110px;}
+  .item-fields .f label{font-size:10.5px;}
+  .item-obs{flex:1;min-width:180px;}
+
+  /* ---------- MAP PICKER (polígono de local) ---------- */
+  .map-field{margin-top:16px;}
+  .map-field > label{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-bottom:7px;}
+  .map-picker{position:relative;width:100%;max-width:680px;height:280px;border:1px solid var(--line-strong);border-radius:var(--radius-m);overflow:hidden;background:#CFE3D3;}
+  .map-picker svg{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
+  .map-picker svg.map-draw{cursor:crosshair;}
+  .map-polygon{fill:rgba(44,110,79,0.30);stroke:var(--pine);stroke-width:2;}
+  .map-vertex{fill:var(--pine-dark);stroke:#fff;stroke-width:1.5;}
+  .map-hint{position:absolute;left:10px;bottom:10px;background:rgba(21,34,25,0.72);color:#fff;font-size:11px;padding:5px 9px;border-radius:100px;pointer-events:none;}
+  .map-actions{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap;}
+
+  /* ---------- SERVIÇO ROWS (emissão) ---------- */
+  .servico-row{display:flex;gap:10px;align-items:flex-end;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .servico-row:last-child{border-bottom:none;}
+  .servico-row .f{flex:1;min-width:150px;}
+  .servico-row .f label{font-size:10.5px;}
+  .servico-remove{flex:none;}
+
+  .perm-table{width:100%;border-collapse:collapse;}
+  .perm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);}
+  .perm-table th.perm-check-col{text-align:center;}
+  .perm-table td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .perm-table td.perm-check-col{text-align:center;}
+  .perm-table tr:last-child td{border-bottom:none;}
+  .perm-table input[type=checkbox]{width:15px;height:15px;}
+
+  @media (max-width:1100px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .panel-grid{grid-template-columns:1fr;}
+    .palette-grid{grid-template-columns:repeat(2,1fr);}
+    .modal-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="view-login">
+  <div class="login-brand">
+    <svg class="grid-art" viewBox="0 0 500 800" preserveAspectRatio="none">
+      <g stroke="rgba(255,255,255,0.10)" stroke-width="1">
+        <line x1="0" y1="100" x2="500" y2="100"/><line x1="0" y1="200" x2="500" y2="200"/>
+        <line x1="0" y1="300" x2="500" y2="300"/><line x1="0" y1="400" x2="500" y2="400"/>
+        <line x1="0" y1="500" x2="500" y2="500"/><line x1="0" y1="600" x2="500" y2="600"/>
+        <line x1="0" y1="700" x2="500" y2="700"/>
+        <line x1="100" y1="0" x2="100" y2="800"/><line x1="200" y1="0" x2="200" y2="800"/>
+        <line x1="300" y1="0" x2="300" y2="800"/><line x1="400" y1="0" x2="400" y2="800"/>
+      </g>
+      <circle cx="380" cy="140" r="60" fill="none" stroke="rgba(143,203,166,0.35)" stroke-width="1.5"/>
+      <circle cx="90" cy="640" r="90" fill="none" stroke="rgba(143,203,166,0.22)" stroke-width="1.5"/>
+      <path d="M60 720 C 90 660, 70 600, 110 560 C 150 520, 140 470, 180 430" fill="none" stroke="rgba(143,203,166,0.4)" stroke-width="2"/>
+    </svg>
+    <div class="login-brand-top">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C8 6 5 9 5 13a7 7 0 0 0 14 0c0-4-3-7-7-11z" fill="currentColor"/></svg>
+      </div>
+      <div class="brand-name">Raiz</div>
+    </div>
+    <div class="login-brand-mid">
+      <h1>Controle de ativos, planos revisionais e emissões em um só lugar.</h1>
+      <p>Cadastre ativos, defina planos de revisão e acompanhe cada emissão do início ao encerramento, com rastreabilidade completa.</p>
+    </div>
+    <div class="login-brand-bottom">
+      <div class="login-stat"><b>1.284</b><span>ativos monitorados</span></div>
+      <div class="login-stat"><b>96%</b><span>revisões no prazo</span></div>
+      <div class="login-stat"><b>312</b><span>emissões este mês</span></div>
+    </div>
+  </div>
+  <div class="login-form-wrap">
+    <div class="login-form">
+      <h2>Entrar na sua conta</h2>
+      <p class="lede">Acesse o painel administrativo do Raiz.</p>
+      <div class="field">
+        <label for="li-email">E-mail corporativo</label>
+        <input id="li-email" type="email" placeholder="voce@empresa.com.br" value="ana.souza@empresa.com.br">
+      </div>
+      <div class="field">
+        <label for="li-pass">Senha</label>
+        <input id="li-pass" type="password" placeholder="••••••••" value="••••••••••">
+      </div>
+      <div class="field-row">
+        <label><input type="checkbox" checked> Manter conectado</label>
+        <a href="#" style="color:var(--pine-dark);text-decoration:none;font-weight:500;">Esqueci minha senha</a>
+      </div>
+      <button class="btn btn-primary login-submit" onclick="goToApp()">
+        Entrar
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+      <div class="login-foot">Precisa de acesso? Fale com o administrador da sua conta.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="view-app">
+  <div class="topbar">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C8 6 5 9 5 13a7 7 0 0 0 14 0c0-4-3-7-7-11z" fill="currentColor"/></svg>
+    </div>
+    <div class="topbar-title">Raiz</div>
+    <div class="topbar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input placeholder="Buscar ativo, plano, emissão...">
+    </div>
+    <div class="topbar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="dot"></span>
+    </div>
+    <div class="topbar-user">
+      <div class="avatar">AS</div>
+      <div>
+        <div class="name">Ana Souza</div>
+        <div class="role">Administradora</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="side-group">
+      <button class="side-item nav-item active" data-target="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        Início
+      </button>
+    </div>
+
+    <div class="side-group">
+      <button class="side-item group-toggle expanded" data-group="g-cadastros">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Cadastros
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <div class="side-sub" id="g-cadastros">
+        <button class="side-item nav-item active" data-target="ativos">Ativos</button>
+        <button class="side-item nav-item" data-target="tipos">Tipos</button>
+        <button class="side-item nav-item" data-target="itens">Itens revisionais</button>
+        <button class="side-item nav-item" data-target="planos">Planos revisionais</button>
+        <button class="side-item nav-item" data-target="locais">Locais</button>
+        <button class="side-item nav-item" data-target="empresas">Empresas</button>
+        <button class="side-item nav-item" data-target="cargos">Cargos</button>
+        <button class="side-item nav-item" data-target="funcoes">Funções</button>
+        <button class="side-item nav-item" data-target="pessoas">Pessoas</button>
+      </div>
+    </div>
+
+    <div class="side-group">
+      <button class="side-item nav-item" data-target="emissao">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        Emissão
+      </button>
+    </div>
+
+    <div class="side-group">
+      <button class="side-item group-toggle" data-group="g-config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Configurações
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <div class="side-sub hidden" id="g-config">
+        <button class="side-item nav-item" data-target="usuarios">Usuários</button>
+        <button class="side-item nav-item" data-target="contas">Contas</button>
+        <button class="side-item nav-item" data-target="perfil">Perfil de acesso</button>
+        <button class="side-item nav-item" data-target="aparencia">Aparência</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ===== HOME ===== -->
+    <section class="page" id="page-home">
+      <div class="crumb">Raiz / <b>Início</b></div>
+      <div class="page-head">
+        <div>
+          <h1>Olá, Ana</h1>
+          <p>Este é o panorama geral dos seus ativos e emissões.</p>
+        </div>
+        <button class="btn btn-primary" onclick="setView('emissao')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Nova emissão
+        </button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="k-label">Ativos cadastrados</div>
+          <div class="k-value">1.284</div>
+          <div class="k-delta">+18 este mês</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Planos revisionais ativos</div>
+          <div class="k-value">96</div>
+          <div class="k-delta">+4 este mês</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Emissões no mês</div>
+          <div class="k-value">312</div>
+          <div class="k-delta">+7,4% vs. mês anterior</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Revisões pendentes</div>
+          <div class="k-value">23</div>
+          <div class="k-delta down">6 vencem esta semana</div>
+        </div>
+      </div>
+
+      <div class="panel-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Próximas revisões</h3>
+            <a href="#" onclick="setView('planos');return false;">Ver planos revisionais</a>
+          </div>
+          <div class="panel-body">
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+              <div class="txt"><div class="t1">Compressor de ar CP-014</div><div class="t2">Plano: Manutenção trimestral</div></div>
+              <div class="side">Vence em 2 dias</div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+              <div class="txt"><div class="t1">Painel elétrico QGBT-02</div><div class="t2">Plano: Inspeção semestral</div></div>
+              <div class="side">Vence em 5 dias</div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+              <div class="txt"><div class="t1">Empilhadeira EMP-07</div><div class="t2">Plano: Revisão mensal</div></div>
+              <div class="side">Vence em 9 dias</div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+              <div class="txt"><div class="t1">Caldeira CD-01</div><div class="t2">Plano: Inspeção anual</div></div>
+              <div class="side">Vence em 14 dias</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Últimas emissões</h3>
+            <a href="#" onclick="setView('emissao');return false;">Ver todas</a>
+          </div>
+          <div class="panel-body">
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+              <div class="txt"><div class="t1">EM-2026-0312</div><div class="t2">Compressor de ar CP-014</div></div>
+              <div class="side"><span class="tag tag-ok"><span class="tag-dot"></span>Emitido</span></div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+              <div class="txt"><div class="t1">EM-2026-0311</div><div class="t2">Painel elétrico QGBT-02</div></div>
+              <div class="side"><span class="tag tag-warn"><span class="tag-dot"></span>Em análise</span></div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+              <div class="txt"><div class="t1">EM-2026-0310</div><div class="t2">Empilhadeira EMP-07</div></div>
+              <div class="side"><span class="tag tag-neutral"><span class="tag-dot"></span>Rascunho</span></div>
+            </div>
+            <div class="mini-row">
+              <div class="icon-sq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div>
+              <div class="txt"><div class="t1">EM-2026-0309</div><div class="t2">Caldeira CD-01</div></div>
+              <div class="side"><span class="tag tag-ok"><span class="tag-dot"></span>Emitido</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ATIVOS ===== -->
+    <section class="page hidden" id="page-ativos">
+      <div class="crumb">Raiz / Cadastros / <b>Ativos</b></div>
+      <div class="page-head">
+        <div><h1>Ativos</h1><p>Todos os ativos cadastrados na sua operação.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-ativos')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo ativo</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por código ou nome"></div>
+        <div class="filter-chip">Tipo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-ativos')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+          <option value="bloqueado">Bloqueado</option>
+          <option value="vendido">Vendido</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Código</th><th>Ativo</th><th>Tipo</th><th>Localização</th><th>Última revisão</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-ativos">
+            <tr class="form-row hidden" id="create-ativos"><td colspan="7">
+              <div class="form-row-label">Novo ativo</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" placeholder="Ex.: Compressor de ar CP-015"></div>
+                <div class="f"><label>Tipo</label><select><option>Equipamento mecânico</option><option>Instalação elétrica</option><option>Equipamento térmico</option><option>Veículo interno</option><option>Instrumento de medição</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" placeholder="Ex.: Planta 1 · Setor B"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option><option>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-ativos')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-ativos')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="code">AT-0014</td><td><div class="primary-text">Compressor de ar CP-014</div><div class="sub-text">Nº série 88213-A</div></td><td>Equipamento mecânico</td><td>Planta 1 · Setor B</td><td>12/06/2026</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-1"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0014</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Compressor de ar CP-014"></div>
+                <div class="f"><label>Tipo</label><select><option selected>Equipamento mecânico</option><option>Instalação elétrica</option><option>Equipamento térmico</option><option>Veículo interno</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 1 · Setor B"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option><option>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="code">AT-0022</td><td><div class="primary-text">Painel elétrico QGBT-02</div><div class="sub-text">Nº série 44092-C</div></td><td>Instalação elétrica</td><td>Planta 1 · Setor A</td><td>03/05/2026</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-2"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0022</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Painel elétrico QGBT-02"></div>
+                <div class="f"><label>Tipo</label><select><option>Equipamento mecânico</option><option selected>Instalação elétrica</option><option>Equipamento térmico</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 1 · Setor A"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option><option>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="bloqueado"><td class="code">AT-0007</td><td><div class="primary-text">Empilhadeira EMP-07</div><div class="sub-text">Nº série 10992-B</div></td><td>Veículo interno</td><td>Planta 2 · Pátio</td><td>28/04/2026</td><td><span class="tag tag-off"><span class="tag-dot"></span>Bloqueado</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-3"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0007</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Empilhadeira EMP-07"></div>
+                <div class="f"><label>Tipo</label><select><option>Equipamento mecânico</option><option>Instalação elétrica</option><option selected>Veículo interno</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 2 · Pátio"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option><option selected>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="code">AT-0001</td><td><div class="primary-text">Caldeira CD-01</div><div class="sub-text">Nº série 00871-A</div></td><td>Equipamento térmico</td><td>Planta 1 · Setor C</td><td>15/02/2026</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-4"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0001</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Caldeira CD-01"></div>
+                <div class="f"><label>Tipo</label><select><option>Equipamento mecânico</option><option selected>Equipamento térmico</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 1 · Setor C"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option><option>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="vendido"><td class="code">AT-0031</td><td><div class="primary-text">Gerador GE-03</div><div class="sub-text">Nº série 55214-D</div></td><td>Equipamento elétrico</td><td>Planta 2 · Setor A</td><td>—</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Vendido</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-5')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-5"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0031</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Gerador GE-03"></div>
+                <div class="f"><label>Tipo</label><select><option selected>Equipamento elétrico</option><option>Equipamento mecânico</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 2 · Setor A"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option><option>Bloqueado</option><option selected>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-5')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-5')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="inativo"><td class="code">AT-0045</td><td><div class="primary-text">Empilhadeira antiga EMP-02</div><div class="sub-text">Nº série 09981-A</div></td><td>Veículo interno</td><td>Planta 2 · Pátio</td><td>04/11/2025</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Inativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-ativos-6')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button><button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-ativos-6"><td colspan="7">
+              <div class="form-row-label">Editar ativo · AT-0045</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do ativo</label><input type="text" value="Empilhadeira antiga EMP-02"></div>
+                <div class="f"><label>Tipo</label><select><option selected>Veículo interno</option><option>Equipamento mecânico</option></select></div>
+                <div class="f"><label>Localização</label><input type="text" value="Planta 2 · Pátio"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Inativo</option><option>Bloqueado</option><option>Vendido</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-ativos-6')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-ativos-6')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+        <div class="table-foot">
+          <span>Exibindo 1–5 de 1.284 ativos</span>
+          <div class="pager"><button class="active">1</button><button>2</button><button>3</button><button>···</button><button>257</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TIPOS ===== -->
+    <section class="page hidden" id="page-tipos">
+      <div class="crumb">Raiz / Cadastros / <b>Tipos</b></div>
+      <div class="page-head">
+        <div><h1>Tipos de ativo</h1><p>Categorias usadas para classificar os ativos cadastrados.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-tipos')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo tipo</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar tipo"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-tipos')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="arquivado">Arquivado</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tipo</th><th>Descrição</th><th>Ativos vinculados</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-tipos">
+            <tr class="form-row hidden" id="create-tipos"><td colspan="5">
+              <div class="form-row-label">Novo tipo</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" placeholder="Ex.: Instrumento de medição"></div>
+                <div class="f"><label>Descrição</label><input type="text" placeholder="Descreva brevemente esse tipo"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-tipos')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-tipos')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Equipamento mecânico</div></td><td class="muted">Máquinas e equipamentos com partes móveis</td><td>412</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-tipos-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-tipos-1"><td colspan="5">
+              <div class="form-row-label">Editar tipo · Equipamento mecânico</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" value="Equipamento mecânico"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Máquinas e equipamentos com partes móveis"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-tipos-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-tipos-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Instalação elétrica</div></td><td class="muted">Painéis, quadros e redes de distribuição</td><td>268</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-tipos-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-tipos-2"><td colspan="5">
+              <div class="form-row-label">Editar tipo · Instalação elétrica</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" value="Instalação elétrica"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Painéis, quadros e redes de distribuição"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-tipos-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-tipos-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Equipamento térmico</div></td><td class="muted">Caldeiras, fornos e trocadores de calor</td><td>54</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-tipos-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-tipos-3"><td colspan="5">
+              <div class="form-row-label">Editar tipo · Equipamento térmico</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" value="Equipamento térmico"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Caldeiras, fornos e trocadores de calor"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-tipos-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-tipos-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Veículo interno</div></td><td class="muted">Empilhadeiras, carrinhos e transportadores</td><td>97</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-tipos-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-tipos-4"><td colspan="5">
+              <div class="form-row-label">Editar tipo · Veículo interno</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" value="Veículo interno"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Empilhadeiras, carrinhos e transportadores"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-tipos-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-tipos-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="arquivado"><td><div class="primary-text">Instrumento de medição</div></td><td class="muted">Manômetros, sensores e instrumentos calibráveis</td><td>453</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Arquivado</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-tipos-5')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-tipos-5"><td colspan="5">
+              <div class="form-row-label">Editar tipo · Instrumento de medição</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do tipo</label><input type="text" value="Instrumento de medição"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Manômetros, sensores e instrumentos calibráveis"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-tipos-5')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-tipos-5')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== ITENS REVISIONAIS ===== -->
+    <section class="page hidden" id="page-itens">
+      <div class="crumb">Raiz / Cadastros / <b>Itens revisionais</b></div>
+      <div class="page-head">
+        <div><h1>Itens revisionais</h1><p>Verificações e tarefas que compõem os planos revisionais, com seu controle de medição.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-itens')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo item</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar item revisional"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-itens')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="arquivado">Arquivado</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item revisional</th><th>Descrição</th><th>Controle de medição</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-itens">
+            <tr class="form-row hidden" id="create-itens"><td colspan="5">
+              <div class="form-row-label">Novo item revisional</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" placeholder="Ex.: Troca de filtro de ar"></div>
+                <div class="f"><label>Descrição</label><input type="text" placeholder="Descreva a verificação"></div>
+                <div class="f" style="flex:2;min-width:260px;">
+                  <label>Controle de medição</label>
+                  <div style="display:flex;gap:14px;padding-top:6px;font-size:13px;color:var(--ink-soft);">
+                    <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox"> Dias</label>
+                    <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox"> Quilometragem (km)</label>
+                    <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox"> Horas</label>
+                  </div>
+                </div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-itens')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-itens')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Troca de óleo</div></td><td class="muted">Substituição do óleo lubrificante</td><td><div class="perm-badges"><span class="tag tag-neutral">Dias</span><span class="tag tag-neutral">Km</span></div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-itens-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-itens-1"><td colspan="5">
+              <div class="form-row-label">Editar item · Troca de óleo</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" value="Troca de óleo"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Substituição do óleo lubrificante"></div>
+                <div class="f"><label>A cada (dias)</label><input type="number" value="90"></div>
+                <div class="f"><label>A cada (km)</label><input type="number" value="5000"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-itens-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-itens-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Verificação de nível de fluido</div></td><td class="muted">Checagem de fluidos hidráulicos e de arrefecimento</td><td><div class="perm-badges"><span class="tag tag-neutral">Dias</span></div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-itens-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-itens-2"><td colspan="5">
+              <div class="form-row-label">Editar item · Verificação de nível de fluido</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" value="Verificação de nível de fluido"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Checagem de fluidos hidráulicos e de arrefecimento"></div>
+                <div class="f"><label>A cada (dias)</label><input type="number" value="30"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-itens-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-itens-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Inspeção de correias</div></td><td class="muted">Verificação de tensão e desgaste das correias</td><td><div class="perm-badges"><span class="tag tag-neutral">Horas</span></div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-itens-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-itens-3"><td colspan="5">
+              <div class="form-row-label">Editar item · Inspeção de correias</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" value="Inspeção de correias"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Verificação de tensão e desgaste das correias"></div>
+                <div class="f"><label>A cada (horas)</label><input type="number" value="500"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-itens-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-itens-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Calibração de instrumento</div></td><td class="muted">Aferição e calibração de instrumentos de medição</td><td><div class="perm-badges"><span class="tag tag-neutral">Dias</span></div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-itens-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-itens-4"><td colspan="5">
+              <div class="form-row-label">Editar item · Calibração de instrumento</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" value="Calibração de instrumento"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Aferição e calibração de instrumentos de medição"></div>
+                <div class="f"><label>A cada (dias)</label><input type="number" value="180"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-itens-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-itens-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="arquivado"><td><div class="primary-text">Revisão geral do motor</div></td><td class="muted">Revisão completa do conjunto motor</td><td><div class="perm-badges"><span class="tag tag-neutral">Km</span><span class="tag tag-neutral">Horas</span></div></td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Arquivado</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-itens-5')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-itens-5"><td colspan="5">
+              <div class="form-row-label">Editar item · Revisão geral do motor</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do item</label><input type="text" value="Revisão geral do motor"></div>
+                <div class="f"><label>Descrição</label><input type="text" value="Revisão completa do conjunto motor"></div>
+                <div class="f"><label>A cada (km)</label><input type="number" value="20000"></div>
+                <div class="f"><label>A cada (horas)</label><input type="number" value="2000"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Arquivado</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-itens-5')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-itens-5')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== PLANOS REVISIONAIS ===== -->
+    <section class="page hidden" id="page-planos">
+      <div class="crumb">Raiz / Cadastros / <b>Planos revisionais</b></div>
+      <div class="page-head">
+        <div><h1>Planos revisionais</h1><p>Regras de periodicidade de revisão vinculadas a ativos ou tipos, com os itens que compõem cada plano.</p></div>
+        <button class="btn btn-primary" onclick="openPlanoModal('create')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo plano</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar plano"></div>
+        <div class="filter-chip">Vinculado a <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-planos')">
+          <option value="all">Status: Todos</option>
+          <option value="no-prazo">No prazo</option>
+          <option value="vence-em-breve">Vence em breve</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plano</th><th>Vinculado a</th><th>Itens revisionais</th><th>Próxima revisão</th><th>Responsável</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-planos">
+            <tr data-row data-status="vence-em-breve"><td><div class="primary-text">Manutenção trimestral</div></td><td class="muted">Compressor de ar CP-014</td><td>2 itens</td><td>05/09/2026</td><td class="cell-user"><div class="avatar-sm">RC</div>Rafael Costa</td><td><span class="tag tag-warn"><span class="tag-dot"></span>Vence em breve</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openPlanoModal('edit',0)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="vence-em-breve"><td><div class="primary-text">Inspeção semestral</div></td><td class="muted">Instalação elétrica (tipo)</td><td>1 item</td><td>08/09/2026</td><td class="cell-user"><div class="avatar-sm">LM</div>Luana Martins</td><td><span class="tag tag-warn"><span class="tag-dot"></span>Vence em breve</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openPlanoModal('edit',1)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="no-prazo"><td><div class="primary-text">Revisão mensal</div></td><td class="muted">Empilhadeira EMP-07</td><td>1 item</td><td>12/09/2026</td><td class="cell-user"><div class="avatar-sm">JP</div>João Pereira</td><td><span class="tag tag-ok"><span class="tag-dot"></span>No prazo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openPlanoModal('edit',2)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="no-prazo"><td><div class="primary-text">Inspeção anual</div></td><td class="muted">Equipamento térmico (tipo)</td><td>2 itens</td><td>17/09/2026</td><td class="cell-user"><div class="avatar-sm">RC</div>Rafael Costa</td><td><span class="tag tag-ok"><span class="tag-dot"></span>No prazo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openPlanoModal('edit',3)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== LOCAIS ===== -->
+    <section class="page hidden" id="page-locais">
+      <div class="crumb">Raiz / Cadastros / <b>Locais</b></div>
+      <div class="page-head">
+        <div><h1>Locais</h1><p>Plantas, pátios e áreas onde os ativos estão instalados, com a delimitação da área no mapa.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-locais')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo local</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por nome ou endereço"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-locais')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Local</th><th>Endereço</th><th>Área no mapa</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-locais">
+            <tr class="form-row hidden" id="create-locais"><td colspan="5">
+              <div class="form-row-label">Novo local</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do local</label><input type="text" placeholder="Ex.: Planta 3 · Depósito"></div>
+                <div class="f"><label>Endereço</label><input type="text" placeholder="Rua, número, bairro, cidade"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-locais')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-locais')">Cancelar</button></div>
+              </div>
+              <div class="map-field">
+                <label>Área do local (polígono)</label>
+                <div class="map-picker">
+                  <svg class="map-bg" viewBox="0 0 600 300" preserveAspectRatio="none">
+                    <rect width="600" height="300" fill="#CFE3D3"/>
+                    <rect x="0" y="118" width="600" height="24" fill="#EDEADF"/>
+                    <rect x="176" y="0" width="24" height="300" fill="#EDEADF"/>
+                    <rect x="430" y="0" width="18" height="300" fill="#EDEADF"/>
+                    <rect x="36" y="26" width="120" height="76" fill="#BFD8C4"/>
+                    <rect x="224" y="26" width="180" height="76" fill="#BFD8C4"/>
+                    <rect x="470" y="26" width="98" height="76" fill="#BFD8C4"/>
+                    <rect x="36" y="166" width="120" height="106" fill="#BFD8C4"/>
+                    <rect x="224" y="166" width="180" height="106" fill="#BFD8C4"/>
+                    <rect x="470" y="166" width="98" height="106" fill="#BFD8C4"/>
+                  </svg>
+                  <svg class="map-draw" data-key="create-locais" viewBox="0 0 600 300" onclick="mapAddPoint(event,'create-locais')"><g class="map-points"></g></svg>
+                  <div class="map-hint">Clique para marcar os vértices</div>
+                </div>
+                <div class="map-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapUndoPoint('create-locais')">Desfazer último ponto</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapClearPoints('create-locais')">Limpar polígono</button>
+                </div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Planta 1 · Industrial</div></td><td class="muted">Av. das Indústrias, 1200 · São Paulo/SP</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Definida</span></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-locais-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-locais-1"><td colspan="5">
+              <div class="form-row-label">Editar local · Planta 1 · Industrial</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do local</label><input type="text" value="Planta 1 · Industrial"></div>
+                <div class="f"><label>Endereço</label><input type="text" value="Av. das Indústrias, 1200 · São Paulo/SP"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-locais-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-locais-1')">Cancelar</button></div>
+              </div>
+              <div class="map-field">
+                <label>Área do local (polígono)</label>
+                <div class="map-picker">
+                  <svg class="map-bg" viewBox="0 0 600 300" preserveAspectRatio="none">
+                    <rect width="600" height="300" fill="#CFE3D3"/>
+                    <rect x="0" y="118" width="600" height="24" fill="#EDEADF"/>
+                    <rect x="176" y="0" width="24" height="300" fill="#EDEADF"/>
+                    <rect x="430" y="0" width="18" height="300" fill="#EDEADF"/>
+                    <rect x="36" y="26" width="120" height="76" fill="#BFD8C4"/>
+                    <rect x="224" y="26" width="180" height="76" fill="#BFD8C4"/>
+                    <rect x="470" y="26" width="98" height="76" fill="#BFD8C4"/>
+                    <rect x="36" y="166" width="120" height="106" fill="#BFD8C4"/>
+                    <rect x="224" y="166" width="180" height="106" fill="#BFD8C4"/>
+                    <rect x="470" y="166" width="98" height="106" fill="#BFD8C4"/>
+                  </svg>
+                  <svg class="map-draw" data-key="edit-locais-1" viewBox="0 0 600 300" onclick="mapAddPoint(event,'edit-locais-1')"><g class="map-points"></g></svg>
+                  <div class="map-hint">Clique para marcar os vértices</div>
+                </div>
+                <div class="map-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapUndoPoint('edit-locais-1')">Desfazer último ponto</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapClearPoints('edit-locais-1')">Limpar polígono</button>
+                </div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Planta 2 · Pátio externo</div></td><td class="muted">Rod. dos Metalúrgicos, km 8 · Sorocaba/SP</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Definida</span></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-locais-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-locais-2"><td colspan="5">
+              <div class="form-row-label">Editar local · Planta 2 · Pátio externo</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do local</label><input type="text" value="Planta 2 · Pátio externo"></div>
+                <div class="f"><label>Endereço</label><input type="text" value="Rod. dos Metalúrgicos, km 8 · Sorocaba/SP"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-locais-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-locais-2')">Cancelar</button></div>
+              </div>
+              <div class="map-field">
+                <label>Área do local (polígono)</label>
+                <div class="map-picker">
+                  <svg class="map-bg" viewBox="0 0 600 300" preserveAspectRatio="none">
+                    <rect width="600" height="300" fill="#CFE3D3"/>
+                    <rect x="0" y="118" width="600" height="24" fill="#EDEADF"/>
+                    <rect x="176" y="0" width="24" height="300" fill="#EDEADF"/>
+                    <rect x="430" y="0" width="18" height="300" fill="#EDEADF"/>
+                    <rect x="36" y="26" width="120" height="76" fill="#BFD8C4"/>
+                    <rect x="224" y="26" width="180" height="76" fill="#BFD8C4"/>
+                    <rect x="470" y="26" width="98" height="76" fill="#BFD8C4"/>
+                    <rect x="36" y="166" width="120" height="106" fill="#BFD8C4"/>
+                    <rect x="224" y="166" width="180" height="106" fill="#BFD8C4"/>
+                    <rect x="470" y="166" width="98" height="106" fill="#BFD8C4"/>
+                  </svg>
+                  <svg class="map-draw" data-key="edit-locais-2" viewBox="0 0 600 300" onclick="mapAddPoint(event,'edit-locais-2')"><g class="map-points"></g></svg>
+                  <div class="map-hint">Clique para marcar os vértices</div>
+                </div>
+                <div class="map-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapUndoPoint('edit-locais-2')">Desfazer último ponto</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapClearPoints('edit-locais-2')">Limpar polígono</button>
+                </div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="inativo"><td><div class="primary-text">Almoxarifado Central</div></td><td class="muted">Rua Barão de Limeira, 480 · Campinas/SP</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Não definida</span></td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Inativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-locais-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-locais-3"><td colspan="5">
+              <div class="form-row-label">Editar local · Almoxarifado Central</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome do local</label><input type="text" value="Almoxarifado Central"></div>
+                <div class="f"><label>Endereço</label><input type="text" value="Rua Barão de Limeira, 480 · Campinas/SP"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-locais-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-locais-3')">Cancelar</button></div>
+              </div>
+              <div class="map-field">
+                <label>Área do local (polígono)</label>
+                <div class="map-picker">
+                  <svg class="map-bg" viewBox="0 0 600 300" preserveAspectRatio="none">
+                    <rect width="600" height="300" fill="#CFE3D3"/>
+                    <rect x="0" y="118" width="600" height="24" fill="#EDEADF"/>
+                    <rect x="176" y="0" width="24" height="300" fill="#EDEADF"/>
+                    <rect x="430" y="0" width="18" height="300" fill="#EDEADF"/>
+                    <rect x="36" y="26" width="120" height="76" fill="#BFD8C4"/>
+                    <rect x="224" y="26" width="180" height="76" fill="#BFD8C4"/>
+                    <rect x="470" y="26" width="98" height="76" fill="#BFD8C4"/>
+                    <rect x="36" y="166" width="120" height="106" fill="#BFD8C4"/>
+                    <rect x="224" y="166" width="180" height="106" fill="#BFD8C4"/>
+                    <rect x="470" y="166" width="98" height="106" fill="#BFD8C4"/>
+                  </svg>
+                  <svg class="map-draw" data-key="edit-locais-3" viewBox="0 0 600 300" onclick="mapAddPoint(event,'edit-locais-3')"><g class="map-points"></g></svg>
+                  <div class="map-hint">Clique para marcar os vértices</div>
+                </div>
+                <div class="map-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapUndoPoint('edit-locais-3')">Desfazer último ponto</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="mapClearPoints('edit-locais-3')">Limpar polígono</button>
+                </div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== EMPRESAS ===== -->
+    <section class="page hidden" id="page-empresas">
+      <div class="crumb">Raiz / Cadastros / <b>Empresas</b></div>
+      <div class="page-head">
+        <div><h1>Empresas</h1><p>Empresas e prestadores relacionados à operação.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-empresas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova empresa</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por razão social, nome fantasia ou CNPJ"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Razão social</th><th>Nome fantasia</th><th>CNPJ</th><th>CPF</th><th>Observação</th><th></th></tr></thead>
+          <tbody id="tbody-empresas">
+            <tr class="form-row hidden" id="create-empresas"><td colspan="6">
+              <div class="form-row-label">Nova empresa</div>
+              <div class="inline-form">
+                <div class="f"><label>Razão social</label><input type="text" placeholder="Ex.: Raiz Manutenção Industrial Ltda."></div>
+                <div class="f"><label>Nome fantasia</label><input type="text" placeholder="Ex.: Raiz Manutenção"></div>
+                <div class="f"><label>CNPJ</label><input type="text" placeholder="00.000.000/0000-00"></div>
+                <div class="f"><label>CPF</label><input type="text" placeholder="000.000.000-00 (se aplicável)"></div>
+                <div class="f"><label>Observação</label><input type="text" placeholder="Observações gerais"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-empresas')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-empresas')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td><div class="primary-text">Raiz Manutenção Industrial Ltda.</div></td><td class="muted">Raiz Manutenção</td><td class="mono">12.345.678/0001-90</td><td class="mono muted">—</td><td class="muted">Contrato de manutenção corretiva e preventiva</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-empresas-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-empresas-1"><td colspan="6">
+              <div class="form-row-label">Editar empresa · Raiz Manutenção Industrial Ltda.</div>
+              <div class="inline-form">
+                <div class="f"><label>Razão social</label><input type="text" value="Raiz Manutenção Industrial Ltda."></div>
+                <div class="f"><label>Nome fantasia</label><input type="text" value="Raiz Manutenção"></div>
+                <div class="f"><label>CNPJ</label><input type="text" value="12.345.678/0001-90"></div>
+                <div class="f"><label>CPF</label><input type="text" value=""></div>
+                <div class="f"><label>Observação</label><input type="text" value="Contrato de manutenção corretiva e preventiva"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-empresas-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-empresas-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td><div class="primary-text">Calibra Instrumentos ME</div></td><td class="muted">Calibra</td><td class="mono">98.765.432/0001-11</td><td class="mono muted">—</td><td class="muted">Fornecedor de calibração de instrumentos</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-empresas-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-empresas-2"><td colspan="6">
+              <div class="form-row-label">Editar empresa · Calibra Instrumentos ME</div>
+              <div class="inline-form">
+                <div class="f"><label>Razão social</label><input type="text" value="Calibra Instrumentos ME"></div>
+                <div class="f"><label>Nome fantasia</label><input type="text" value="Calibra"></div>
+                <div class="f"><label>CNPJ</label><input type="text" value="98.765.432/0001-11"></div>
+                <div class="f"><label>CPF</label><input type="text" value=""></div>
+                <div class="f"><label>Observação</label><input type="text" value="Fornecedor de calibração de instrumentos"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-empresas-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-empresas-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td><div class="primary-text">João Almeida Serviços Industriais</div></td><td class="muted">JA Serviços</td><td class="mono muted">—</td><td class="mono">321.654.987-00</td><td class="muted">Autônomo · elétrica industrial</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-empresas-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-empresas-3"><td colspan="6">
+              <div class="form-row-label">Editar empresa · João Almeida Serviços Industriais</div>
+              <div class="inline-form">
+                <div class="f"><label>Razão social</label><input type="text" value="João Almeida Serviços Industriais"></div>
+                <div class="f"><label>Nome fantasia</label><input type="text" value="JA Serviços"></div>
+                <div class="f"><label>CNPJ</label><input type="text" value=""></div>
+                <div class="f"><label>CPF</label><input type="text" value="321.654.987-00"></div>
+                <div class="f"><label>Observação</label><input type="text" value="Autônomo · elétrica industrial"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-empresas-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-empresas-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== CARGOS ===== -->
+    <section class="page hidden" id="page-cargos">
+      <div class="crumb">Raiz / Cadastros / <b>Cargos</b></div>
+      <div class="page-head">
+        <div><h1>Cargos</h1><p>Cargos usados no cadastro de pessoas.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-cargos')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo cargo</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar cargo"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-cargos')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Descrição</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-cargos">
+            <tr class="form-row hidden" id="create-cargos"><td colspan="3">
+              <div class="form-row-label">Novo cargo</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" placeholder="Ex.: Supervisor de operações"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-cargos')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-cargos')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Técnico de manutenção</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-cargos-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-cargos-1"><td colspan="3">
+              <div class="form-row-label">Editar cargo · Técnico de manutenção</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Técnico de manutenção"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-cargos-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-cargos-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Supervisor de operações</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-cargos-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-cargos-2"><td colspan="3">
+              <div class="form-row-label">Editar cargo · Supervisor de operações</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Supervisor de operações"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-cargos-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-cargos-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Inspetor de qualidade</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-cargos-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-cargos-3"><td colspan="3">
+              <div class="form-row-label">Editar cargo · Inspetor de qualidade</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Inspetor de qualidade"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-cargos-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-cargos-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="inativo"><td><div class="primary-text">Auxiliar de almoxarifado</div></td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Inativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-cargos-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-cargos-4"><td colspan="3">
+              <div class="form-row-label">Editar cargo · Auxiliar de almoxarifado</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Auxiliar de almoxarifado"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-cargos-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-cargos-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== FUNÇÕES ===== -->
+    <section class="page hidden" id="page-funcoes">
+      <div class="crumb">Raiz / Cadastros / <b>Funções</b></div>
+      <div class="page-head">
+        <div><h1>Funções</h1><p>Funções usadas no cadastro de pessoas.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-funcoes')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova função</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar função"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-funcoes')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Descrição</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-funcoes">
+            <tr class="form-row hidden" id="create-funcoes"><td colspan="3">
+              <div class="form-row-label">Nova função</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" placeholder="Ex.: Elétrica"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-funcoes')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-funcoes')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Elétrica</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-funcoes-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-funcoes-1"><td colspan="3">
+              <div class="form-row-label">Editar função · Elétrica</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Elétrica"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-funcoes-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-funcoes-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Mecânica</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-funcoes-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-funcoes-2"><td colspan="3">
+              <div class="form-row-label">Editar função · Mecânica</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Mecânica"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-funcoes-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-funcoes-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td><div class="primary-text">Instrumentação</div></td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-funcoes-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-funcoes-3"><td colspan="3">
+              <div class="form-row-label">Editar função · Instrumentação</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Instrumentação"></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-funcoes-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-funcoes-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="inativo"><td><div class="primary-text">Logística</div></td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Inativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-funcoes-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-funcoes-4"><td colspan="3">
+              <div class="form-row-label">Editar função · Logística</div>
+              <div class="inline-form">
+                <div class="f"><label>Descrição</label><input type="text" value="Logística"></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option selected>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-funcoes-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-funcoes-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== PESSOAS ===== -->
+    <section class="page hidden" id="page-pessoas">
+      <div class="crumb">Raiz / Cadastros / <b>Pessoas</b></div>
+      <div class="page-head">
+        <div><h1>Pessoas</h1><p>Pessoas que executam serviços e checklists, com cargo e função vinculados.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-pessoas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova pessoa</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por nome ou CPF"></div>
+        <div class="filter-chip">Cargo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="filter-chip">Função <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Função</th><th>Observação</th><th></th></tr></thead>
+          <tbody id="tbody-pessoas">
+            <tr class="form-row hidden" id="create-pessoas"><td colspan="6">
+              <div class="form-row-label">Nova pessoa</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" placeholder="Nome completo"></div>
+                <div class="f"><label>CPF</label><input type="text" placeholder="000.000.000-00"></div>
+                <div class="f"><label>Cargo</label><select><option>Técnico de manutenção</option><option>Supervisor de operações</option><option>Inspetor de qualidade</option><option>Auxiliar de almoxarifado</option></select></div>
+                <div class="f"><label>Função</label><select><option>Elétrica</option><option>Mecânica</option><option>Instrumentação</option><option>Logística</option></select></div>
+                <div class="f"><label>Observação</label><input type="text" placeholder="Observações gerais"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-pessoas')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-pessoas')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td class="cell-user"><div class="avatar-sm">RC</div><div class="primary-text">Rafael Costa</div></td><td class="mono">123.456.789-01</td><td>Técnico de manutenção</td><td>Mecânica</td><td class="muted">Turno da manhã</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-pessoas-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-pessoas-1"><td colspan="6">
+              <div class="form-row-label">Editar pessoa · Rafael Costa</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Rafael Costa"></div>
+                <div class="f"><label>CPF</label><input type="text" value="123.456.789-01"></div>
+                <div class="f"><label>Cargo</label><select><option selected>Técnico de manutenção</option><option>Supervisor de operações</option><option>Inspetor de qualidade</option><option>Auxiliar de almoxarifado</option></select></div>
+                <div class="f"><label>Função</label><select><option>Elétrica</option><option selected>Mecânica</option><option>Instrumentação</option><option>Logística</option></select></div>
+                <div class="f"><label>Observação</label><input type="text" value="Turno da manhã"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-pessoas-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-pessoas-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td class="cell-user"><div class="avatar-sm">LM</div><div class="primary-text">Luana Martins</div></td><td class="mono">234.567.890-12</td><td>Inspetor de qualidade</td><td>Instrumentação</td><td class="muted">Responsável por calibrações</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-pessoas-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-pessoas-2"><td colspan="6">
+              <div class="form-row-label">Editar pessoa · Luana Martins</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Luana Martins"></div>
+                <div class="f"><label>CPF</label><input type="text" value="234.567.890-12"></div>
+                <div class="f"><label>Cargo</label><select><option>Técnico de manutenção</option><option>Supervisor de operações</option><option selected>Inspetor de qualidade</option><option>Auxiliar de almoxarifado</option></select></div>
+                <div class="f"><label>Função</label><select><option>Elétrica</option><option>Mecânica</option><option selected>Instrumentação</option><option>Logística</option></select></div>
+                <div class="f"><label>Observação</label><input type="text" value="Responsável por calibrações"></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-pessoas-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-pessoas-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row><td class="cell-user"><div class="avatar-sm">JP</div><div class="primary-text">João Pereira</div></td><td class="mono">345.678.901-23</td><td>Supervisor de operações</td><td>Logística</td><td class="muted">—</td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-pessoas-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-pessoas-3"><td colspan="6">
+              <div class="form-row-label">Editar pessoa · João Pereira</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="João Pereira"></div>
+                <div class="f"><label>CPF</label><input type="text" value="345.678.901-23"></div>
+                <div class="f"><label>Cargo</label><select><option>Técnico de manutenção</option><option selected>Supervisor de operações</option><option>Inspetor de qualidade</option><option>Auxiliar de almoxarifado</option></select></div>
+                <div class="f"><label>Função</label><select><option>Elétrica</option><option>Mecânica</option><option>Instrumentação</option><option selected>Logística</option></select></div>
+                <div class="f"><label>Observação</label><input type="text" value=""></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-pessoas-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-pessoas-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== EMISSÃO ===== -->
+    <section class="page hidden" id="page-emissao">
+      <div class="crumb">Raiz / <b>Emissão</b></div>
+      <div class="page-head">
+        <div><h1>Emissão</h1><p>Documentos de emissão gerados a partir dos planos revisionais.</p></div>
+        <button class="btn btn-primary" onclick="openEmissaoModal('create')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova emissão</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por nº de emissão ou ativo"></div>
+        <div class="filter-chip">Período <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-emissao')">
+          <option value="all">Status: Todos</option>
+          <option value="emitido">Emitido</option>
+          <option value="em-analise">Em análise</option>
+          <option value="rascunho">Rascunho</option>
+          <option value="reprovado">Reprovado</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nº emissão</th><th>Ativo</th><th>Setor</th><th>Plano revisional</th><th>Data</th><th>Responsável</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-emissao">
+            <tr data-row data-status="emitido"><td class="code">EM-2026-0312</td><td>Compressor de ar CP-014</td><td class="muted">Manutenção</td><td class="muted">Manutenção trimestral</td><td>02/09/2026</td><td class="cell-user"><div class="avatar-sm">RC</div>Rafael Costa</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Emitido</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openEmissaoModal('edit',0)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="em-analise"><td class="code">EM-2026-0311</td><td>Painel elétrico QGBT-02</td><td class="muted">Produção</td><td class="muted">Inspeção semestral</td><td>01/09/2026</td><td class="cell-user"><div class="avatar-sm">LM</div>Luana Martins</td><td><span class="tag tag-warn"><span class="tag-dot"></span>Em análise</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openEmissaoModal('edit',1)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="rascunho"><td class="code">EM-2026-0310</td><td>Empilhadeira EMP-07</td><td class="muted">Logística</td><td class="muted">Revisão mensal</td><td>30/08/2026</td><td class="cell-user"><div class="avatar-sm">JP</div>João Pereira</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Rascunho</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openEmissaoModal('edit',2)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="emitido"><td class="code">EM-2026-0309</td><td>Caldeira CD-01</td><td class="muted">Manutenção</td><td class="muted">Inspeção anual</td><td>28/08/2026</td><td class="cell-user"><div class="avatar-sm">RC</div>Rafael Costa</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Emitido</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openEmissaoModal('edit',3)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr data-row data-status="reprovado"><td class="code">EM-2026-0308</td><td>Gerador GE-03</td><td class="muted">Segurança do trabalho</td><td class="muted">Inspeção semestral</td><td>25/08/2026</td><td class="cell-user"><div class="avatar-sm">LM</div>Luana Martins</td><td><span class="tag tag-off"><span class="tag-dot"></span>Reprovado</span></td><td><div class="row-actions"><button class="icon-btn" onclick="openEmissaoModal('edit',4)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+          </tbody>
+        </table>
+        <div class="table-foot">
+          <span>Exibindo 1–5 de 312 emissões</span>
+          <div class="pager"><button class="active">1</button><button>2</button><button>3</button><button>···</button><button>63</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== USUÁRIOS ===== -->
+    <section class="page hidden" id="page-usuarios">
+      <div class="crumb">Raiz / Configurações / <b>Usuários</b></div>
+      <div class="page-head">
+        <div><h1>Usuários</h1><p>Pessoas com acesso ao painel administrativo.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-usuarios')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Convidar usuário</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por nome ou e-mail"></div>
+        <div class="filter-chip">Perfil <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-usuarios')">
+          <option value="all">Status: Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="convite-pendente">Convite pendente</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Usuário</th><th>Perfil de acesso</th><th>Último acesso</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-usuarios">
+            <tr class="form-row hidden" id="create-usuarios"><td colspan="5">
+              <div class="form-row-label">Convidar usuário</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" placeholder="Nome completo"></div>
+                <div class="f"><label>E-mail</label><input type="email" placeholder="nome@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option>Administrador</option><option>Técnico de manutenção</option><option>Inspetor</option><option>Somente leitura</option></select></div>
+                <div class="f"><label>Status</label><select><option>Convite pendente</option><option>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-usuarios')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-usuarios')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="cell-user"><div class="avatar-sm">AS</div><div><div class="primary-text">Ana Souza</div><div class="sub-text">ana.souza@empresa.com.br</div></div></td><td>Administrador</td><td>Hoje, 09:12</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-usuarios-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-usuarios-1"><td colspan="5">
+              <div class="form-row-label">Editar usuário · Ana Souza</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Ana Souza"></div>
+                <div class="f"><label>E-mail</label><input type="email" value="ana.souza@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option selected>Administrador</option><option>Técnico de manutenção</option><option>Inspetor</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Convite pendente</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-usuarios-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-usuarios-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="cell-user"><div class="avatar-sm">RC</div><div><div class="primary-text">Rafael Costa</div><div class="sub-text">rafael.costa@empresa.com.br</div></div></td><td>Técnico de manutenção</td><td>Ontem, 17:40</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-usuarios-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-usuarios-2"><td colspan="5">
+              <div class="form-row-label">Editar usuário · Rafael Costa</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Rafael Costa"></div>
+                <div class="f"><label>E-mail</label><input type="email" value="rafael.costa@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option>Administrador</option><option selected>Técnico de manutenção</option><option>Inspetor</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Convite pendente</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-usuarios-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-usuarios-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativo"><td class="cell-user"><div class="avatar-sm">LM</div><div><div class="primary-text">Luana Martins</div><div class="sub-text">luana.martins@empresa.com.br</div></div></td><td>Inspetora</td><td>Ontem, 14:02</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-usuarios-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-usuarios-3"><td colspan="5">
+              <div class="form-row-label">Editar usuário · Luana Martins</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Luana Martins"></div>
+                <div class="f"><label>E-mail</label><input type="email" value="luana.martins@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option>Administrador</option><option>Técnico de manutenção</option><option selected>Inspetor</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Ativo</option><option>Convite pendente</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-usuarios-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-usuarios-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="convite-pendente"><td class="cell-user"><div class="avatar-sm">JP</div><div><div class="primary-text">João Pereira</div><div class="sub-text">joao.pereira@empresa.com.br</div></div></td><td>Técnico de manutenção</td><td>28/08/2026</td><td><span class="tag tag-neutral"><span class="tag-dot"></span>Convite pendente</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-usuarios-4')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-usuarios-4"><td colspan="5">
+              <div class="form-row-label">Editar usuário · João Pereira</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="João Pereira"></div>
+                <div class="f"><label>E-mail</label><input type="email" value="joao.pereira@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option selected>Técnico de manutenção</option><option>Administrador</option><option>Inspetor</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Convite pendente</option><option>Ativo</option><option>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-usuarios-4')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-usuarios-4')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="inativo"><td class="cell-user"><div class="avatar-sm">MF</div><div><div class="primary-text">Marina Ferreira</div><div class="sub-text">marina.ferreira@empresa.com.br</div></div></td><td>Somente leitura</td><td>02/07/2026</td><td><span class="tag tag-off"><span class="tag-dot"></span>Inativo</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-usuarios-5')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-usuarios-5"><td colspan="5">
+              <div class="form-row-label">Editar usuário · Marina Ferreira</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome</label><input type="text" value="Marina Ferreira"></div>
+                <div class="f"><label>E-mail</label><input type="email" value="marina.ferreira@empresa.com.br"></div>
+                <div class="f"><label>Perfil de acesso</label><select><option selected>Somente leitura</option><option>Administrador</option></select></div>
+                <div class="f"><label>Status</label><select><option>Ativo</option><option>Convite pendente</option><option selected>Inativo</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-usuarios-5')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-usuarios-5')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== CONTAS ===== -->
+    <section class="page hidden" id="page-contas">
+      <div class="crumb">Raiz / Configurações / <b>Contas</b></div>
+      <div class="page-head">
+        <div><h1>Contas</h1><p>Empresas e unidades com contrato ativo na plataforma.</p></div>
+        <button class="btn btn-primary" onclick="toggleRow('create-contas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova conta</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Buscar por nome ou CNPJ"></div>
+        <select class="status-select" onchange="filterStatus(this,'tbody-contas')">
+          <option value="all">Status: Todos</option>
+          <option value="ativa">Ativa</option>
+          <option value="pendente">Pagamento pendente</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Conta</th><th>CNPJ</th><th>Plano contratado</th><th>Usuários</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tbody-contas">
+            <tr class="form-row hidden" id="create-contas"><td colspan="6">
+              <div class="form-row-label">Nova conta</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome da conta</label><input type="text" placeholder="Razão social"></div>
+                <div class="f"><label>CNPJ</label><input type="text" placeholder="00.000.000/0001-00"></div>
+                <div class="f"><label>Plano contratado</label><select><option>Essencial</option><option>Corporativo</option></select></div>
+                <div class="f"><label>Status</label><select><option>Ativa</option><option>Pagamento pendente</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('create-contas')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('create-contas')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativa"><td><div class="primary-text">Indústria Bela Vista Ltda.</div></td><td class="code">12.345.678/0001-90</td><td>Corporativo</td><td>48</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativa</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-contas-1')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-contas-1"><td colspan="6">
+              <div class="form-row-label">Editar conta · Indústria Bela Vista Ltda.</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome da conta</label><input type="text" value="Indústria Bela Vista Ltda."></div>
+                <div class="f"><label>CNPJ</label><input type="text" value="12.345.678/0001-90"></div>
+                <div class="f"><label>Plano contratado</label><select><option selected>Corporativo</option><option>Essencial</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Ativa</option><option>Pagamento pendente</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-contas-1')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-contas-1')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="ativa"><td><div class="primary-text">Metalúrgica Serrano S.A.</div></td><td class="code">98.765.432/0001-11</td><td>Corporativo</td><td>112</td><td><span class="tag tag-ok"><span class="tag-dot"></span>Ativa</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-contas-2')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-contas-2"><td colspan="6">
+              <div class="form-row-label">Editar conta · Metalúrgica Serrano S.A.</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome da conta</label><input type="text" value="Metalúrgica Serrano S.A."></div>
+                <div class="f"><label>CNPJ</label><input type="text" value="98.765.432/0001-11"></div>
+                <div class="f"><label>Plano contratado</label><select><option selected>Corporativo</option><option>Essencial</option></select></div>
+                <div class="f"><label>Status</label><select><option selected>Ativa</option><option>Pagamento pendente</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-contas-2')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-contas-2')">Cancelar</button></div>
+              </div>
+            </td></tr>
+
+            <tr data-row data-status="pendente"><td><div class="primary-text">Grupo Vertex Engenharia</div></td><td class="code">55.221.009/0001-45</td><td>Essencial</td><td>19</td><td><span class="tag tag-warn"><span class="tag-dot"></span>Pagamento pendente</span></td><td><div class="row-actions"><button class="icon-btn" onclick="toggleRow('edit-contas-3')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td></tr>
+            <tr class="form-row hidden" id="edit-contas-3"><td colspan="6">
+              <div class="form-row-label">Editar conta · Grupo Vertex Engenharia</div>
+              <div class="inline-form">
+                <div class="f"><label>Nome da conta</label><input type="text" value="Grupo Vertex Engenharia"></div>
+                <div class="f"><label>CNPJ</label><input type="text" value="55.221.009/0001-45"></div>
+                <div class="f"><label>Plano contratado</label><select><option selected>Essencial</option><option>Corporativo</option></select></div>
+                <div class="f"><label>Status</label><select><option>Ativa</option><option selected>Pagamento pendente</option></select></div>
+                <div class="actions"><button class="btn btn-primary btn-sm" onclick="toggleRow('edit-contas-3')">Salvar</button><button class="btn btn-ghost btn-sm" onclick="toggleRow('edit-contas-3')">Cancelar</button></div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== PERFIL DE ACESSO ===== -->
+    <section class="page hidden" id="page-perfil">
+      <div class="crumb">Raiz / Configurações / <b>Perfil de acesso</b></div>
+      <div class="page-head">
+        <div><h1>Perfis de acesso</h1><p>Grupos de permissões atribuídos aos usuários.</p></div>
+        <button class="btn btn-primary" onclick="openPerfilModal('create')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Novo perfil</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Perfil</th><th>Descrição</th><th>Usuários</th><th>Permissões</th><th></th></tr></thead>
+          <tbody id="tbody-perfil">
+            <tr data-row>
+              <td><div class="primary-text">Administrador</div></td>
+              <td class="muted">Acesso completo à conta e às configurações</td>
+              <td>3</td>
+              <td><div class="perm-badges"><span class="tag tag-ok">Criar</span><span class="tag tag-ok">Editar</span><span class="tag tag-ok">Excluir</span></div></td>
+              <td><div class="row-actions"><button class="icon-btn" onclick="openPerfilModal('edit',0)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td>
+            </tr>
+            <tr data-row>
+              <td><div class="primary-text">Técnico de manutenção</div></td>
+              <td class="muted">Gerencia ativos e realiza emissões</td>
+              <td>26</td>
+              <td><div class="perm-badges"><span class="tag tag-ok">Criar</span><span class="tag tag-ok">Editar</span></div></td>
+              <td><div class="row-actions"><button class="icon-btn" onclick="openPerfilModal('edit',1)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td>
+            </tr>
+            <tr data-row>
+              <td><div class="primary-text">Inspetor</div></td>
+              <td class="muted">Analisa e aprova emissões pendentes</td>
+              <td>9</td>
+              <td><div class="perm-badges"><span class="tag tag-ok">Editar</span></div></td>
+              <td><div class="row-actions"><button class="icon-btn" onclick="openPerfilModal('edit',2)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td>
+            </tr>
+            <tr data-row>
+              <td><div class="primary-text">Somente leitura</div></td>
+              <td class="muted">Visualiza cadastros e emissões sem editar</td>
+              <td>7</td>
+              <td><div class="perm-badges"><span class="tag tag-neutral">Sem permissões de escrita</span></div></td>
+              <td><div class="row-actions"><button class="icon-btn" onclick="openPerfilModal('edit',3)" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== APARÊNCIA ===== -->
+    <section class="page hidden" id="page-aparencia">
+      <div class="crumb">Raiz / Configurações / <b>Aparência</b></div>
+      <div class="page-head">
+        <div><h1>Aparência</h1><p>Teste paletas de cores e o modo de exibição do painel. As mudanças se aplicam em tempo real.</p></div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Modo de exibição</h3>
+        <p>Escolha entre o modo claro e o modo escuro.</p>
+        <div class="mode-toggle">
+          <button class="mode-btn active" data-mode="light" onclick="applyMode('light')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            Claro
+          </button>
+          <button class="mode-btn" data-mode="dark" onclick="applyMode('dark')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+            Escuro
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Paleta de cores</h3>
+        <p>Selecione uma paleta para pré-visualizar em todo o painel.</p>
+        <div class="palette-grid">
+          <div class="palette-card selected" data-key="atual" onclick="applyPalette('atual')">
+            <div class="palette-swatches">
+              <span style="background:#173A2C"></span><span style="background:#1F4D3A"></span><span style="background:#2C6E4F"></span><span style="background:#8FCBA6"></span><span style="background:#DCEEE1"></span>
+            </div>
+            <div class="palette-card-body"><span class="pname">Atual · Verde Floresta</span><span class="palette-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></div>
+          </div>
+          <div class="palette-card" data-key="cedro" onclick="applyPalette('cedro')">
+            <div class="palette-swatches">
+              <span style="background:#071821"></span><span style="background:#145A4C"></span><span style="background:#1E9B83"></span><span style="background:#A9E5D1"></span><span style="background:#F1EEE7"></span>
+            </div>
+            <div class="palette-card-body"><span class="pname">Verde Cedro</span><span class="palette-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></div>
+          </div>
+          <div class="palette-card" data-key="noturno" onclick="applyPalette('noturno')">
+            <div class="palette-swatches">
+              <span style="background:#0B1F33"></span><span style="background:#0F4E3A"></span><span style="background:#1F8E7A"></span><span style="background:#A7DDC9"></span><span style="background:#FFFFFF;border-left:1px solid #eee"></span>
+            </div>
+            <div class="palette-card-body"><span class="pname">Verde Noturno</span><span class="palette-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></div>
+          </div>
+          <div class="palette-card" data-key="laguna" onclick="applyPalette('laguna')">
+            <div class="palette-swatches">
+              <span style="background:#0A0F14"></span><span style="background:#003B46"></span><span style="background:#07575B"></span><span style="background:#66A5AD"></span><span style="background:#C4DFE6"></span>
+            </div>
+            <div class="palette-card-body"><span class="pname">Laguna Profunda</span><span class="palette-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></div>
+          </div>
+          <div class="palette-card" data-key="retro" onclick="applyPalette('retro')">
+            <div class="palette-swatches">
+              <span style="background:#023047"></span><span style="background:#0077B6"></span><span style="background:#00B4D8"></span><span style="background:#90E0EF"></span><span style="background:#CAF0F8"></span>
+            </div>
+            <div class="palette-card-body"><span class="pname">Retrô à Beira da Piscina</span><span class="palette-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===== MODAL: PLANO REVISIONAL ===== -->
+  <div class="modal-overlay hidden" id="modal-plano">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-plano-title">Novo plano revisional</h2>
+        <button class="modal-close" onclick="closeModal('modal-plano')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-tab="geral" onclick="switchModalTab('modal-plano','geral')">Geral</button>
+        <button class="modal-tab-btn" data-tab="itens" onclick="switchModalTab('modal-plano','itens')">Itens revisionais</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tab-panel" data-tab="geral">
+          <div class="modal-grid">
+            <div class="f f-full"><label>Nome do plano</label><input type="text" id="plano-nome" placeholder="Ex.: Inspeção trimestral"></div>
+            <div class="f f-full">
+              <label>Vinculado a</label>
+              <div class="radio-row">
+                <label><input type="radio" name="plano-vinculo" id="plano-vinculo-ativo" value="ativo" checked> Ativo específico</label>
+                <label><input type="radio" name="plano-vinculo" id="plano-vinculo-tipo" value="tipo"> Tipo de ativo</label>
+              </div>
+              <input type="text" id="plano-vinculo-valor" placeholder="Selecione o ativo ou tipo">
+            </div>
+            <div class="f"><label>Responsável</label><input type="text" id="plano-responsavel" placeholder="Nome do responsável"></div>
+            <div class="f"><label>Status</label>
+              <select id="plano-status"><option>No prazo</option><option>Vence em breve</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-tab-panel hidden" data-tab="itens">
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Selecione os itens revisionais que fazem parte deste plano. Ao marcar um item, você pode ajustar a medição específica para este plano.</p>
+          <div id="plano-itens-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-plano')">Cancelar</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-plano')">Salvar plano</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: EMISSÃO ===== -->
+  <div class="modal-overlay hidden" id="modal-emissao">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-emissao-title">Nova emissão</h2>
+        <button class="modal-close" onclick="closeModal('modal-emissao')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-tab="geral" onclick="switchModalTab('modal-emissao','geral')">Geral</button>
+        <button class="modal-tab-btn" data-tab="itens" onclick="switchModalTab('modal-emissao','itens')">Itens</button>
+        <button class="modal-tab-btn" data-tab="servico" onclick="switchModalTab('modal-emissao','servico')">Serviço</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tab-panel" data-tab="geral">
+          <div class="modal-grid">
+            <div class="f"><label>Ativo</label>
+              <select id="emissao-ativo"><option>Compressor de ar CP-014</option><option>Painel elétrico QGBT-02</option><option>Empilhadeira EMP-07</option><option>Caldeira CD-01</option><option>Gerador GE-03</option></select>
+            </div>
+            <div class="f"><label>Setor</label>
+              <select id="emissao-setor"><option>Manutenção</option><option>Produção</option><option>Logística</option><option>Segurança do trabalho</option><option>Administrativo</option></select>
+            </div>
+            <div class="f"><label>Plano revisional</label>
+              <select id="emissao-plano"><option>Manutenção trimestral</option><option>Inspeção semestral</option><option>Revisão mensal</option><option>Inspeção anual</option></select>
+            </div>
+            <div class="f"><label>Responsável</label><input type="text" id="emissao-responsavel" placeholder="Nome do responsável"></div>
+            <div class="f"><label>Data de emissão</label><input type="date" id="emissao-data"></div>
+            <div class="f"><label>Status</label>
+              <select id="emissao-status"><option>Rascunho</option><option>Em análise</option><option>Emitido</option><option>Reprovado</option></select>
+            </div>
+            <div class="f"><label>Data agendamento</label><input type="datetime-local" id="emissao-data-agendamento"></div>
+            <div class="f"><label>Data início</label><input type="datetime-local" id="emissao-data-inicio"></div>
+            <div class="f"><label>Data fim</label><input type="datetime-local" id="emissao-data-fim"></div>
+          </div>
+        </div>
+        <div class="modal-tab-panel hidden" data-tab="itens">
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Marque os itens revisionais executados nesta emissão e registre a medição realizada.</p>
+          <div id="emissao-itens-list"></div>
+        </div>
+        <div class="modal-tab-panel hidden" data-tab="servico">
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Registre quem executou o serviço, o período trabalhado e o item revisional relacionado (aba Itens).</p>
+          <div id="emissao-servico-list"></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addServicoRow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Adicionar serviço</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-emissao')">Cancelar</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-emissao')">Salvar emissão</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: PERFIL DE ACESSO ===== -->
+  <div class="modal-overlay hidden" id="modal-perfil">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-perfil-title">Novo perfil de acesso</h2>
+        <button class="modal-close" onclick="closeModal('modal-perfil')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-tab="geral" onclick="switchModalTab('modal-perfil','geral')">Geral</button>
+        <button class="modal-tab-btn" data-tab="permissoes" onclick="switchModalTab('modal-perfil','permissoes')">Permissões</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tab-panel" data-tab="geral">
+          <div class="modal-grid">
+            <div class="f f-full"><label>Nome do perfil</label><input type="text" id="perfil-nome" placeholder="Ex.: Supervisor de planta"></div>
+            <div class="f f-full"><label>Descrição</label><input type="text" id="perfil-descricao" placeholder="O que esse perfil pode fazer"></div>
+          </div>
+        </div>
+        <div class="modal-tab-panel hidden" data-tab="permissoes">
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Defina, para cada módulo do sistema, se este perfil pode criar, editar ou excluir registros.</p>
+          <div id="perfil-permissoes-table"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-perfil')">Cancelar</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-perfil')">Salvar perfil</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function goToApp(){
+    document.getElementById('view-login').style.display = 'none';
+    document.getElementById('view-app').classList.add('active');
+    setView('home');
+  }
+
+  function toggleRow(id){
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('hidden');
+  }
+
+  function filterStatus(selectEl, tbodyId){
+    const val = selectEl.value;
+    const tbody = document.getElementById(tbodyId);
+    tbody.querySelectorAll('tr[data-row]').forEach(function(tr){
+      const show = (val === 'all' || tr.dataset.status === val);
+      tr.style.display = show ? '' : 'none';
+    });
+  }
+
+  const pageParent = {
+    home:'home', ativos:'cadastros', tipos:'cadastros', itens:'cadastros', planos:'cadastros',
+    locais:'cadastros', empresas:'cadastros', cargos:'cadastros', funcoes:'cadastros', pessoas:'cadastros',
+    emissao:'emissao', usuarios:'config', contas:'config', perfil:'config', aparencia:'config'
+  };
+
+  function setView(target){
+    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+    const page = document.getElementById('page-' + target);
+    if(page) page.classList.remove('hidden');
+
+    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.nav-item[data-target="'+target+'"]').forEach(b=>b.classList.add('active'));
+
+    const parent = pageParent[target];
+    if(parent==='cadastros'){ expandGroup('g-cadastros', true); }
+    if(parent==='config'){ expandGroup('g-config', true); }
+  }
+
+  function expandGroup(id, open){
+    const sub = document.getElementById(id);
+    const toggle = document.querySelector('.group-toggle[data-group="'+id+'"]');
+    if(open){ sub.classList.remove('hidden'); toggle.classList.add('expanded'); }
+    else { sub.classList.add('hidden'); toggle.classList.remove('expanded'); }
+  }
+
+  document.querySelectorAll('.nav-item').forEach(btn=>{
+    btn.addEventListener('click', ()=> setView(btn.dataset.target));
+  });
+  document.querySelectorAll('.group-toggle').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.group;
+      const sub = document.getElementById(id);
+      expandGroup(id, sub.classList.contains('hidden'));
+    });
+  });
+
+  /* ---------- THEME / PALETTE ENGINE ---------- */
+  const PALETTES = {
+    atual:   { name:'Atual · Verde Floresta',      forest:'#173A2C', forest2:'#1F4D3A', pine:'#2C6E4F', pineDark:'#215839', sage:'#8FCBA6', sagePale:'#DCEEE1' },
+    cedro:   { name:'Verde Cedro',                 forest:'#071821', forest2:'#145A4C', pine:'#1E9B83', pineDark:null,       sage:'#A9E5D1', sagePale:'#F1EEE7' },
+    noturno: { name:'Verde Noturno',               forest:'#0B1F33', forest2:'#0F4E3A', pine:'#1F8E7A', pineDark:null,       sage:'#A7DDC9', sagePale:'#F2FBF7' },
+    laguna:  { name:'Laguna Profunda',             forest:'#0A0F14', forest2:'#003B46', pine:'#07575B', pineDark:null,       sage:'#66A5AD', sagePale:'#DCEEF1' },
+    retro:   { name:'Retrô à Beira da Piscina',    forest:'#023047', forest2:'#0077B6', pine:'#00B4D8', pineDark:'#2A9D8F', sage:'#90E0EF', sagePale:'#E4F8FC' }
+  };
+
+  const NEUTRAL = {
+    light: { paper:'#F5F8F5', paper2:'#EEF3EE', white:'#FFFFFF', ink:'#152219', inkSoft:'#3F4F46', line:'#DEE7DE', lineStrong:'#C7D5C9' },
+    dark:  { paper:'#0F1613', paper2:'#161F1B', white:'#1B241F', ink:'#EAF3EC', inkSoft:'#9FB3A8', line:'#2A362F', lineStrong:'#3A483F' }
+  };
+
+  let currentPalette = 'atual';
+  let currentMode = 'light';
+
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    return { r: parseInt(hex.substring(0,2),16), g: parseInt(hex.substring(2,4),16), b: parseInt(hex.substring(4,6),16) };
+  }
+  function darkenHex(hex, amt){
+    const c = hexToRgb(hex);
+    const dr = Math.round(c.r*(1-amt)), dg = Math.round(c.g*(1-amt)), db = Math.round(c.b*(1-amt));
+    return '#' + [dr,dg,db].map(v=>v.toString(16).padStart(2,'0')).join('');
+  }
+
+  function applyPalette(key){
+    const p = PALETTES[key];
+    if(!p) return;
+    const root = document.documentElement.style;
+    root.setProperty('--forest', p.forest);
+    root.setProperty('--forest-2', p.forest2);
+    root.setProperty('--pine', p.pine);
+    root.setProperty('--pine-dark', p.pineDark || darkenHex(p.pine, 0.18));
+    root.setProperty('--sage', p.sage);
+    root.setProperty('--sage-pale', p.sagePale);
+    currentPalette = key;
+    document.querySelectorAll('.palette-card').forEach(c=>c.classList.toggle('selected', c.dataset.key===key));
+  }
+
+  function applyMode(mode){
+    currentMode = mode;
+    const n = mode === 'dark' ? NEUTRAL.dark : NEUTRAL.light;
+    const root = document.documentElement.style;
+    root.setProperty('--paper', n.paper);
+    root.setProperty('--paper-2', n.paper2);
+    root.setProperty('--white', n.white);
+    root.setProperty('--ink', n.ink);
+    root.setProperty('--ink-soft', n.inkSoft);
+    root.setProperty('--line', n.line);
+    root.setProperty('--line-strong', n.lineStrong);
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  }
+
+  /* ---------- GENERIC MODAL / TAB ENGINE ---------- */
+  function showModal(id){ document.getElementById(id).classList.remove('hidden'); }
+  function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+  function switchModalTab(modalId, tabKey){
+    const modal = document.getElementById(modalId);
+    modal.querySelectorAll('.modal-tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tabKey));
+    modal.querySelectorAll('.modal-tab-panel').forEach(p=>p.classList.toggle('hidden', p.dataset.tab!==tabKey));
+  }
+
+  function toggleItemRow(checkbox){
+    const row = checkbox.closest('.item-row');
+    row.querySelectorAll('.item-fields input, .item-obs input').forEach(inp => inp.disabled = !checkbox.checked);
+  }
+
+  /* ---------- MAP PICKER (polígono de local) ---------- */
+  const MAP_POINTS = {};
+
+  function mapAddPoint(evt, key){
+    const svg = evt.currentTarget;
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+    if(!MAP_POINTS[key]) MAP_POINTS[key] = [];
+    MAP_POINTS[key].push([Math.round(loc.x), Math.round(loc.y)]);
+    renderMapPolygon(svg, key);
+  }
+  function mapUndoPoint(key){
+    const svg = document.querySelector('svg.map-draw[data-key="'+key+'"]');
+    if(!svg || !MAP_POINTS[key] || !MAP_POINTS[key].length) return;
+    MAP_POINTS[key].pop();
+    renderMapPolygon(svg, key);
+  }
+  function mapClearPoints(key){
+    const svg = document.querySelector('svg.map-draw[data-key="'+key+'"]');
+    if(!svg) return;
+    MAP_POINTS[key] = [];
+    renderMapPolygon(svg, key);
+  }
+  function renderMapPolygon(svg, key){
+    const g = svg.querySelector('.map-points');
+    const pts = MAP_POINTS[key] || [];
+    let html = '';
+    if(pts.length > 1){
+      html += '<polygon points="'+pts.map(p=>p.join(',')).join(' ')+'" class="map-polygon"></polygon>';
+    }
+    pts.forEach(function(p){ html += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="5" class="map-vertex"></circle>'; });
+    g.innerHTML = html;
+  }
+
+  /* ---------- CATALOG: ITENS REVISIONAIS ---------- */
+  const ITENS_CATALOG = [
+    { id:1, nome:'Troca de óleo', controle:['dias','km'], dias:90, km:5000 },
+    { id:2, nome:'Verificação de nível de fluido', controle:['dias'], dias:30 },
+    { id:3, nome:'Inspeção de correias', controle:['horas'], horas:500 },
+    { id:4, nome:'Calibração de instrumento', controle:['dias'], dias:180 },
+    { id:5, nome:'Revisão geral do motor', controle:['km','horas'], km:20000, horas:2000 }
+  ];
+  const CONTROLE_LABEL = { dias:'Dias', km:'Km', horas:'Horas' };
+
+  /* ---------- PLANOS REVISIONAIS ---------- */
+  const PLANOS = [
+    { nome:'Manutenção trimestral', vinculoTipo:'ativo', vinculoValor:'Compressor de ar CP-014', responsavel:'Rafael Costa', status:'Vence em breve',
+      itens:[{id:1,checked:true,dias:90,km:5000},{id:2,checked:true,dias:30}] },
+    { nome:'Inspeção semestral', vinculoTipo:'tipo', vinculoValor:'Instalação elétrica', responsavel:'Luana Martins', status:'Vence em breve',
+      itens:[{id:4,checked:true,dias:180}] },
+    { nome:'Revisão mensal', vinculoTipo:'ativo', vinculoValor:'Empilhadeira EMP-07', responsavel:'João Pereira', status:'No prazo',
+      itens:[{id:3,checked:true,horas:500}] },
+    { nome:'Inspeção anual', vinculoTipo:'tipo', vinculoValor:'Equipamento térmico', responsavel:'Rafael Costa', status:'No prazo',
+      itens:[{id:1,checked:true,dias:365,km:''},{id:5,checked:true,km:20000,horas:2000}] }
+  ];
+
+  function renderPlanoItens(selected){
+    const container = document.getElementById('plano-itens-list');
+    container.innerHTML = '';
+    ITENS_CATALOG.forEach(function(item){
+      const sel = selected.find(s=>s.id===item.id) || { checked:false };
+      let fieldsHtml = '';
+      item.controle.forEach(function(c){
+        const val = (sel[c] !== undefined && sel[c] !== '') ? sel[c] : item[c];
+        fieldsHtml += '<div class="f"><label>'+CONTROLE_LABEL[c]+'</label><input type="number" value="'+val+'" '+(sel.checked?'':'disabled')+'></div>';
+      });
+      const badges = item.controle.map(c=>'<span class="tag tag-neutral">'+CONTROLE_LABEL[c]+'</span>').join('');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML =
+        '<label class="item-check"><input type="checkbox" '+(sel.checked?'checked':'')+' onchange="toggleItemRow(this)"><span>'+item.nome+'</span></label>' +
+        '<div class="item-badges">'+badges+'</div>' +
+        '<div class="item-fields">'+fieldsHtml+'</div>';
+      container.appendChild(row);
+    });
+  }
+
+  function openPlanoModal(mode, index){
+    const isEdit = mode === 'edit';
+    const p = isEdit ? PLANOS[index] : { nome:'', vinculoTipo:'ativo', vinculoValor:'', responsavel:'', status:'No prazo', itens:[] };
+    document.getElementById('modal-plano-title').textContent = isEdit ? 'Editar plano · ' + p.nome : 'Novo plano revisional';
+    document.getElementById('plano-nome').value = p.nome;
+    document.getElementById('plano-responsavel').value = p.responsavel;
+    document.getElementById('plano-status').value = p.status;
+    document.getElementById('plano-vinculo-ativo').checked = p.vinculoTipo === 'ativo';
+    document.getElementById('plano-vinculo-tipo').checked = p.vinculoTipo === 'tipo';
+    document.getElementById('plano-vinculo-valor').value = p.vinculoValor;
+    renderPlanoItens(p.itens);
+    switchModalTab('modal-plano','geral');
+    showModal('modal-plano');
+  }
+
+  /* ---------- CATALOG: PESSOAS (usado na aba Serviço) ---------- */
+  const PESSOAS_CATALOG = ['Rafael Costa', 'Luana Martins', 'João Pereira'];
+
+  /* ---------- EMISSÕES ---------- */
+  const EMISSOES = [
+    { codigo:'EM-2026-0312', ativo:'Compressor de ar CP-014', setor:'Manutenção', plano:'Manutenção trimestral', responsavel:'Rafael Costa', data:'2026-09-02', status:'Emitido',
+      dataAgendamento:'2026-09-01T08:00', dataInicio:'2026-09-02T08:15', dataFim:'2026-09-02T11:40',
+      itens:[{id:1,executado:true,dias:88,km:4950,obs:'Óleo trocado conforme especificação'},{id:2,executado:true,dias:28,obs:'Nível dentro do esperado'}],
+      servicos:[{pessoa:'Rafael Costa', inicio:'2026-09-02T08:15', fim:'2026-09-02T09:50', item:'Troca de óleo'},{pessoa:'Rafael Costa', inicio:'2026-09-02T10:00', fim:'2026-09-02T11:40', item:'Verificação de nível de fluido'}] },
+    { codigo:'EM-2026-0311', ativo:'Painel elétrico QGBT-02', setor:'Produção', plano:'Inspeção semestral', responsavel:'Luana Martins', data:'2026-09-01', status:'Em análise',
+      dataAgendamento:'2026-08-30T09:00', dataInicio:'2026-09-01T09:00', dataFim:'2026-09-01T10:30',
+      itens:[{id:4,executado:true,dias:178,obs:'Aguardando validação do laudo'}],
+      servicos:[{pessoa:'Luana Martins', inicio:'2026-09-01T09:00', fim:'2026-09-01T10:30', item:'Calibração de instrumento'}] },
+    { codigo:'EM-2026-0310', ativo:'Empilhadeira EMP-07', setor:'Logística', plano:'Revisão mensal', responsavel:'João Pereira', data:'2026-08-30', status:'Rascunho',
+      dataAgendamento:'2026-08-30T13:00', dataInicio:'', dataFim:'',
+      itens:[{id:3,executado:false,horas:'',obs:''}], servicos:[] },
+    { codigo:'EM-2026-0309', ativo:'Caldeira CD-01', setor:'Manutenção', plano:'Inspeção anual', responsavel:'Rafael Costa', data:'2026-08-28', status:'Emitido',
+      dataAgendamento:'2026-08-27T08:00', dataInicio:'2026-08-28T08:00', dataFim:'2026-08-28T15:20',
+      itens:[{id:1,executado:true,dias:360,km:'',obs:'Revisão concluída sem apontamentos'},{id:5,executado:true,km:19800,horas:1980,obs:'Dentro da vida útil prevista'}],
+      servicos:[{pessoa:'Rafael Costa', inicio:'2026-08-28T08:00', fim:'2026-08-28T12:00', item:'Troca de óleo'},{pessoa:'João Pereira', inicio:'2026-08-28T12:30', fim:'2026-08-28T15:20', item:'Revisão geral do motor'}] },
+    { codigo:'EM-2026-0308', ativo:'Gerador GE-03', setor:'Segurança do trabalho', plano:'Inspeção semestral', responsavel:'Luana Martins', data:'2026-08-25', status:'Reprovado',
+      dataAgendamento:'2026-08-24T08:00', dataInicio:'2026-08-25T08:00', dataFim:'2026-08-25T09:10',
+      itens:[{id:4,executado:true,dias:190,obs:'Instrumento fora da faixa de calibração'}],
+      servicos:[{pessoa:'Luana Martins', inicio:'2026-08-25T08:00', fim:'2026-08-25T09:10', item:'Calibração de instrumento'}] }
+  ];
+
+  let emissaoServicos = [];
+
+  function renderEmissaoServicos(){
+    const container = document.getElementById('emissao-servico-list');
+    container.innerHTML = '';
+    if(!emissaoServicos.length){
+      container.innerHTML = '<p class="muted" style="font-size:13px;margin:0 0 10px;">Nenhum serviço adicionado ainda.</p>';
+      return;
+    }
+    emissaoServicos.forEach(function(s, idx){
+      const row = document.createElement('div');
+      row.className = 'servico-row';
+      row.innerHTML =
+        '<div class="f"><label>Pessoa</label><select onchange="updateServicoRow('+idx+',\'pessoa\',this.value)">' +
+          PESSOAS_CATALOG.map(p=>'<option '+(p===s.pessoa?'selected':'')+'>'+p+'</option>').join('') +
+        '</select></div>' +
+        '<div class="f"><label>Data/hora início</label><input type="datetime-local" value="'+(s.inicio||'')+'" onchange="updateServicoRow('+idx+',\'inicio\',this.value)"></div>' +
+        '<div class="f"><label>Data/hora fim</label><input type="datetime-local" value="'+(s.fim||'')+'" onchange="updateServicoRow('+idx+',\'fim\',this.value)"></div>' +
+        '<div class="f"><label>Item trabalhado</label><select onchange="updateServicoRow('+idx+',\'item\',this.value)">' +
+          ITENS_CATALOG.map(it=>'<option '+(it.nome===s.item?'selected':'')+'>'+it.nome+'</option>').join('') +
+        '</select></div>' +
+        '<button type="button" class="icon-btn servico-remove" title="Remover serviço" onclick="removeServicoRow('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>';
+      container.appendChild(row);
+    });
+  }
+  function addServicoRow(){
+    emissaoServicos.push({ pessoa:PESSOAS_CATALOG[0], inicio:'', fim:'', item:ITENS_CATALOG[0].nome });
+    renderEmissaoServicos();
+  }
+  function removeServicoRow(idx){
+    emissaoServicos.splice(idx,1);
+    renderEmissaoServicos();
+  }
+  function updateServicoRow(idx, key, val){
+    if(emissaoServicos[idx]) emissaoServicos[idx][key] = val;
+  }
+
+  function renderEmissaoItens(selected){
+    const container = document.getElementById('emissao-itens-list');
+    container.innerHTML = '';
+    ITENS_CATALOG.forEach(function(item){
+      const sel = selected.find(s=>s.id===item.id) || { executado:false };
+      let fieldsHtml = '';
+      item.controle.forEach(function(c){
+        const val = (sel[c] !== undefined && sel[c] !== '') ? sel[c] : '';
+        fieldsHtml += '<div class="f"><label>'+CONTROLE_LABEL[c]+' medido</label><input type="number" value="'+val+'" '+(sel.executado?'':'disabled')+'></div>';
+      });
+      const badges = item.controle.map(c=>'<span class="tag tag-neutral">'+CONTROLE_LABEL[c]+'</span>').join('');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML =
+        '<label class="item-check"><input type="checkbox" '+(sel.executado?'checked':'')+' onchange="toggleItemRow(this)"><span>'+item.nome+'</span></label>' +
+        '<div class="item-badges">'+badges+'</div>' +
+        '<div class="item-fields">'+fieldsHtml+'</div>' +
+        '<div class="f item-obs"><label>Observação</label><input type="text" value="'+(sel.obs||'')+'" '+(sel.executado?'':'disabled')+'></div>';
+      container.appendChild(row);
+    });
+  }
+
+  function openEmissaoModal(mode, index){
+    const isEdit = mode === 'edit';
+    const e = isEdit ? EMISSOES[index] : { codigo:'', ativo:'Compressor de ar CP-014', setor:'Manutenção', plano:'Manutenção trimestral', responsavel:'', data:'', status:'Rascunho', dataAgendamento:'', dataInicio:'', dataFim:'', itens:[], servicos:[] };
+    document.getElementById('modal-emissao-title').textContent = isEdit ? 'Editar emissão · ' + e.codigo : 'Nova emissão';
+    document.getElementById('emissao-ativo').value = e.ativo;
+    document.getElementById('emissao-setor').value = e.setor || 'Manutenção';
+    document.getElementById('emissao-plano').value = e.plano;
+    document.getElementById('emissao-responsavel').value = e.responsavel;
+    document.getElementById('emissao-data').value = e.data;
+    document.getElementById('emissao-status').value = e.status;
+    document.getElementById('emissao-data-agendamento').value = e.dataAgendamento || '';
+    document.getElementById('emissao-data-inicio').value = e.dataInicio || '';
+    document.getElementById('emissao-data-fim').value = e.dataFim || '';
+    renderEmissaoItens(e.itens);
+    emissaoServicos = (e.servicos || []).map(s => Object.assign({}, s));
+    renderEmissaoServicos();
+    switchModalTab('modal-emissao','geral');
+    showModal('modal-emissao');
+  }
+
+  /* ---------- PERFIS DE ACESSO ---------- */
+  const MODULOS = [
+    { key:'ativos', label:'Ativos' },
+    { key:'tipos', label:'Tipos' },
+    { key:'itens', label:'Itens revisionais' },
+    { key:'planos', label:'Planos revisionais' },
+    { key:'locais', label:'Locais' },
+    { key:'empresas', label:'Empresas' },
+    { key:'cargos', label:'Cargos' },
+    { key:'funcoes', label:'Funções' },
+    { key:'pessoas', label:'Pessoas' },
+    { key:'emissao', label:'Emissão' },
+    { key:'usuarios', label:'Usuários' },
+    { key:'contas', label:'Contas' },
+    { key:'perfil', label:'Perfil de acesso' },
+    { key:'aparencia', label:'Aparência' }
+  ];
+
+  const PERFIS = [
+    { nome:'Administrador', descricao:'Acesso completo à conta e às configurações',
+      perms: Object.fromEntries(MODULOS.map(m=>[m.key,{criar:true,editar:true,excluir:true}])) },
+    { nome:'Técnico de manutenção', descricao:'Gerencia ativos e realiza emissões',
+      perms:{ ativos:{criar:true,editar:true,excluir:false}, tipos:{criar:false,editar:false,excluir:false}, itens:{criar:false,editar:true,excluir:false},
+        planos:{criar:false,editar:true,excluir:false}, emissao:{criar:true,editar:true,excluir:false}, usuarios:{criar:false,editar:false,excluir:false},
+        contas:{criar:false,editar:false,excluir:false}, perfil:{criar:false,editar:false,excluir:false}, aparencia:{criar:false,editar:false,excluir:false} } },
+    { nome:'Inspetor', descricao:'Analisa e aprova emissões pendentes',
+      perms:{ ativos:{criar:false,editar:false,excluir:false}, tipos:{criar:false,editar:false,excluir:false}, itens:{criar:false,editar:false,excluir:false},
+        planos:{criar:false,editar:false,excluir:false}, emissao:{criar:false,editar:true,excluir:false}, usuarios:{criar:false,editar:false,excluir:false},
+        contas:{criar:false,editar:false,excluir:false}, perfil:{criar:false,editar:false,excluir:false}, aparencia:{criar:false,editar:false,excluir:false} } },
+    { nome:'Somente leitura', descricao:'Visualiza cadastros e emissões sem editar',
+      perms: Object.fromEntries(MODULOS.map(m=>[m.key,{criar:false,editar:false,excluir:false}])) }
+  ];
+
+  function renderPerfilPermissoes(perms){
+    const container = document.getElementById('perfil-permissoes-table');
+    let rows = '';
+    MODULOS.forEach(function(m){
+      const p = perms[m.key] || {criar:false,editar:false,excluir:false};
+      rows += '<tr><td>'+m.label+'</td>' +
+        '<td class="perm-check-col"><input type="checkbox" '+(p.criar?'checked':'')+'></td>' +
+        '<td class="perm-check-col"><input type="checkbox" '+(p.editar?'checked':'')+'></td>' +
+        '<td class="perm-check-col"><input type="checkbox" '+(p.excluir?'checked':'')+'></td></tr>';
+    });
+    container.innerHTML =
+      '<table class="perm-table"><thead><tr><th>Módulo</th><th class="perm-check-col">Criar</th><th class="perm-check-col">Editar</th><th class="perm-check-col">Excluir</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+
+  function openPerfilModal(mode, index){
+    const isEdit = mode === 'edit';
+    const perf = isEdit ? PERFIS[index] : { nome:'', descricao:'', perms:{} };
+    document.getElementById('modal-perfil-title').textContent = isEdit ? 'Editar perfil · ' + perf.nome : 'Novo perfil de acesso';
+    document.getElementById('perfil-nome').value = perf.nome;
+    document.getElementById('perfil-descricao').value = perf.descricao;
+    renderPerfilPermissoes(perf.perms);
+    switchModalTab('modal-perfil','geral');
+    showModal('modal-perfil');
+  }
+
+  /* ---------- SEED: polígonos de exemplo já cadastrados ---------- */
+  (function seedLocalPolygons(){
+    const seeds = {
+      'edit-locais-1': [[70,60],[380,55],[400,140],[240,255],[95,235]],
+      'edit-locais-2': [[120,90],[500,90],[500,240],[120,240]]
+    };
+    Object.keys(seeds).forEach(function(key){
+      const svg = document.querySelector('svg.map-draw[data-key="'+key+'"]');
+      if(!svg) return;
+      MAP_POINTS[key] = seeds[key];
+      renderMapPolygon(svg, key);
+    });
+  })();
+</script>
+
+</body>
+</html>
