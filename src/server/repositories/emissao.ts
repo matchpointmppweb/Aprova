@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Prisma, type StatusEmissao } from "@prisma/client";
+import { Prisma, type Setor, type StatusEmissao } from "@prisma/client";
 
 import { prisma } from "./db";
 
@@ -8,6 +8,16 @@ import { prisma } from "./db";
 // contaId sempre obrigatório e sempre aplicado ao `where`. Mesmo formato de
 // src/server/repositories/plano.ts, usando updateMany/prisma.$transaction
 // escopados por {id, contaId} para mutação cross-tenant-safe.
+
+// Ordem determinística das linhas de serviço: atualizarEmissao recria todas
+// elas com cuids novos a cada edição, então sem orderBy a ordem devolvida
+// pelo banco não é garantida entre um save e o próximo. Fora do
+// INCLUDE_LISTAGEM `as const` de propósito — um array readonly não é aceito
+// pelo tipo de orderBy do Prisma.
+const ORDEM_SERVICOS: Prisma.ServicoEmissaoOrderByWithRelationInput[] = [
+  { inicio: "asc" },
+  { id: "asc" },
+];
 
 const INCLUDE_LISTAGEM = {
   ativo: { select: { id: true, nome: true } },
@@ -26,6 +36,19 @@ const INCLUDE_LISTAGEM = {
       medicaoHoras: true,
       observacao: true,
     },
+  },
+  // Story 5.5: os três caminhos de leitura (listarEmissoes/buscarEmissao/o
+  // retorno de criarEmissao) ganham os serviços de graça por viverem no
+  // mesmo INCLUDE.
+  servicos: {
+    select: {
+      id: true,
+      pessoaId: true,
+      itemRevisionalId: true,
+      inicio: true,
+      fim: true,
+    },
+    orderBy: ORDEM_SERVICOS,
   },
 } as const;
 
@@ -61,11 +84,31 @@ export type DadosItemExecutadoNovo = {
   observacao: string | null;
 };
 
-export type DadosCriarEmissao = {
+// Uma linha da aba "Serviço" (Story 5.5) — sem id próprio: as linhas são
+// sempre substituídas em bloco, nunca casadas com uma linha já persistida
+// (Boundaries/AD-20).
+export type DadosServicoEmissao = {
+  pessoaId: string;
+  itemRevisionalId: string;
+  inicio: Date | null;
+  fim: Date | null;
+};
+
+// Campos gerais compartilhados pela criação e pelos dois braços da edição
+// (Story 5.5 acrescentou setor + os 3 marcos opcionais de data/hora).
+type CamposGeraisEmissao = {
   ativoId: string;
   planoId: string;
   responsavelId: string;
   dataEmissao: Date;
+  setor: Setor;
+  dataAgendamento: Date | null;
+  dataInicio: Date | null;
+  dataFim: Date | null;
+  servicos: DadosServicoEmissao[];
+};
+
+export type DadosCriarEmissao = CamposGeraisEmissao & {
   itens: DadosItemExecutadoNovo[];
 };
 
@@ -106,10 +149,26 @@ export async function criarEmissao(contaId: string, dados: DadosCriarEmissao) {
             planoId: dados.planoId,
             responsavelId: dados.responsavelId,
             dataEmissao: dados.dataEmissao,
+            setor: dados.setor,
+            dataAgendamento: dados.dataAgendamento,
+            dataInicio: dados.dataInicio,
+            dataFim: dados.dataFim,
             codigo,
             ano,
             seq,
             status: "Rascunho" as StatusEmissao,
+            // Irmão de `itens`: serviços entram na MESMA transação da
+            // emissão (AD-9/AD-20). O retry de colisão de código não muda —
+            // uma tentativa revertida derruba emissão, itens e serviços
+            // juntos.
+            servicos: {
+              create: dados.servicos.map((servico) => ({
+                pessoaId: servico.pessoaId,
+                itemRevisionalId: servico.itemRevisionalId,
+                inicio: servico.inicio,
+                fim: servico.fim,
+              })),
+            },
             itens: {
               create: dados.itens.map((item) => ({
                 itemRevisionalId: item.itemRevisionalId,
@@ -153,22 +212,14 @@ export type DadosItemExecutadoExistente = {
 // `trocouPlano: true` descarta as linhas antigas e grava um novo snapshot a
 // partir dos itens atuais do novo plano.
 export type DadosEditarEmissao =
-  | {
+  | (CamposGeraisEmissao & {
       trocouPlano: false;
-      ativoId: string;
-      planoId: string;
-      responsavelId: string;
-      dataEmissao: Date;
       itens: DadosItemExecutadoExistente[];
-    }
-  | {
+    })
+  | (CamposGeraisEmissao & {
       trocouPlano: true;
-      ativoId: string;
-      planoId: string;
-      responsavelId: string;
-      dataEmissao: Date;
       itens: DadosItemExecutadoNovo[];
-    };
+    });
 
 export type ResultadoAtualizarEmissao =
   | { ok: true }
@@ -195,14 +246,38 @@ export async function atualizarEmissao(
           planoId: dados.planoId,
           responsavelId: dados.responsavelId,
           dataEmissao: dados.dataEmissao,
+          setor: dados.setor,
+          dataAgendamento: dados.dataAgendamento,
+          dataInicio: dados.dataInicio,
+          dataFim: dados.dataFim,
         },
       });
 
       if (resultado.count === 0) {
         // updateMany não lança quando não encontra nada — força um erro
-        // para abortar a transação (nenhuma linha de item é tocada) e cair
-        // no catch abaixo, onde decidimos "não encontrado" vs. "conflito".
+        // para abortar a transação (nenhuma linha de item/serviço é tocada)
+        // e cair no catch abaixo, onde decidimos "não encontrado" vs.
+        // "conflito".
         throw new Error("EMISSAO_NAO_ATUALIZADA");
+      }
+
+      // Story 5.5: serviços são substituídos EM BLOCO, sempre DEPOIS do
+      // guard de lock otimista acima (Boundaries) — num conflito de edição a
+      // transação já abortou e nenhuma linha de serviço foi tocada.
+      // Diferente dos itens executados, uma linha de serviço não carrega
+      // snapshot nem progresso a preservar, então nunca há update-in-place
+      // aqui.
+      await tx.servicoEmissao.deleteMany({ where: { emissaoId: id } });
+      if (dados.servicos.length > 0) {
+        await tx.servicoEmissao.createMany({
+          data: dados.servicos.map((servico) => ({
+            emissaoId: id,
+            pessoaId: servico.pessoaId,
+            itemRevisionalId: servico.itemRevisionalId,
+            inicio: servico.inicio,
+            fim: servico.fim,
+          })),
+        });
       }
 
       if (dados.trocouPlano) {

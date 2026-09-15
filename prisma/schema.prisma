@@ -86,6 +86,20 @@ enum StatusEmissao {
   Reprovado
 }
 
+/// Setor da demanda registrada numa Emissao (Story 5.5) — enum FIXO, sem
+/// tela de gestão própria e deliberadamente FORA do enum `Modulo` (AD-15):
+/// é o único item do Epic 5 que não vira um módulo de permissão, vive sob
+/// as permissões de `emissao`. Como a coluna é obrigatória e já existem
+/// emissões gravadas (Stories 4.1/4.2), o campo carrega
+/// `@default(Manutencao)` para a migration aplicar sem perder linhas.
+enum Setor {
+  Manutencao
+  Producao
+  Logistica
+  SegurancaDoTrabalho
+  Administrativo
+}
+
 /// Status de Local (Story 5.1) — mesmo padrão de StatusTipoAtivo: "excluir"
 /// nunca é DELETE físico (AD-10), é atualizarLocal(...,{status:"Inativo"})
 /// pela mesma função de repositório usada pela edição comum.
@@ -396,6 +410,7 @@ model ItemRevisional {
 
   planoItens             PlanoItemRevisional[]
   itensExecutadosEmissao ItemExecutadoEmissao[]
+  servicosEmissao        ServicoEmissao[]
 
   @@unique([contaId, nome])
   @@map("itens_revisionais")
@@ -524,6 +539,18 @@ model Emissao {
   /// fora de ordem em emissões retroativas perto de virada de ano).
   dataEmissao DateTime
 
+  /// Setor da demanda (Story 5.5). Obrigatório, com default para a migration
+  /// cobrir as emissões já existentes (Boundaries). NUNCA influencia o
+  /// código/ano/seq.
+  setor Setor @default(Manutencao)
+
+  /// Marcos de agendamento/execução (Story 5.5) — os TRÊS são opcionais e
+  /// nenhum deles influencia a geração do código "EM-{ano}-{seq}", que
+  /// continua derivando só de `dataEmissao` (AD-19).
+  dataAgendamento DateTime?
+  dataInicio      DateTime?
+  dataFim         DateTime?
+
   /// Formato "EM-{ano}-{seq}" — gerado uma única vez na criação, nunca
   /// recalculado na edição.
   codigo String
@@ -535,7 +562,8 @@ model Emissao {
   /// fica sempre null.
   motivoReprovacao String?
 
-  itens ItemExecutadoEmissao[]
+  itens    ItemExecutadoEmissao[]
+  servicos ServicoEmissao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -586,6 +614,39 @@ model ItemExecutadoEmissao {
 
   @@unique([emissaoId, itemRevisionalId])
   @@map("itens_executados_emissao")
+}
+
+// Linha de serviço executado numa Emissao (Story 5.5) — quem executou
+// (Pessoa), qual item revisional foi trabalhado e o período (início/fim,
+// ambos opcionais). Sem `contaId` próprio, mesmo padrão de
+// ItemExecutadoEmissao: o escopo multi-tenant vem da Emissao pai (AD-1), e a
+// Server Action valida `pessoaId`/`itemRevisionalId` contra a conta da
+// sessão antes de gravar.
+//
+// Diferente de ItemExecutadoEmissao, NÃO tem @@unique([emissaoId, ...]): a
+// mesma pessoa pode trabalhar o mesmo item em dois períodos distintos, e as
+// linhas são substituídas em bloco (deleteMany + createMany) na edição —
+// não carregam snapshot nem progresso a preservar (Boundaries/AD-20).
+//
+// onDelete: Cascade na Emissao pai, mesmo motivo de ItemExecutadoEmissao.
+model ServicoEmissao {
+  id        String  @id @default(cuid())
+  emissaoId String
+  emissao   Emissao @relation(fields: [emissaoId], references: [id], onDelete: Cascade)
+
+  pessoaId String
+  pessoa   Pessoa @relation(fields: [pessoaId], references: [id])
+
+  itemRevisionalId String
+  itemRevisional   ItemRevisional @relation(fields: [itemRevisionalId], references: [id])
+
+  inicio DateTime?
+  fim    DateTime?
+
+  @@index([emissaoId])
+  @@index([pessoaId])
+  @@index([itemRevisionalId])
+  @@map("servicos_emissao")
 }
 
 // ---------------------------------------------------------------------------
@@ -726,6 +787,8 @@ model Pessoa {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  servicosEmissao ServicoEmissao[]
 
   /// Diferente das demais entidades do Epic 5, Pessoa não tem
   /// @@unique([contaId, ...]) (nome/CPF não são identificadores únicos aqui),

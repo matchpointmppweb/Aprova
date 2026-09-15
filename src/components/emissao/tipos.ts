@@ -1,4 +1,10 @@
-import type { StatusAtivo, StatusEmissao, StatusItemRevisional, StatusPlanoRevisional } from "@prisma/client";
+import type {
+  Setor,
+  StatusAtivo,
+  StatusEmissao,
+  StatusItemRevisional,
+  StatusPlanoRevisional,
+} from "@prisma/client";
 
 import type { TomBadge } from "@/src/components/shared/status-badge";
 
@@ -21,6 +27,17 @@ export interface ItemExecutadoListagem {
   observacao: string | null;
 }
 
+// Linha da aba "Serviço" (Story 5.5) — compatível com o `servicos` incluído
+// por listarEmissoes()/buscarEmissao(). Sem contaId próprio: o escopo vem da
+// Emissão pai.
+export interface ServicoEmissaoListagem {
+  id: string;
+  pessoaId: string;
+  itemRevisionalId: string;
+  inicio: Date | null;
+  fim: Date | null;
+}
+
 export interface EmissaoListagem {
   id: string;
   codigo: string;
@@ -33,12 +50,19 @@ export interface EmissaoListagem {
   responsavelId: string;
   responsavel: { id: string; nome: string };
   dataEmissao: Date;
+  // Story 5.5: setor sempre preenchido (default no banco cobre as emissões
+  // criadas antes da migration); os três marcos de data/hora são opcionais.
+  setor: Setor;
+  dataAgendamento: Date | null;
+  dataInicio: Date | null;
+  dataFim: Date | null;
   status: StatusEmissao;
   // Preenchido só a partir de uma reprovação (Story 4.2); continua null
   // para emissões que nunca foram reprovadas. Sobrevive a um reenvio
   // (voltar a EmAnalise) — só uma nova reprovação futura o sobrescreve.
   motivoReprovacao: string | null;
   itens: ItemExecutadoListagem[];
+  servicos: ServicoEmissaoListagem[];
   updatedAt: Date;
 }
 
@@ -79,6 +103,14 @@ export interface PlanoOpcao {
 }
 
 export interface UsuarioOpcao {
+  id: string;
+  nome: string;
+}
+
+// Forma mínima usada pelo <select> de Pessoa de cada linha de serviço
+// (Story 5.5) — compatível com listarPessoas(). Pessoa não tem `status`
+// (AD-17/AD-18), então não há filtro de ativos/inativos aqui.
+export interface PessoaOpcao {
   id: string;
   nome: string;
 }

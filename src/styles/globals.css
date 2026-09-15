@@ -392,6 +392,16 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .item-fields .f label{font-size:10.5px;}
 .item-obs{flex:1;min-width:180px;}
 
+/* Linhas da aba "Serviço" do modal de Emissão (Story 5.5) — portado de
+   Mockups/Mochup_atual.html:381-385. */
+.servico-row{
+  display:flex;gap:10px;align-items:flex-end;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.servico-row:last-child{border-bottom:none;}
+.servico-row .f{flex:1;min-width:150px;}
+.servico-row .f label{font-size:10.5px;}
+.servico-remove{flex:none;}
+
 /* ---------- MAP PICKER (polígono de local) ---------- */
 .map-field{margin-top:16px;}
 .map-field > label{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-bottom:7px;}

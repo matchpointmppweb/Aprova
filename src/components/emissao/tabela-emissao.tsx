@@ -3,9 +3,17 @@
 import { useState } from "react";
 
 import { StatusBadge } from "@/src/components/shared/status-badge";
+import { LABEL_POR_SETOR } from "@/src/server/actions/emissao-estado";
 import { ModalEmissao } from "./modal-emissao";
 import { BADGE_POR_STATUS } from "./tipos";
-import type { AtivoOpcao, EmissaoListagem, ItemRevisionalOpcao, PlanoOpcao, UsuarioOpcao } from "./tipos";
+import type {
+  AtivoOpcao,
+  EmissaoListagem,
+  ItemRevisionalOpcao,
+  PessoaOpcao,
+  PlanoOpcao,
+  UsuarioOpcao,
+} from "./tipos";
 
 type FiltroStatus = "all" | "rascunho" | "em-analise" | "emitido" | "reprovado";
 
@@ -49,6 +57,7 @@ export function TabelaEmissao({
   planos,
   usuarios,
   itensRevisionais,
+  pessoas,
   podeCriar,
   podeEditar,
 }: {
@@ -57,6 +66,7 @@ export function TabelaEmissao({
   planos: PlanoOpcao[];
   usuarios: UsuarioOpcao[];
   itensRevisionais: ItemRevisionalOpcao[];
+  pessoas: PessoaOpcao[];
   podeCriar: boolean;
   podeEditar: boolean;
 }) {
@@ -132,6 +142,7 @@ export function TabelaEmissao({
             <tr>
               <th>Nº emissão</th>
               <th>Ativo</th>
+              <th>Setor</th>
               <th>Plano revisional</th>
               <th>Data</th>
               <th>Responsável</th>
@@ -142,7 +153,7 @@ export function TabelaEmissao({
           <tbody>
             {emissoesFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "var(--ink-soft)" }}>
+                <td colSpan={8} style={{ textAlign: "center", color: "var(--ink-soft)" }}>
                   Nenhuma emissão encontrada.
                 </td>
               </tr>
@@ -154,6 +165,7 @@ export function TabelaEmissao({
                 <tr data-row key={emissao.id}>
                   <td className="code">{emissao.codigo}</td>
                   <td>{emissao.ativo.nome}</td>
+                  <td className="muted">{LABEL_POR_SETOR[emissao.setor]}</td>
                   <td className="muted">{emissao.plano.nome}</td>
                   <td>{formatarData(emissao.dataEmissao)}</td>
                   <td className="cell-user">
@@ -192,6 +204,7 @@ export function TabelaEmissao({
           planos={planos}
           usuarios={usuarios}
           itensRevisionais={itensRevisionais}
+          pessoas={pessoas}
           onFechar={fecharModal}
           onSucesso={fecharModal}
         />
@@ -203,6 +216,7 @@ export function TabelaEmissao({
           planos={planos}
           usuarios={usuarios}
           itensRevisionais={itensRevisionais}
+          pessoas={pessoas}
           onFechar={fecharModal}
           onSucesso={fecharModal}
         />

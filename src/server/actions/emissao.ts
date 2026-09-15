@@ -16,16 +16,22 @@ import {
   type DadosItemExecutadoNovo,
 } from "@/src/server/repositories/emissao";
 import { listarItensRevisionais } from "@/src/server/repositories/item-revisional";
+import { listarPessoas } from "@/src/server/repositories/pessoa";
 import { buscarPlano } from "@/src/server/repositories/plano";
 import { listarUsuarios } from "@/src/server/repositories/usuario";
 import {
   calcularValorEsperado,
   ERRO_CONFLITO_EDICAO,
   ERRO_TRANSICAO_INVALIDA,
+  isSetorValido,
+  parseDataHora,
+  SETOR_PADRAO,
   validarCamposGerais,
+  validarServicos,
   type ErroDeValidacao,
   type EstadoAcaoEmissao,
   type ItemRevisionalReal,
+  type LinhaServicoBruta,
 } from "./emissao-estado";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
@@ -77,7 +83,77 @@ function lerCamposGerais(formData: FormData) {
   const responsavelId = String(formData.get("responsavelId") ?? "").trim();
   const dataEmissaoBruta = String(formData.get("dataEmissao") ?? "").trim();
   const dataEmissao = parseDataEmissao(dataEmissaoBruta);
-  return { ativoId, planoId, responsavelId, dataEmissao };
+  // Story 5.5: setor (validado contra o enum em validarCamposGerais) + os
+  // três marcos opcionais de data/hora, cada um podendo vir como null
+  // (campo vazio) ou "invalido" (valor malformado -> erro de campo).
+  const setor = String(formData.get("setor") ?? "").trim();
+  const dataAgendamento = parseDataHora(String(formData.get("dataAgendamento") ?? ""));
+  const dataInicio = parseDataHora(String(formData.get("dataInicio") ?? ""));
+  const dataFim = parseDataHora(String(formData.get("dataFim") ?? ""));
+  return {
+    ativoId,
+    planoId,
+    responsavelId,
+    dataEmissao,
+    setor,
+    dataAgendamento,
+    dataInicio,
+    dataFim,
+  };
+}
+
+// Linhas da aba "Serviço" (Story 5.5). Convenção do Boundaries: contagem
+// explícita em `servicoCount` + campos indexados `servico-{i}-*` — NUNCA
+// getAll() posicional, que embaralharia as colunas quando um campo vem
+// vazio/desabilitado. Um índice cuja linha não tem NENHUM campo preenchido
+// é ignorado (linha fantasma), mas uma linha parcialmente preenchida cai na
+// validação de campo obrigatório de validarServicos.
+const MAX_LINHAS_SERVICO = 200;
+
+// Acima do teto a requisição é REJEITADA, nunca truncada: truncar salvaria
+// um subconjunto silencioso das linhas enviadas e ainda responderia ok.
+const ERRO_EXCESSO_SERVICOS = `Uma emissão aceita no máximo ${MAX_LINHAS_SERVICO} serviços.`;
+
+function lerServicos(
+  formData: FormData,
+): { ok: true; linhas: LinhaServicoBruta[] } | { ok: false; erro: string } {
+  const totalBruto = Number(String(formData.get("servicoCount") ?? "0").trim());
+  if (!Number.isFinite(totalBruto) || !Number.isInteger(totalBruto) || totalBruto <= 0) {
+    return { ok: true, linhas: [] };
+  }
+  if (totalBruto > MAX_LINHAS_SERVICO) {
+    return { ok: false, erro: ERRO_EXCESSO_SERVICOS };
+  }
+  const total = totalBruto;
+
+  const linhas: LinhaServicoBruta[] = [];
+  for (let indice = 0; indice < total; indice++) {
+    const pessoaId = String(formData.get(`servico-${indice}-pessoaId`) ?? "").trim();
+    const itemRevisionalId = String(
+      formData.get(`servico-${indice}-itemRevisionalId`) ?? "",
+    ).trim();
+    const inicio = String(formData.get(`servico-${indice}-inicio`) ?? "").trim();
+    const fim = String(formData.get(`servico-${indice}-fim`) ?? "").trim();
+
+    if (!pessoaId && !itemRevisionalId && !inicio && !fim) continue;
+    linhas.push({ indice, pessoaId, itemRevisionalId, inicio, fim });
+  }
+  return { ok: true, linhas };
+}
+
+// Estreita os campos da Story 5.5 já validados para a forma que o
+// repositório espera — validarCamposGerais já rejeitou setor fora do enum e
+// qualquer "invalido" nas três datas, então nem o fallback de setor nem o de
+// data jamais ocorrem aqui (existem só para estreitar o tipo sem cast, nunca
+// gravam dado errado).
+function camposDeSetorEDatas(campos: ReturnType<typeof lerCamposGerais>) {
+  const semInvalido = (valor: Date | null | "invalido") => (valor === "invalido" ? null : valor);
+  return {
+    setor: isSetorValido(campos.setor) ? campos.setor : SETOR_PADRAO,
+    dataAgendamento: semInvalido(campos.dataAgendamento),
+    dataInicio: semInvalido(campos.dataInicio),
+    dataFim: semInvalido(campos.dataFim),
+  };
 }
 
 // emissaoId + updatedAt são os únicos campos comuns a toda ação que opera
@@ -105,14 +181,23 @@ function lerIdentificacaoEmissao(formData: FormData) {
 // num id vindo do cliente sem checar contra os dados reais da conta (I/O
 // Matrix: "Ativo/Plano de outra conta" -> erro de validação de campo). Mesmo
 // padrão de vinculoEResponsavelValidos em actions/plano.ts.
+// Story 5.5: valida também cada linha de serviço — `pessoaId` contra
+// listarPessoas(contaId) e `itemRevisionalId` contra o mesmo Map de itens
+// reais da conta já usado para montar o snapshot dos itens executados. Um id
+// de outra conta é rejeitado como erro de campo ANTES de qualquer escrita —
+// nada é persistido (nem emissão, nem itens, nem serviços), e a mensagem
+// nunca revela se o registro existe em outra conta (I/O Matrix).
 async function referenciasValidas(
   contaId: string,
   campos: { ativoId: string; planoId: string; responsavelId: string },
+  servicos: LinhaServicoBruta[],
 ) {
-  const [ativos, plano, usuarios] = await Promise.all([
+  const [ativos, plano, usuarios, itensReaisPorId, pessoas] = await Promise.all([
     listarAtivos(contaId),
     buscarPlano(contaId, campos.planoId),
     listarUsuarios(contaId),
+    buscarItensReaisPorId(contaId),
+    servicos.length > 0 ? listarPessoas(contaId) : Promise.resolve([]),
   ]);
 
   const erros: { field: string; message: string }[] = [];
@@ -125,7 +210,24 @@ async function referenciasValidas(
   if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
   }
-  return { erros, plano };
+
+  const pessoasDaConta = new Set(pessoas.map((pessoa) => pessoa.id));
+  for (const linha of servicos) {
+    if (linha.pessoaId && !pessoasDaConta.has(linha.pessoaId)) {
+      erros.push({
+        field: `servico-${linha.indice}-pessoaId`,
+        message: "Selecione uma pessoa válida.",
+      });
+    }
+    if (linha.itemRevisionalId && !itensReaisPorId.has(linha.itemRevisionalId)) {
+      erros.push({
+        field: `servico-${linha.indice}-itemRevisionalId`,
+        message: "Selecione um item trabalhado válido.",
+      });
+    }
+  }
+
+  return { erros, plano, itensReaisPorId };
 }
 
 async function buscarItensReaisPorId(contaId: string) {
@@ -212,15 +314,22 @@ export async function criarEmissaoAction(
   }
 
   const campos = lerCamposGerais(formData);
-  const erros = validarCamposGerais(campos);
+  const leituraDeServicos = lerServicos(formData);
+  if (!leituraDeServicos.ok) {
+    return { ok: false, error: leituraDeServicos.erro };
+  }
+  const linhasDeServico = leituraDeServicos.linhas;
+  const { erros: errosDeServico, servicos } = validarServicos(linhasDeServico);
+  const erros = [...validarCamposGerais(campos), ...errosDeServico];
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
 
-  const { erros: errosDeReferencia, plano } = await referenciasValidas(
-    usuarioSessao.contaId,
-    campos,
-  );
+  const {
+    erros: errosDeReferencia,
+    plano,
+    itensReaisPorId,
+  } = await referenciasValidas(usuarioSessao.contaId, campos, linhasDeServico);
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }
@@ -228,7 +337,6 @@ export async function criarEmissaoAction(
   // já barrou isso) e referenciasValidas já confirmou que existe na conta.
   const planoAtual = plano!;
 
-  const itensReaisPorId = await buscarItensReaisPorId(usuarioSessao.contaId);
   const itens = montarItensNovos(planoAtual.itens, itensReaisPorId, formData);
 
   try {
@@ -237,6 +345,8 @@ export async function criarEmissaoAction(
       planoId: campos.planoId,
       responsavelId: campos.responsavelId,
       dataEmissao: campos.dataEmissao as Date,
+      ...camposDeSetorEDatas(campos),
+      servicos,
       itens,
     });
   } catch {
@@ -269,12 +379,18 @@ export async function editarEmissaoAction(
   }
 
   const campos = lerCamposGerais(formData);
+  const leituraDeServicos = lerServicos(formData);
+  if (!leituraDeServicos.ok) {
+    return { ok: false, error: leituraDeServicos.erro };
+  }
+  const linhasDeServico = leituraDeServicos.linhas;
+  const { erros: errosDeServico, servicos } = validarServicos(linhasDeServico);
   const {
     emissaoId,
     updatedAtEsperado,
     erros: errosDeIdentificacao,
   } = lerIdentificacaoEmissao(formData);
-  const erros = [...validarCamposGerais(campos), ...errosDeIdentificacao];
+  const erros = [...validarCamposGerais(campos), ...errosDeServico, ...errosDeIdentificacao];
 
   if (erros.length > 0) {
     return { ok: false, error: erros };
@@ -296,10 +412,11 @@ export async function editarEmissaoAction(
     return { ok: false, error: ERRO_TRANSICAO_INVALIDA };
   }
 
-  const { erros: errosDeReferencia, plano: planoSelecionado } = await referenciasValidas(
-    usuarioSessao.contaId,
-    campos,
-  );
+  const {
+    erros: errosDeReferencia,
+    plano: planoSelecionado,
+    itensReaisPorId,
+  } = await referenciasValidas(usuarioSessao.contaId, campos, linhasDeServico);
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }
@@ -307,24 +424,26 @@ export async function editarEmissaoAction(
 
   const trocouPlano = campos.planoId !== emissaoAtual.planoId;
 
+  const comuns = {
+    ativoId: campos.ativoId,
+    planoId: campos.planoId,
+    responsavelId: campos.responsavelId,
+    dataEmissao: campos.dataEmissao as Date,
+    ...camposDeSetorEDatas(campos),
+    servicos,
+  };
+
   let dados: DadosEditarEmissao;
   if (trocouPlano) {
-    const itensReaisPorId = await buscarItensReaisPorId(usuarioSessao.contaId);
     dados = {
       trocouPlano: true,
-      ativoId: campos.ativoId,
-      planoId: campos.planoId,
-      responsavelId: campos.responsavelId,
-      dataEmissao: campos.dataEmissao as Date,
+      ...comuns,
       itens: montarItensNovos(planoAtual.itens, itensReaisPorId, formData),
     };
   } else {
     dados = {
       trocouPlano: false,
-      ativoId: campos.ativoId,
-      planoId: campos.planoId,
-      responsavelId: campos.responsavelId,
-      dataEmissao: campos.dataEmissao as Date,
+      ...comuns,
       itens: montarItensExistentes(emissaoAtual.itens, formData),
     };
   }

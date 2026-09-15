@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { StatusBadge } from "@/src/components/shared/status-badge";
@@ -14,7 +14,10 @@ import {
 } from "@/src/server/actions/emissao";
 import {
   estadoInicialAcaoEmissao,
+  LABEL_POR_SETOR,
   mensagemDeErro,
+  SETOR_PADRAO,
+  SETORES,
   type EstadoAcaoEmissao,
 } from "@/src/server/actions/emissao-estado";
 import { BADGE_POR_STATUS } from "./tipos";
@@ -22,11 +25,31 @@ import type {
   AtivoOpcao,
   EmissaoListagem,
   ItemRevisionalOpcao,
+  PessoaOpcao,
   PlanoOpcao,
   UsuarioOpcao,
 } from "./tipos";
 
-type AbaModal = "geral" | "itens";
+type AbaModal = "geral" | "itens" | "servico";
+
+// Valor de um <input type="datetime-local">: "YYYY-MM-DDTHH:mm". Lido com os
+// getters getUTC* de propósito, para casar com parseDataHora
+// (emissao-estado.ts), que interpreta a string enviada como wall-clock UTC:
+// os dois lados tratam o valor como o relógio de parede que o usuário
+// digitou, então o round trip salvar -> reabrir devolve a mesma hora. Getters
+// locais aqui quebrariam isso — o browser é UTC-3 e o servidor Vercel roda em
+// UTC, o que deslocava 3h a cada reabertura.
+// Decisão consciente e seu limite: o produto é single-timezone pt-BR
+// (internacionalização é non-goal explícito do SPEC); precisa ser revisto se
+// algum dia atender múltiplos fusos.
+function paraDatetimeLocal(data: Date | null): string {
+  if (!data) return "";
+  const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
+  return (
+    `${data.getUTCFullYear()}-${doisDigitos(data.getUTCMonth() + 1)}-${doisDigitos(data.getUTCDate())}` +
+    `T${doisDigitos(data.getUTCHours())}:${doisDigitos(data.getUTCMinutes())}`
+  );
+}
 
 // useFormStatus só funciona num componente descendente do <form> — mesmo
 // padrão de Acoes em src/components/planos-revisionais/modal-plano.tsx.
@@ -401,7 +424,98 @@ function LinhaItemEmissaoRow({ linha }: { linha: LinhaItem }) {
   );
 }
 
-// Modal tabbed Geral/Itens, clonando o padrão de modal-plano.tsx (Code Map).
+// Uma linha da aba "Serviço" (Story 5.5). `indice` é só o que compõe o NOME
+// dos campos no FormData (`servico-{i}-*`, convenção indexada do
+// Boundaries); a identidade React da linha vem da `key` estável do chamador,
+// nunca do índice — remover uma linha do meio renumera os `name` sem
+// remontar os inputs não-controlados, preservando o que o usuário digitou
+// em cada linha remanescente.
+function LinhaServicoRow({
+  indice,
+  inicial,
+  pessoas,
+  itensRevisionais,
+  onRemover,
+}: {
+  indice: number;
+  inicial: { pessoaId: string; itemRevisionalId: string; inicio: string; fim: string };
+  pessoas: PessoaOpcao[];
+  itensRevisionais: ItemRevisionalOpcao[];
+  onRemover: () => void;
+}) {
+  // Só itens revisionais "Ativo" ficam selecionáveis para um vínculo novo
+  // (mesmo critério de opcoesAtivo/opcoesPlano e da Story 5.4 para cargo/
+  // função); o item que ESTA linha já referencia continua na lista mesmo se
+  // arquivado depois, para a edição não perder o valor existente.
+  const opcoesItem = itensRevisionais.filter(
+    (item) => item.status === "Ativo" || item.id === inicial.itemRevisionalId,
+  );
+
+  return (
+    <div className="servico-row">
+      <div className="f">
+        <label htmlFor={`servico-${indice}-pessoaId`}>Pessoa</label>
+        <select
+          id={`servico-${indice}-pessoaId`}
+          name={`servico-${indice}-pessoaId`}
+          defaultValue={inicial.pessoaId}
+        >
+          <option value="">Selecione a pessoa</option>
+          {pessoas.map((pessoa) => (
+            <option key={pessoa.id} value={pessoa.id}>
+              {pessoa.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="f">
+        <label htmlFor={`servico-${indice}-inicio`}>Data/hora início</label>
+        <input
+          id={`servico-${indice}-inicio`}
+          name={`servico-${indice}-inicio`}
+          type="datetime-local"
+          defaultValue={inicial.inicio}
+        />
+      </div>
+      <div className="f">
+        <label htmlFor={`servico-${indice}-fim`}>Data/hora fim</label>
+        <input
+          id={`servico-${indice}-fim`}
+          name={`servico-${indice}-fim`}
+          type="datetime-local"
+          defaultValue={inicial.fim}
+        />
+      </div>
+      <div className="f">
+        <label htmlFor={`servico-${indice}-itemRevisionalId`}>Item trabalhado</label>
+        <select
+          id={`servico-${indice}-itemRevisionalId`}
+          name={`servico-${indice}-itemRevisionalId`}
+          defaultValue={inicial.itemRevisionalId}
+        >
+          <option value="">Selecione o item</option>
+          {opcoesItem.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        className="icon-btn servico-remove"
+        type="button"
+        title="Remover serviço"
+        onClick={onRemover}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// Modal tabbed Geral/Itens/Serviço, clonando o padrão de modal-plano.tsx (Code Map).
 // emissao === null -> modo criação; emissao preenchida -> modo edição. SEM
 // campo de Status editável (Boundaries: emissão nasce sempre em Rascunho, o
 // avanço de status é a Story 4.2).
@@ -421,6 +535,7 @@ export function ModalEmissao({
   planos,
   usuarios,
   itensRevisionais,
+  pessoas,
   onFechar,
   onSucesso,
 }: {
@@ -429,6 +544,7 @@ export function ModalEmissao({
   planos: PlanoOpcao[];
   usuarios: UsuarioOpcao[];
   itensRevisionais: ItemRevisionalOpcao[];
+  pessoas: PessoaOpcao[];
   onFechar: () => void;
   onSucesso: () => void;
 }) {
@@ -438,6 +554,40 @@ export function ModalEmissao({
   const [ativoId, setAtivoId] = useState(emissao?.ativoId ?? "");
   const [planoId, setPlanoId] = useState(emissao?.planoId ?? "");
   const [responsavelId, setResponsavelId] = useState(emissao?.responsavelId ?? "");
+  const [setor, setSetor] = useState(emissao?.setor ?? SETOR_PADRAO);
+
+  // Linhas da aba Serviço: só a LISTA é estado (add/remover); os valores de
+  // cada linha ficam nos próprios inputs não-controlados, lidos do FormData
+  // no submit. `chave` é um contador local monotônico — nunca o índice do
+  // array (Boundaries): remover uma linha do meio com key=índice
+  // reembaralharia os defaultValue das linhas seguintes.
+  const [linhasServico, setLinhasServico] = useState(() =>
+    (emissao?.servicos ?? []).map((servico, indice) => ({
+      chave: indice,
+      pessoaId: servico.pessoaId,
+      itemRevisionalId: servico.itemRevisionalId,
+      inicio: paraDatetimeLocal(servico.inicio),
+      fim: paraDatetimeLocal(servico.fim),
+    })),
+  );
+  // Contador em ref (não em estado): a chave é derivada no próprio momento da
+  // inserção, então duas chamadas dentro de um mesmo batch de render nunca
+  // podem ler o mesmo valor "antigo" do closure e gerar duas linhas com a
+  // mesma `key`.
+  const proximaChave = useRef((emissao?.servicos.length ?? 0) + 1);
+
+  const adicionarServico = () => {
+    const chave = proximaChave.current;
+    proximaChave.current += 1;
+    setLinhasServico((atual) => [
+      ...atual,
+      { chave, pessoaId: "", itemRevisionalId: "", inicio: "", fim: "" },
+    ]);
+  };
+
+  const removerServico = (chave: number) => {
+    setLinhasServico((atual) => atual.filter((linha) => linha.chave !== chave));
+  };
 
   useEffect(() => {
     if (estado.ok) {
@@ -445,6 +595,26 @@ export function ModalEmissao({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado]);
+
+  // Erro de campo numa linha de serviço: o banner de erro fica no topo do
+  // modal, mas os campos culpados estão na aba Serviço — trazer o usuário
+  // para ela evita a mensagem "solta", sem dono visível, quando ele está na
+  // aba Geral. Ajuste feito DURANTE o render (comparando com o último estado
+  // já tratado), nunca num efeito: setState dentro de efeito dispara render
+  // em cascata e é barrado pelo lint do projeto. Depois disso o usuário
+  // continua livre para trocar de aba — só uma NOVA resposta da action
+  // reposiciona.
+  const [estadoTratado, setEstadoTratado] = useState(estado);
+  if (estado !== estadoTratado) {
+    setEstadoTratado(estado);
+    if (
+      !estado.ok &&
+      Array.isArray(estado.error) &&
+      estado.error.some((item) => item.field.startsWith("servico-"))
+    ) {
+      setAba("servico");
+    }
+  }
 
   const erro = mensagemDeErro(estado.error);
 
@@ -564,6 +734,13 @@ export function ModalEmissao({
           >
             Itens
           </button>
+          <button
+            type="button"
+            className={`modal-tab-btn${aba === "servico" ? " active" : ""}`}
+            onClick={() => setAba("servico")}
+          >
+            Serviço
+          </button>
         </div>
 
         {erro ? (
@@ -622,6 +799,22 @@ export function ModalEmissao({
                   </select>
                 </div>
                 <div className="f">
+                  <label htmlFor="emissao-setor">Setor</label>
+                  <select
+                    id="emissao-setor"
+                    name="setor"
+                    required
+                    value={setor}
+                    onChange={(evento) => setSetor(evento.target.value as typeof setor)}
+                  >
+                    {SETORES.map((valor) => (
+                      <option key={valor} value={valor}>
+                        {LABEL_POR_SETOR[valor]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="f">
                   <label htmlFor="emissao-plano">Plano revisional</label>
                   <select
                     id="emissao-plano"
@@ -671,6 +864,35 @@ export function ModalEmissao({
                     }
                   />
                 </div>
+                {/* Story 5.5: os três marcos são OPCIONAIS (sem `required`) —
+                    uma emissão continua salvável só com a data de emissão. */}
+                <div className="f">
+                  <label htmlFor="emissao-data-agendamento">Data agendamento</label>
+                  <input
+                    id="emissao-data-agendamento"
+                    name="dataAgendamento"
+                    type="datetime-local"
+                    defaultValue={paraDatetimeLocal(emissao?.dataAgendamento ?? null)}
+                  />
+                </div>
+                <div className="f">
+                  <label htmlFor="emissao-data-inicio">Data início</label>
+                  <input
+                    id="emissao-data-inicio"
+                    name="dataInicio"
+                    type="datetime-local"
+                    defaultValue={paraDatetimeLocal(emissao?.dataInicio ?? null)}
+                  />
+                </div>
+                <div className="f">
+                  <label htmlFor="emissao-data-fim">Data fim</label>
+                  <input
+                    id="emissao-data-fim"
+                    name="dataFim"
+                    type="datetime-local"
+                    defaultValue={paraDatetimeLocal(emissao?.dataFim ?? null)}
+                  />
+                </div>
               </div>
             </div>
 
@@ -691,6 +913,50 @@ export function ModalEmissao({
                   <LinhaItemEmissaoRow key={`${planoId}-${linha.itemRevisionalId}`} linha={linha} />
                 ))}
               </div>
+            </div>
+
+            {/* Visibilidade por classe ".hidden" (mesmo padrão dos outros
+                painéis), NUNCA desmontando o conteúdo: os inputs das linhas
+                de serviço são não-controlados, desmontar o painel ao trocar
+                de aba perderia tudo o que foi digitado aqui antes do submit
+                (e tiraria os campos do FormData). */}
+            <div className={`modal-tab-panel${aba === "servico" ? "" : " hidden"}`}>
+              <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
+                Registre quem executou o serviço, o período trabalhado e o item revisional
+                relacionado (aba Itens).
+              </p>
+              {/* Contagem explícita lida pelo servidor (lerServicos) junto
+                  dos campos indexados `servico-{i}-*` — nunca getAll()
+                  posicional (Boundaries). */}
+              <input type="hidden" name="servicoCount" value={linhasServico.length} />
+              <div id="emissao-servico-list">
+                {linhasServico.length === 0 ? (
+                  <p className="muted" style={{ fontSize: 13, margin: "0 0 10px" }}>
+                    Nenhum serviço adicionado ainda.
+                  </p>
+                ) : null}
+                {linhasServico.map((linha, indice) => (
+                  <LinhaServicoRow
+                    key={linha.chave}
+                    indice={indice}
+                    inicial={linha}
+                    pessoas={pessoas}
+                    itensRevisionais={itensRevisionais}
+                    onRemover={() => removerServico(linha.chave)}
+                  />
+                ))}
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                onClick={adicionarServico}
+                style={{ marginTop: 10 }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Adicionar serviço
+              </button>
             </div>
           </div>
 
