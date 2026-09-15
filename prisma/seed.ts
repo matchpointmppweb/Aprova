@@ -30,6 +30,7 @@ const TODOS_OS_MODULOS: Modulo[] = [
   Modulo.planos,
   Modulo.emissao,
   Modulo.locais,
+  Modulo.empresas,
   Modulo.usuarios,
   Modulo.perfil,
   Modulo.aparencia,

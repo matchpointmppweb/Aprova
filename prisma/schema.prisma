@@ -104,6 +104,7 @@ enum Modulo {
   planos
   emissao
   locais
+  empresas
   usuarios
   contas
   perfil
@@ -137,6 +138,7 @@ model Conta {
   planosRevisionais PlanoRevisional[]
   emissoes          Emissao[]
   locais            Local[]
+  empresas          Empresa[]
 
   @@map("contas")
 }
@@ -591,4 +593,34 @@ model Local {
 
   @@unique([contaId, nome])
   @@map("locais")
+}
+
+// ---------------------------------------------------------------------------
+// Empresa (Story 5.2) — terceiros/prestadores relacionados à operação
+// (razão social, nome fantasia, CNPJ e/ou CPF quando autônomo, observação
+// livre). Sem `status` e sem exclusão física ou lógica: o mockup só mostra
+// a ação "Editar" por linha (Boundaries/AD-17 — diferente de
+// Local/TipoAtivo/Ativo/ItemRevisional/PlanoRevisional, que têm um estado de
+// arquivamento). `cnpj`/`cpf`/`observacao` são opcionais e sem validação de
+// dígito verificador — texto livre (Boundaries da story).
+// ---------------------------------------------------------------------------
+
+model Empresa {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  razaoSocial  String
+  nomeFantasia String
+  /// Opcional — empresas com CNPJ deixam `cpf` vazio.
+  cnpj         String?
+  /// Opcional — prestadores autônomos preenchem `cpf` em vez de `cnpj`.
+  cpf          String?
+  observacao   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, razaoSocial])
+  @@map("empresas")
 }
