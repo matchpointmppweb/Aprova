@@ -124,6 +124,7 @@ enum Modulo {
   empresas
   cargos
   funcoes
+  pessoas
   usuarios
   contas
   perfil
@@ -160,6 +161,7 @@ model Conta {
   empresas          Empresa[]
   cargos            Cargo[]
   funcoes           Funcao[]
+  pessoas           Pessoa[]
 
   @@map("contas")
 }
@@ -669,6 +671,8 @@ model Cargo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  pessoas Pessoa[]
+
   @@unique([contaId, descricao])
   @@map("cargos")
 }
@@ -684,6 +688,51 @@ model Funcao {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  pessoas Pessoa[]
+
   @@unique([contaId, descricao])
   @@map("funcoes")
+}
+
+// ---------------------------------------------------------------------------
+// Pessoa (Story 5.4) — pessoas que executam serviços/checklists, com Cargo e
+// Função vinculados por FK obrigatória (nunca texto livre) — último cadastro
+// complementar do Epic 5 e pré-requisito da Story 5.5 (registrar quem
+// executou cada serviço numa emissão). Sem `@@unique` de nome (Code Map: o
+// mockup não trata nome como identificador único de pessoa, diferente das
+// demais entidades desta epic). `cpf` é texto livre, sem validação de dígito
+// verificador (mesmo padrão de Empresa). Sem exclusão física nem campo
+// `status` (AD-17/AD-18 — mesmo padrão de Empresa: mockup só mostra
+// "Editar"). Um Cargo/Função depois inativado (StatusCargo/StatusFuncao)
+// continua referenciável por uma Pessoa já vinculada — a FK não quebra
+// (Boundaries/I-O Matrix da story).
+// ---------------------------------------------------------------------------
+
+model Pessoa {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nome String
+  cpf  String
+
+  cargoId String
+  cargo   Cargo @relation(fields: [cargoId], references: [id])
+
+  funcaoId String
+  funcao   Funcao @relation(fields: [funcaoId], references: [id])
+
+  observacao String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Diferente das demais entidades do Epic 5, Pessoa não tem
+  /// @@unique([contaId, ...]) (nome/CPF não são identificadores únicos aqui),
+  /// então nada indexaria `contaId` de graça — e toda leitura filtra por ele
+  /// (AD-1). Índice explícito para não varrer a tabela inteira por conta.
+  @@index([contaId])
+  @@index([cargoId])
+  @@index([funcaoId])
+  @@map("pessoas")
 }

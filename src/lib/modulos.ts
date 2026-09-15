@@ -17,6 +17,7 @@ export const MODULOS_PERFIL: { key: Modulo; label: string }[] = [
   { key: "empresas", label: "Empresas" },
   { key: "cargos", label: "Cargos" },
   { key: "funcoes", label: "Funções" },
+  { key: "pessoas", label: "Pessoas" },
   { key: "usuarios", label: "Usuários" },
   { key: "perfil", label: "Perfil de acesso" },
   { key: "aparencia", label: "Aparência" },

@@ -8,9 +8,9 @@ import { prisma } from "./db";
 // contaId sempre obrigatório e sempre aplicado ao `where`.
 // buscarPermissaoDoModulo (can()) e listarPerfisAcesso (dropdown de
 // convite/edição de usuário, Story 1.2) já existiam e não mudam. A
-// criação, leitura e edição de perfis (+ suas 8 linhas de permissão) são
-// acrescentadas aqui pela Story 1.3 — não há exclusão de perfil nesta
-// story.
+// criação, leitura e edição de perfis (+ uma linha de permissão por módulo
+// de MODULOS_PERFIL) são acrescentadas aqui pela Story 1.3 — não há
+// exclusão de perfil nesta story.
 
 export async function buscarPermissaoDoModulo(
   perfilAcessoId: string,
@@ -81,8 +81,8 @@ export async function criarPerfilAcesso(
   });
 }
 
-// Edição: nome/descrição do perfil + as (até 8) linhas de permissão são
-// escritos numa única transação (AD-9) — nunca parcialmente aplicados se
+// Edição: nome/descrição do perfil + as linhas de permissão (uma por módulo
+// de MODULOS_PERFIL) são escritos numa única transação (AD-9) — nunca parcialmente aplicados se
 // uma das escritas falhar. O update do perfil é escopado por
 // {id, contaId} (AD-1); se não achar nada (perfil de outra conta ou
 // inexistente), a transação inteira é abortada (count 0) sem tocar nas
