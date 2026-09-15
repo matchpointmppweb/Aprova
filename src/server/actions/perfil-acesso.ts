@@ -26,7 +26,7 @@ function isErroDeNomeDuplicado(erro: unknown): boolean {
   );
 }
 
-// Lê, para cada um dos 8 módulos configuráveis (MODULOS_PERFIL, AD-13 —
+// Lê, para cada módulo configurável (MODULOS_PERFIL, AD-13 —
 // "contas" nunca aparece aqui), os 3 checkboxes de criar/editar/excluir do
 // formulário do modal. Um checkbox desmarcado simplesmente não aparece no
 // FormData — daí o `=== "on"` em vez de checar truthiness de string.
