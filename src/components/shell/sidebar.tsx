@@ -79,6 +79,7 @@ export function Sidebar() {
           <Link href="/tipos" className={`side-item nav-item${ehRotaAtiva(pathname, "/tipos") ? " active" : ""}`}>Tipos</Link>
           <Link href="/itens-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/itens-revisionais") ? " active" : ""}`}>Itens revisionais</Link>
           <Link href="/planos-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/planos-revisionais") ? " active" : ""}`}>Planos revisionais</Link>
+          <Link href="/locais" className={`side-item nav-item${ehRotaAtiva(pathname, "/locais") ? " active" : ""}`}>Locais</Link>
         </div>
       </div>
 

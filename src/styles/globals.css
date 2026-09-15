@@ -392,6 +392,17 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .item-fields .f label{font-size:10.5px;}
 .item-obs{flex:1;min-width:180px;}
 
+/* ---------- MAP PICKER (polígono de local) ---------- */
+.map-field{margin-top:16px;}
+.map-field > label{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-bottom:7px;}
+.map-picker{position:relative;width:100%;max-width:680px;height:280px;border:1px solid var(--line-strong);border-radius:var(--radius-m);overflow:hidden;background:#CFE3D3;}
+.map-picker svg{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
+.map-picker svg.map-draw{cursor:crosshair;}
+.map-polygon{fill:rgba(44,110,79,0.30);stroke:var(--pine);stroke-width:2;}
+.map-vertex{fill:var(--pine-dark);stroke:#fff;stroke-width:1.5;}
+.map-hint{position:absolute;left:10px;bottom:10px;background:rgba(21,34,25,0.72);color:#fff;font-size:11px;padding:5px 9px;border-radius:100px;pointer-events:none;}
+.map-actions{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap;}
+
 .perm-table{width:100%;border-collapse:collapse;}
 .perm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);}
 .perm-table th.perm-check-col{text-align:center;}

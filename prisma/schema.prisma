@@ -86,6 +86,14 @@ enum StatusEmissao {
   Reprovado
 }
 
+/// Status de Local (Story 5.1) — mesmo padrão de StatusTipoAtivo: "excluir"
+/// nunca é DELETE físico (AD-10), é atualizarLocal(...,{status:"Inativo"})
+/// pela mesma função de repositório usada pela edição comum.
+enum StatusLocal {
+  Ativo
+  Inativo
+}
+
 /// Chave de módulo usada por can() e pelas linhas de permissão do Perfil de
 /// acesso (Consistency Conventions da arquitetura). "contas" existe como
 /// chave mas nunca é selecionável na UI de Perfil de acesso (AD-13).
@@ -95,6 +103,7 @@ enum Modulo {
   itens
   planos
   emissao
+  locais
   usuarios
   contas
   perfil
@@ -127,6 +136,7 @@ model Conta {
   itensRevisionais  ItemRevisional[]
   planosRevisionais PlanoRevisional[]
   emissoes          Emissao[]
+  locais            Local[]
 
   @@map("contas")
 }
@@ -551,4 +561,34 @@ model ItemExecutadoEmissao {
 
   @@unique([emissaoId, itemRevisionalId])
   @@map("itens_executados_emissao")
+}
+
+// ---------------------------------------------------------------------------
+// Local (Story 5.1) — plantas/pátios/áreas onde os ativos estão instalados,
+// com a área delimitada por um polígono ilustrativo (AD-14): `areaPoligono`
+// é um array de pontos `[x,y]` em coordenadas do viewBox="0 0 600 300" do
+// editor client-side (src/components/locais/mapa-editor.tsx), gravado como
+// Json — NUNCA lat/long, nunca integração com serviço de mapas real. Campo
+// opcional: um local pode ser salvo sem polígono definido (Boundaries).
+// Sem exclusão física (AD-10): "excluir" é só mudar `status` para Inativo,
+// pela mesma função de repositório usada pela edição comum (atualizarLocal).
+// ---------------------------------------------------------------------------
+
+model Local {
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nome         String
+  endereco     String
+  /// Array de pontos `{x,y}` do viewBox do editor, ou `null` quando nenhum
+  /// vértice foi marcado ainda (Boundaries — nunca obrigatório).
+  areaPoligono Json?
+  status       StatusLocal @default(Ativo)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contaId, nome])
+  @@map("locais")
 }

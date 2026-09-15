@@ -29,6 +29,7 @@ const TODOS_OS_MODULOS: Modulo[] = [
   Modulo.itens,
   Modulo.planos,
   Modulo.emissao,
+  Modulo.locais,
   Modulo.usuarios,
   Modulo.perfil,
   Modulo.aparencia,

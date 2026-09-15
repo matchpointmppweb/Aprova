@@ -104,9 +104,18 @@ export async function atualizarPerfilAcesso(
 
     await Promise.all(
       dados.permissoes.map((permissao) =>
-        tx.permissaoModulo.updateMany({
-          where: { perfilAcessoId, modulo: permissao.modulo },
-          data: {
+        tx.permissaoModulo.upsert({
+          where: {
+            perfilAcessoId_modulo: { perfilAcessoId, modulo: permissao.modulo },
+          },
+          create: {
+            perfilAcessoId,
+            modulo: permissao.modulo,
+            criar: permissao.criar,
+            editar: permissao.editar,
+            excluir: permissao.excluir,
+          },
+          update: {
             criar: permissao.criar,
             editar: permissao.editar,
             excluir: permissao.excluir,
