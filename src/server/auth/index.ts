@@ -20,11 +20,12 @@ import { logarLinkDeDefinicaoDeSenha } from "./email";
  * `contaId`/`perfilAcessoId` NÃO estão aqui de propósito (Story 6.2): a conta
  * ativa e o perfil são resolvidos pelo VinculoConta, revalidado contra o banco
  * a cada requisição (NFR6), em
- * src/server/repositories/vinculo-conta.ts -> exigirUsuarioAutenticado(). As
- * colunas ainda existem em `usuarios` (só somem na Story 6.3), mas expô-las na
- * sessão daria cobertura a uma Server Action que lesse `sessao.user.contaId` e
- * contornasse a resolução pelo vínculo — inclusive servindo uma conta cujo
- * vínculo já foi desativado. Da sessão sai apenas a identidade (`id`).
+ * src/server/repositories/vinculo-conta.ts -> exigirUsuarioAutenticado(). A
+ * Story 6.3 removeu de vez essas colunas de `usuarios`; mesmo enquanto
+ * existiam, expô-las na sessão daria cobertura a uma Server Action que lesse
+ * `sessao.user.contaId` e contornasse a resolução pelo vínculo — inclusive
+ * servindo uma conta cujo vínculo já foi desativado. Da sessão sai apenas a
+ * identidade (`id`).
  *
  * Não existe cadastro público (bootstrap só via prisma/seed.ts; convite de
  * usuário é a Story 1.2) — sign-up fica desabilitado no Better Auth.

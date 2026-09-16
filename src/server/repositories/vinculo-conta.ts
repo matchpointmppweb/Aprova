@@ -8,10 +8,9 @@ import { prisma } from "./db";
 //
 // Story 6.2 (fase contract da leitura): a conta ativa e o perfil de acesso de
 // uma identidade passam a sair daqui, e não mais das colunas
-// `Usuario.contaId`/`Usuario.perfilAcessoId`. As colunas continuam existindo e
-// continuam sendo escritas pelo dual-write da 6.1 (src/server/repositories/
-// usuario.ts) — só deixaram de ser lidas no caminho de autenticação. A remoção
-// delas é a Story 6.3.
+// `Usuario.contaId`/`Usuario.perfilAcessoId`. A Story 6.3 removeu essas
+// colunas — o vínculo é agora a única fonte da informação, e não há mais
+// dual-write a manter.
 
 /// Status do vínculo (e da identidade) que dão acesso a uma sessão já
 /// estabelecida — só quem está Ativo opera o sistema.
@@ -58,14 +57,22 @@ async function listarVinculosUtilizaveis(
 // Resolve a identidade autenticada + conta ativa + perfil pelo vínculo,
 // devolvendo EXATAMENTE a forma que `buscarUsuarioAutenticado` devolvia
 // (campos de Usuario + `conta` + `perfilAcesso`), com `contaId` e
-// `perfilAcessoId` sobrescritos pelos do vínculo. É assim que o AD-23 se
+// `perfilAcessoId` vindos do vínculo. Desde a Story 6.3 o spread de
+// `vinculo.usuario` não traz mais esses dois campos (as colunas foram
+// removidas), e a atribuição explícita abaixo é a única origem deles — o que
+// já era o comportamento efetivo na 6.2. É assim que o AD-23 se
 // cumpre: nenhuma Server Action, nenhum repositório de domínio e nenhum uso de
 // `contaId` precisou mudar — inclusive can(), que continua recebendo este
 // mesmo objeto.
 //
-// Fail-closed: zero vínculos utilizáveis nega acesso; mais de um (só possível
-// a partir da 6.3, e com a escolha entre contas só na 6.4) também nega —
+// Fail-closed: zero vínculos utilizáveis nega acesso; mais de um também nega —
 // nunca escolher um vínculo arbitrariamente.
+//
+// A partir da Story 6.3 o segundo caso é real: o colapso de identidades que
+// compartilhavam e-mail pode produzir uma pessoa com vínculo ativo em duas
+// contas, e ela fica sem acesso até a Story 6.4 (escolha de conta) existir.
+// Resultado esperado e documentado na story — nunca contornar escolhendo um
+// vínculo.
 export async function resolverUsuarioAutenticadoPeloVinculo(
   usuarioId: string,
   statusPermitidos: readonly StatusUsuario[],
@@ -73,11 +80,11 @@ export async function resolverUsuarioAutenticadoPeloVinculo(
   const vinculos = await listarVinculosUtilizaveis(usuarioId, statusPermitidos);
 
   if (vinculos.length > 1) {
-    // Não deveria ser possível antes da Story 6.4 (a escolha entre contas só
-    // passa a existir lá) — se acontecer, a negação em si é correta, mas
-    // silenciosa demais para diagnosticar. Só servidor, nada chega ao
-    // cliente: a Server Action/guarda devolve a mesma recusa genérica de
-    // sempre, sem revelar nada sobre o estado dos vínculos.
+    // Possível desde a Story 6.3 (colapso por e-mail), mas sem resolução até a
+    // Story 6.4 (a escolha entre contas só passa a existir lá) — a negação em
+    // si é correta, mas silenciosa demais para diagnosticar. Só servidor, nada
+    // chega ao cliente: a Server Action/guarda devolve a mesma recusa genérica
+    // de sempre, sem revelar nada sobre o estado dos vínculos.
     console.warn(
       `[vinculo-conta] mais de um vínculo utilizável para a identidade ${usuarioId} — acesso negado (fail-closed). A escolha entre contas é a Story 6.4.`,
     );

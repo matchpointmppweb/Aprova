@@ -79,10 +79,11 @@ export async function entrarAction(
     usuario.statusDoVinculo === "ConvitePendente"
   ) {
     try {
-      // count 0 significa que nada foi promovido (a linha não casou o
-      // `status: "ConvitePendente"` do where). Seguir para "/" deixaria o
-      // usuário não promovido bater na guarda de sessão — mesma falha que o
-      // catch abaixo já trata.
+      // count 0 significa que a pessoa NÃO terminou a chamada podendo entrar:
+      // sem vínculo com esta conta, ou desativada (identidade ou vínculo)
+      // entre a leitura e a escrita do compare-and-set. Seguir para "/"
+      // deixaria o usuário não promovido bater na guarda de sessão — mesma
+      // falha que o catch abaixo já trata.
       const { count } = await ativarUsuarioConvidado(usuario.id, usuario.contaId);
       if (count === 0) {
         throw new Error("promoção de convidado não afetou nenhuma linha");
@@ -98,7 +99,9 @@ export async function entrarAction(
   }
 
   // Falha ao registrar o último acesso não deve barrar o login.
-  await registrarUltimoAcesso(usuario.id, usuario.contaId).catch(() => {});
+  // Story 6.3: `ultimoAcesso` é da identidade, sem recorte por conta — a
+  // função deixou de receber `contaId`.
+  await registrarUltimoAcesso(usuario.id).catch(() => {});
 
   redirect("/");
 }

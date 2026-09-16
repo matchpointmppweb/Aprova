@@ -164,7 +164,10 @@ model Conta {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  usuarios          Usuario[]
+  /// A Story 6.3 removeu a relação inversa `usuarios`: quem pertence a uma
+  /// conta é dito pelo VinculoConta, nunca mais por uma coluna em `Usuario`.
+  /// A contagem de usuários da conta (área do operador de plataforma) passa a
+  /// vir de `vinculos`.
   vinculos          VinculoConta[]
   perfisAcesso      PerfilAcesso[]
   tiposDeAtivo      TipoAtivo[]
@@ -182,49 +185,63 @@ model Conta {
 }
 
 // ---------------------------------------------------------------------------
-// Usuario — também é o modelo "user" do Better Auth (credentials + sessão em
-// banco). O campo `name` exigido pelo Better Auth é mapeado para `nome`
-// (server/auth/index.ts: user.fields.name = "nome"); contaId,
-// perfilAcessoId, isPlataformaOperador, status e ultimoAcesso são
+// Usuario — a IDENTIDADE da pessoa na plataforma, e também o modelo "user" do
+// Better Auth (credentials + sessão em banco). O campo `name` exigido pelo
+// Better Auth é mapeado para `nome` (server/auth/index.ts:
+// user.fields.name = "nome"); isPlataformaOperador, status e ultimoAcesso são
 // registrados como additionalFields para sobreviver ao parse de saída do
-// Better Auth e ficarem disponíveis via auth.api.getSession() (AD-1: sessão
-// carrega contaId).
+// Better Auth e ficarem disponíveis via auth.api.getSession().
+//
+// Story 6.3 (fase contract): `contaId`/`perfilAcessoId` NÃO existem mais aqui
+// e `email` é único em TODA a plataforma — é o que permite a mesma pessoa
+// atender duas contas com uma só identidade e uma só senha (FR20/FR21). A
+// conta e o perfil de acesso vivem exclusivamente no VinculoConta, e a sessão
+// carrega apenas a identidade (`id`): a conta ativa é resolvida por vínculo a
+// cada requisição (Story 6.2, AD-1).
 // ---------------------------------------------------------------------------
 
 model Usuario {
   id            String  @id @default(cuid())
   nome          String
-  email         String
+  /// Único em TODA a plataforma a partir da Story 6.3 (antes era único só por
+  /// conta) — é o identificador da pessoa, não do seu papel numa conta.
+  email         String  @unique
   emailVerified Boolean @default(false)
   image         String?
 
+  /// Status GLOBAL da identidade. O status POR CONTA é o de VinculoConta — é o
+  /// que o FR24 pede ao dizer que remover alguém de uma conta encerra só
+  /// aquele vínculo. O acesso exige `Ativo` nos dois
+  /// (src/server/repositories/vinculo-conta.ts).
+  ///
+  /// Hoje só é ESCRITO no ciclo do primeiro acesso (ConvitePendente -> Ativo,
+  /// em ativarUsuarioConvidado): desde a Story 6.3 a tela de Usuários roteia
+  /// `status` para o vínculo, e nenhum caminho da UI grava `Inativo` aqui. O
+  /// banimento global da plataforma é a semântica pretendida do campo, mas
+  /// ainda não tem tela que o escreva. As guardas que LEEM este campo
+  /// continuam necessárias — há dado anterior à 6.3 com `Inativo` gravado na
+  /// identidade, e desligá-las liberaria justamente essas pessoas.
   status               StatusUsuario @default(Ativo)
   ultimoAcesso         DateTime?
   /// Independente do PerfilAcesso (AD-13) — gate exclusivo da área de Contas
   /// (CAP-8, Story 1.4). Só os operadores da plataforma Raiz têm `true`.
   isPlataformaOperador Boolean       @default(false)
 
-  contaId String
-  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
-
-  perfilAcessoId String
-  perfilAcesso   PerfilAcesso @relation(fields: [perfilAcessoId], references: [id])
-
   sessions Session[]
   accounts Account[]
 
-  /// Fase expand da Story 6.1 — o vínculo espelha contaId/perfilAcessoId/
-  /// status acima; as colunas continuam sendo a fonte de verdade até a
-  /// Story 6.2/6.3.
+  /// Única fonte de "a que contas esta pessoa pertence e com qual perfil em
+  /// cada uma" desde a Story 6.3.
   vinculos VinculoConta[]
 
+  /// Responsável de plano/emissão continua apontando para a IDENTIDADE
+  /// (AD-25), nunca para o vínculo.
   planosComoResponsavel   PlanoRevisional[]
   emissoesComoResponsavel Emissao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([contaId, email])
   @@map("usuarios")
 }
 
@@ -298,7 +315,10 @@ model PerfilAcesso {
   descricao String?
 
   permissoes PermissaoModulo[]
-  usuarios   Usuario[]
+  /// A Story 6.3 removeu a relação inversa `usuarios`: o perfil de acesso de
+  /// uma pessoa é atributo do VÍNCULO dela com a conta, não da identidade. A
+  /// contagem de usuários por perfil (tela Perfil de acesso) passa a vir de
+  /// `vinculos`.
   vinculos   VinculoConta[]
 
   createdAt DateTime @default(now())
@@ -313,13 +333,11 @@ model PerfilAcesso {
 // acesso como entidade de primeira classe, pré-requisito de FR21 (a mesma
 // pessoa pertencer a mais de uma conta sem duplicar identidade/senha).
 //
-// Esta é a fase **expand** de uma migração expand/contract: nesta story
-// `Usuario.contaId`/`Usuario.perfilAcessoId` continuam sendo a ÚNICA fonte de
-// verdade lida pela sessão e por can() — o vínculo é populado por backfill
-// versionado e mantido em dia por dual-write nos repositórios (AD-9, mesma
-// transação), para que nada divirja entre este deploy e o da Story 6.2, que é
-// quem passa as leituras a resolver conta/perfil por aqui. A Story 6.3 é quem
-// remove as colunas antigas — antecipar isso quebra a aplicação.
+// Nasceu como fase **expand** de uma migração expand/contract (Story 6.1,
+// espelhando `Usuario.contaId`/`Usuario.perfilAcessoId`), virou a fonte da
+// LEITURA de conta ativa e perfil na Story 6.2, e desde a Story 6.3 — que
+// removeu aquelas colunas e tornou `Usuario.email` único globalmente — é a
+// ÚNICA fonte dessa informação. Não há mais dual-write: não há mais dois lados.
 //
 // `status` reutiliza deliberadamente o enum `StatusUsuario`: a semântica é
 // idêntica (Ativo/ConvitePendente/Inativo) e o projeto já reutiliza enums

@@ -18,6 +18,13 @@ import type { EstadoAcaoUsuario } from "./usuario-estado";
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
 const STATUS_VALIDOS: StatusUsuario[] = ["Ativo", "ConvitePendente", "Inativo"];
+// Recusa NEUTRA, que não afirma nem nega a existência do e-mail. Com o unique
+// global da Story 6.3, "já está em uso" viraria um oráculo: qualquer
+// administrador poderia sondar, um e-mail por vez, quem existe em QUALQUER
+// conta da plataforma — inclusive dentro de outro cliente. É a mesma disciplina
+// anti-enumeração que entrarAction e solicitarResetSenhaAction mantêm de
+// propósito.
+const ERRO_EMAIL_INDISPONIVEL = "Não foi possível usar este e-mail.";
 // Validação básica de formato, suficiente para recusar e-mails claramente
 // malformados antes de persistir ou repassar para
 // auth.api.requestPasswordReset (cujo zod interno rejeitaria de qualquer
@@ -33,12 +40,31 @@ function normalizarEmail(valor: FormDataEntryValue | null) {
 class UltimoAdministradorAtivoError extends Error {}
 
 // Nunca expõe detalhe de banco/constraint (Boundaries) — só reconhece a
-// violação da constraint única @@unique([contaId, email]) para traduzir num
-// erro de validação de campo.
+// violação da constraint única de `Usuario.email` para traduzir num erro de
+// validação de campo. Desde a Story 6.3 essa constraint é GLOBAL (era
+// @@unique([contaId, email])): o e-mail pode estar em uso por uma identidade de
+// OUTRA conta. Convidar alguém que já tem identidade na plataforma (criando só
+// um vínculo novo, em vez de recusar) é a Story 6.6.
+//
+// O `meta.target` é checado, e não só o código: o convite agora cria
+// identidade e vínculo no mesmo nested write, então um P2002 de
+// @@unique([usuarioId, contaId]) também chegaria aqui e viraria, erradamente,
+// um erro no campo "email". O target vem ora como lista de campos
+// (["email"]), ora como nome do índice ("usuarios_email_key") — os dois casam.
 function isErroDeEmailDuplicado(erro: unknown): boolean {
-  return (
-    erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002"
-  );
+  if (
+    !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
+    erro.code !== "P2002"
+  ) {
+    return false;
+  }
+  const alvo = erro.meta?.target;
+  const campos = Array.isArray(alvo)
+    ? alvo.map(String)
+    : typeof alvo === "string"
+      ? [alvo]
+      : [];
+  return campos.some((campo) => campo === "email" || campo.includes("email"));
 }
 
 // Given Administrador autenticado, when convida um usuário com nome, e-mail
@@ -92,7 +118,7 @@ export async function convidarUsuarioAction(
     if (isErroDeEmailDuplicado(erro)) {
       return {
         ok: false,
-        error: [{ field: "email", message: "Este e-mail já está em uso nesta conta." }],
+        error: [{ field: "email", message: ERRO_EMAIL_INDISPONIVEL }],
       };
     }
     return { ok: false, error: ERRO_GENERICO };
@@ -171,9 +197,13 @@ export async function editarUsuarioAction(
     atualizou = await prisma.$transaction(
       async (tx) => {
         if (usuarioId === usuarioSessao.id) {
+          // `statusDoVinculo`, e não `status`: desde a Story 6.3 o `status` do
+          // objeto de sessão é o GLOBAL da identidade, enquanto o `<select>`
+          // deste formulário e contarAdministradoresAtivos falam do status
+          // NAQUELA conta — que é o que esta comparação sempre quis dizer.
           const eraAdministradorAtivo =
             usuarioSessao.perfilAcesso.nome === "Administrador" &&
-            usuarioSessao.status === "Ativo";
+            usuarioSessao.statusDoVinculo === "Ativo";
           const continuaAdministradorAtivo =
             perfilSelecionado.nome === "Administrador" && status === "Ativo";
 
@@ -208,7 +238,7 @@ export async function editarUsuarioAction(
     if (isErroDeEmailDuplicado(erro)) {
       return {
         ok: false,
-        error: [{ field: "email", message: "Este e-mail já está em uso nesta conta." }],
+        error: [{ field: "email", message: ERRO_EMAIL_INDISPONIVEL }],
       };
     }
     return { ok: false, error: ERRO_GENERICO };

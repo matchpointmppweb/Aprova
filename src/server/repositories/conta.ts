@@ -13,11 +13,22 @@ import { prisma } from "./db";
 // Listagem da área Contas (operador de plataforma): todas as contas-cliente
 // da plataforma, com a contagem de usuários vinculados a cada uma (coluna
 // "nº de usuários" do mockup).
+//
+// Story 6.3: `Conta.usuarios` deixou de existir — quem pertence a uma conta é
+// dito pelo VinculoConta. A contagem passa a ser de `vinculos`, mas a FORMA do
+// retorno é mantida (`_count.usuarios`) para que a tela do operador de
+// plataforma (src/components/plataforma/) não precise mudar: a coluna continua
+// significando "nº de usuários desta conta".
 export async function listarContas() {
-  return prisma.conta.findMany({
-    include: { _count: { select: { usuarios: true } } },
+  const contas = await prisma.conta.findMany({
+    include: { _count: { select: { vinculos: true } } },
     orderBy: { nome: "asc" },
   });
+
+  return contas.map(({ _count, ...conta }) => ({
+    ...conta,
+    _count: { usuarios: _count.vinculos },
+  }));
 }
 
 export async function buscarConta(contaId: string) {

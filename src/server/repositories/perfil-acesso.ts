@@ -43,15 +43,26 @@ export type PermissaoParaGravar = {
 // Listagem da tela Perfil de acesso (Story 1.3): nome, descrição, contagem
 // de usuários vinculados e as linhas de permissão — o suficiente para a
 // tabela (`.perm-badges`, resumo por módulo) sem uma 2ª consulta por perfil.
+//
+// Story 6.3: `PerfilAcesso.usuarios` deixou de existir — o perfil de uma
+// pessoa é atributo do VÍNCULO dela com a conta. A contagem passa a ser de
+// `vinculos`, com a FORMA do retorno mantida (`_count.usuarios`) para que
+// src/components/perfil-acesso/ não precise mudar: a coluna continua
+// significando "nº de usuários com este perfil".
 export async function listarPerfisAcessoCompleto(contaId: string) {
-  return prisma.perfilAcesso.findMany({
+  const perfis = await prisma.perfilAcesso.findMany({
     where: { contaId },
     include: {
-      _count: { select: { usuarios: true } },
+      _count: { select: { vinculos: true } },
       permissoes: true,
     },
     orderBy: { nome: "asc" },
   });
+
+  return perfis.map(({ _count, ...perfil }) => ({
+    ...perfil,
+    _count: { usuarios: _count.vinculos },
+  }));
 }
 
 // Leitura de um único perfil (com permissões) escopada pela conta — usada
