@@ -169,6 +169,8 @@ model Conta {
   /// A contagem de usuários da conta (área do operador de plataforma) passa a
   /// vir de `vinculos`.
   vinculos          VinculoConta[]
+  /// Sessões que elegeram esta conta como conta ativa (Story 6.4).
+  sessoes           Session[]
   perfisAcesso      PerfilAcesso[]
   tiposDeAtivo      TipoAtivo[]
   ativos            Ativo[]
@@ -254,12 +256,32 @@ model Session {
   token     String   @unique
   userId    String
   usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Conta ativa DESTA sessão (Story 6.4). Nullable de propósito: a sessão
+  /// nasce sem ela (o Better Auth cria a linha antes de qualquer escolha) e
+  /// quem tem um único vínculo utilizável nunca precisa gravá-la — nesse caso
+  /// a conta ativa é DERIVADA do vínculo único, a cada requisição. Só é
+  /// escrita quando houve escolha real entre dois ou mais vínculos.
+  ///
+  /// A escolha vive na SESSÃO, não na identidade: a mesma pessoa pode estar em
+  /// contas diferentes em dois navegadores, e encerrar a sessão esquece a
+  /// escolha. Nunca é fonte de autorização sozinha — a guarda de sessão
+  /// revalida contra o banco, a cada requisição, que o vínculo com esta conta
+  /// existe e está utilizável (NFR6); se não estiver, o campo é limpo.
+  ///
+  /// `onDelete: SetNull` porque uma conta apagada não pode derrubar a linha de
+  /// sessão: a pessoa perde o ambiente, não a autenticação — cai na seleção ou
+  /// no login pela guarda, não num 500.
+  contaAtivaId String?
+  contaAtiva   Conta?  @relation(fields: [contaAtivaId], references: [id], onDelete: SetNull)
+
   expiresAt DateTime
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([contaAtivaId])
   @@map("sessoes")
 }
 

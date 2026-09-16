@@ -8,8 +8,10 @@ import { prisma } from "@/src/server/repositories/db";
 import { logarLinkDeDefinicaoDeSenha } from "./email";
 
 /**
- * Better Auth — credentials (e-mail/senha), sessão em banco (revogável,
- * carrega contaId) e fluxo de reset de senha (CAP-10, AD-1, AD-3).
+ * Better Auth — credentials (e-mail/senha), sessão em banco (revogável) e
+ * fluxo de reset de senha (CAP-10, AD-1, AD-3). Da sessão sai a identidade e,
+ * desde a Story 6.4, a CONTA ATIVA ESCOLHIDA (`contaAtivaId`, um ponteiro
+ * revalidado a cada requisição) — nunca autorização pronta.
  *
  * O modelo "user" do Better Auth é o `Usuario` do domínio (Prisma). O campo
  * interno `name` é mapeado para a coluna `nome`; os campos próprios do
@@ -38,6 +40,23 @@ export const auth = betterAuth({
   session: {
     // Sessão em banco (não JWT-only), revogável — 7 dias.
     expiresIn: 60 * 60 * 24 * 7,
+    additionalFields: {
+      // Conta ativa DESTA sessão (Story 6.4). Declarado aqui só para que
+      // auth.api.getSession() devolva a coluna em vez de descartá-la no parse
+      // de saída — a guarda precisa dela na mesma leitura que já faz.
+      //
+      // `input: false`: nada vindo do cliente escreve este campo. Quem o
+      // grava é definirContaAtivaDaSessao(), no repositório, depois de o
+      // servidor revalidar o vínculo (NFR2). E ele NÃO é autorização: a
+      // guarda revalida o vínculo com esta conta a cada requisição (NFR6) —
+      // é um ponteiro para a escolha, não uma credencial.
+      //
+      // Contraste deliberado com `user.additionalFields`, de onde
+      // `contaId`/`perfilAcessoId` foram removidos na 6.2 e não devem voltar:
+      // aquilo espelhava autorização na identidade; isto guarda uma escolha
+      // na sessão.
+      contaAtivaId: { type: "string", input: false, required: false },
+    },
   },
   user: {
     modelName: "usuario",

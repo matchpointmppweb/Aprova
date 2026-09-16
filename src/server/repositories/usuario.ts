@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import type { StatusUsuario } from "@prisma/client";
 
 import { prisma } from "./db";
+import { STATUS_COM_ACESSO } from "./vinculo-conta";
 
 // Permite que chamadores (Server Actions) passem um `tx` de
 // prisma.$transaction em vez do client global — usado pela guarda de
@@ -62,6 +63,29 @@ export async function registrarUltimoAcesso(usuarioId: string) {
   return prisma.usuario.update({
     where: { id: usuarioId },
     data: { ultimoAcesso: new Date() },
+  });
+}
+
+// Identidade revalidada contra o banco, SEM recorte por conta (Story 6.4,
+// AD-13). Existe para o gate do operador de plataforma: aquela área não
+// pertence a conta nenhuma, então exigir vínculo/conta ativa ali tirava a área
+// de Contas justamente de quem tem mais de um vínculo.
+//
+// O status GLOBAL continua sendo checado aqui — uma identidade banida da
+// plataforma não opera nada, com ou sem vínculo — e é revalidado a cada
+// requisição (NFR6): não basta o que o token de sessão carrega.
+//
+// STATUS_COM_ACESSO é fixo dentro da função, e não parâmetro: o nome promete
+// "ativa", e receber a allowlist de fora deixaria alguém passar
+// STATUS_COM_LOGIN e fazer uma identidade ConvitePendente cruzar o gate do
+// operador de plataforma — o gate mais sensível do sistema. Só existe um
+// chamador e só existe um valor correto.
+export async function buscarIdentidadeAtiva(usuarioId: string) {
+  return prisma.usuario.findFirst({
+    where: { id: usuarioId, status: { in: [...STATUS_COM_ACESSO] } },
+    // Só o que o gate decide e a casca mostra — nada de devolver a linha
+    // inteira para uma área que não tem conta nem perfil.
+    select: { id: true, nome: true, isPlataformaOperador: true },
   });
 }
 
