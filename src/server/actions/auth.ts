@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 
 import {
   ativarUsuarioConvidado,
-  buscarUsuarioAutenticado,
   registrarUltimoAcesso,
 } from "@/src/server/repositories/usuario";
+import {
+  resolverUsuarioAutenticadoPeloVinculo,
+  STATUS_COM_LOGIN,
+} from "@/src/server/repositories/vinculo-conta";
 import { auth } from "@/src/server/auth";
 import type { UsuarioSessao } from "@/src/server/auth/tipos";
 import type { EstadoAcaoAuth } from "./auth-estado";
@@ -44,13 +47,17 @@ export async function entrarAction(
   // normalmente (só chega aqui se já definiu senha via link de convite —
   // signInEmail já validou a senha acima) e é promovido a Ativo abaixo. A
   // sessão já foi criada em signInEmail, então revogamos antes de recusar.
-  const usuario = await buscarUsuarioAutenticado(
+  //
+  // Story 6.2: a conta do login é resolvida pelo vínculo (identidade +
+  // vínculo com status que permita login + Conta Ativa, tudo no mesmo
+  // `where`), exatamente como a guarda de sessão. Sem vínculo utilizável —
+  // zero, ou mais de um sem escolha registrada — a recusa é a mesma mensagem
+  // genérica de credenciais, sem revelar nada sobre a existência do e-mail.
+  const usuario = await resolverUsuarioAutenticadoPeloVinculo(
     usuarioSessao.id,
-    usuarioSessao.contaId,
+    STATUS_COM_LOGIN,
   );
-  const statusPermiteLogin =
-    usuario?.status === "Ativo" || usuario?.status === "ConvitePendente";
-  if (!usuario || !statusPermiteLogin || usuario.conta.status !== "Ativa") {
+  if (!usuario) {
     await auth.api.signOut({ headers: await headers() }).catch(() => {});
     return { ok: false, error: ERRO_CREDENCIAIS_INVALIDAS };
   }
@@ -62,9 +69,24 @@ export async function entrarAction(
   // status "Ativo" e mandaria o usuário de volta para /login sem explicação
   // nenhuma. Melhor devolver um erro claro aqui e desfazer a sessão recém
   // criada.
-  if (usuario.status === "ConvitePendente") {
+  //
+  // Story 6.2: a condição olha identidade E vínculo. A guarda de sessão exige
+  // `Ativo` nos dois lados; se só o vínculo estivesse ConvitePendente, o login
+  // passaria, a promoção seria pulada e a requisição seguinte expulsaria o
+  // usuário para /login sem explicação nenhuma.
+  if (
+    usuario.status === "ConvitePendente" ||
+    usuario.statusDoVinculo === "ConvitePendente"
+  ) {
     try {
-      await ativarUsuarioConvidado(usuario.id, usuario.contaId);
+      // count 0 significa que nada foi promovido (a linha não casou o
+      // `status: "ConvitePendente"` do where). Seguir para "/" deixaria o
+      // usuário não promovido bater na guarda de sessão — mesma falha que o
+      // catch abaixo já trata.
+      const { count } = await ativarUsuarioConvidado(usuario.id, usuario.contaId);
+      if (count === 0) {
+        throw new Error("promoção de convidado não afetou nenhuma linha");
+      }
     } catch {
       await auth.api.signOut({ headers: await headers() }).catch(() => {});
       return {

@@ -5,6 +5,11 @@
  * Tipado à mão em vez de inferido genericamente do client do Better Auth
  * para manter o acoplamento explícito e óbvio de revisar quando o schema
  * mudar.
+ *
+ * Story 6.2: `contaId`/`perfilAcessoId` saíram daqui junto com os
+ * additionalFields correspondentes. Conta ativa e perfil vêm do VinculoConta
+ * (src/server/repositories/vinculo-conta.ts), revalidado a cada requisição —
+ * o que a sessão carrega e os chamadores usam é apenas `id`.
  */
 export interface UsuarioSessao {
   id: string;
@@ -12,8 +17,6 @@ export interface UsuarioSessao {
   email: string;
   emailVerified: boolean;
   image?: string | null;
-  contaId: string;
-  perfilAcessoId: string;
   isPlataformaOperador: boolean;
   status: string;
   ultimoAcesso?: string | Date | null;

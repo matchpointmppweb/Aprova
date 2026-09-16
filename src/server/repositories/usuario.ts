@@ -40,12 +40,14 @@ function emTransacao<T>(
 // sessão autenticada pela Server Action/Route Handler chamadora, nunca de
 // input do cliente.
 
-export async function buscarUsuarioAutenticado(usuarioId: string, contaId: string) {
-  return prisma.usuario.findFirst({
-    where: { id: usuarioId, contaId },
-    include: { perfilAcesso: true, conta: true },
-  });
-}
+// `buscarUsuarioAutenticado(usuarioId, contaId)` vivia aqui e era a leitura
+// que resolvia a identidade autenticada pelas colunas `Usuario.contaId`/
+// `Usuario.perfilAcessoId`. A Story 6.2 a substituiu por
+// `resolverUsuarioAutenticadoPeloVinculo` em
+// src/server/repositories/vinculo-conta.ts, que devolve a mesma forma
+// resolvida pelo VinculoConta. As leituras abaixo continuam escopadas por
+// `Usuario.contaId` nesta story (o contaId já chega resolvido pelo vínculo),
+// e o dual-write da 6.1 segue intocado — remover as colunas é a Story 6.3.
 
 export async function registrarUltimoAcesso(usuarioId: string, contaId: string) {
   return prisma.usuario.updateMany({
@@ -166,38 +168,54 @@ export async function atualizarUsuario(
 }
 
 // Primeiro login de um convidado (I/O Matrix): ConvitePendente -> Ativo.
-// Só promove quem ainda está ConvitePendente — chamar de novo para um
-// usuário já Ativo é um no-op seguro (count 0).
+// Chamar de novo para quem já está Ativo dos dois lados continua sendo
+// seguro — é idempotente, só que agora reportando `count: 1` (ver abaixo).
+// Story 6.2: a promoção converge os DOIS lados, e não mais só o vínculo de
+// quem acabou de sair de ConvitePendente na identidade. Identidade já `Ativo`
+// com vínculo ainda `ConvitePendente` é estado real (e rotineiro a partir da
+// 6.6) — como a leitura de acesso agora exige `Ativo` no vínculo, deixar essa
+// combinação passar significaria login bem-sucedido seguido de expulsão na
+// requisição seguinte.
+//
+// `count` deixou de ser o do updateMany e passou a responder à pergunta que o
+// chamador realmente faz: "a pessoa terminou esta chamada podendo entrar?".
+// 1 = identidade e vínculo Ativos; 0 = não promovido (usuário inexistente
+// nesta conta, ou status que não é ConvitePendente nem Ativo) — o chamador
+// trata como falha em vez de redirecionar alguém não promovido.
 export async function ativarUsuarioConvidado(usuarioId: string, contaId: string) {
   return prisma.$transaction(async (tx) => {
-    const resultado = await tx.usuario.updateMany({
+    await tx.usuario.updateMany({
       where: { id: usuarioId, contaId, status: "ConvitePendente" },
       data: { status: "Ativo" },
     });
 
-    // Dual-write (Story 6.1): só espelha quando o usuário de fato saiu de
-    // ConvitePendente, para a chamada repetida continuar sendo um no-op nos
-    // dois lados. upsert pelo mesmo motivo de atualizarUsuario — um vínculo
-    // ausente (usuário criado pelo deploy antigo após o backfill) é criado
-    // aqui em vez de ignorado; um vínculo já existente converge para Ativo.
-    if (resultado.count > 0) {
-      const usuario = await tx.usuario.findUniqueOrThrow({
-        where: { id: usuarioId },
-        select: { perfilAcessoId: true },
-      });
-      await tx.vinculoConta.upsert({
-        where: { usuarioId_contaId: { usuarioId, contaId } },
-        create: {
-          usuarioId,
-          contaId,
-          perfilAcessoId: usuario.perfilAcessoId,
-          status: "Ativo",
-        },
-        update: { status: "Ativo" },
-      });
+    const usuario = await tx.usuario.findFirst({
+      where: { id: usuarioId, contaId },
+      select: { perfilAcessoId: true, status: true },
+    });
+
+    // Nunca ativa o vínculo de quem não está Ativo na identidade (um Inativo
+    // não é promovido por uma chamada solta desta função).
+    if (!usuario || usuario.status !== "Ativo") {
+      return { count: 0 };
     }
 
-    return resultado;
+    // Dual-write (Story 6.1). upsert pelo mesmo motivo de atualizarUsuario —
+    // um vínculo ausente (usuário criado pelo deploy antigo após o backfill) é
+    // criado aqui em vez de ignorado; um vínculo já existente converge para
+    // Ativo. Repetir a chamada continua sendo seguro: o resultado é o mesmo.
+    await tx.vinculoConta.upsert({
+      where: { usuarioId_contaId: { usuarioId, contaId } },
+      create: {
+        usuarioId,
+        contaId,
+        perfilAcessoId: usuario.perfilAcessoId,
+        status: "Ativo",
+      },
+      update: { status: "Ativo" },
+    });
+
+    return { count: 1 };
   });
 }
 

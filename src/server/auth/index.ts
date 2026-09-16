@@ -13,10 +13,18 @@ import { logarLinkDeDefinicaoDeSenha } from "./email";
  *
  * O modelo "user" do Better Auth é o `Usuario` do domínio (Prisma). O campo
  * interno `name` é mapeado para a coluna `nome`; os campos próprios do
- * domínio (contaId, perfilAcessoId, isPlataformaOperador, status,
- * ultimoAcesso) são declarados como additionalFields para não serem
- * descartados na saída de auth.api.getSession() — é assim que
- * "contaId sempre lido da sessão" (AD-1) se sustenta sem consulta extra.
+ * domínio (isPlataformaOperador, status, ultimoAcesso) são declarados como
+ * additionalFields para não serem descartados na saída de
+ * auth.api.getSession().
+ *
+ * `contaId`/`perfilAcessoId` NÃO estão aqui de propósito (Story 6.2): a conta
+ * ativa e o perfil são resolvidos pelo VinculoConta, revalidado contra o banco
+ * a cada requisição (NFR6), em
+ * src/server/repositories/vinculo-conta.ts -> exigirUsuarioAutenticado(). As
+ * colunas ainda existem em `usuarios` (só somem na Story 6.3), mas expô-las na
+ * sessão daria cobertura a uma Server Action que lesse `sessao.user.contaId` e
+ * contornasse a resolução pelo vínculo — inclusive servindo uma conta cujo
+ * vínculo já foi desativado. Da sessão sai apenas a identidade (`id`).
  *
  * Não existe cadastro público (bootstrap só via prisma/seed.ts; convite de
  * usuário é a Story 1.2) — sign-up fica desabilitado no Better Auth.
@@ -36,8 +44,6 @@ export const auth = betterAuth({
       name: "nome",
     },
     additionalFields: {
-      contaId: { type: "string", input: false },
-      perfilAcessoId: { type: "string", input: false },
       isPlataformaOperador: {
         type: "boolean",
         input: false,
