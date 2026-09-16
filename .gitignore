@@ -30,3 +30,6 @@ next-env.d.ts
 
 # Cluster do PostgreSQL embarcado, se alguma configuração cair no diretório padrão
 /data
+
+# Banco PostgreSQL local usado por `npm run dev:local`
+.dev-db/
