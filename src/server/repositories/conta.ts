@@ -3,6 +3,14 @@ import "server-only";
 import type { PlanoContratado, StatusConta } from "@prisma/client";
 
 import { prisma } from "./db";
+import {
+  comRegrasDeCorrida,
+  OPCOES_DE_TRANSACAO_DE_PROVISIONAMENTO,
+  ProvisionamentoInconsistenteError,
+  provisionarContaEm,
+  type DadosDaConta,
+  type ResultadoProvisionamento,
+} from "./provisionamento";
 
 // Único repositório de Conta (AD-13, Story 1.4) — Conta é a raiz do
 // isolamento multi-tenant (AD-1), não filha dele: nenhuma função abaixo
@@ -35,17 +43,42 @@ export async function buscarConta(contaId: string) {
   return prisma.conta.findUnique({ where: { id: contaId } });
 }
 
-// "Nova conta" (Decisão confirmada no Intent): cria só a linha de Conta —
-// nenhum Usuario/PerfilAcesso nasce junto. Uma conta criada aqui fica sem
-// nenhum usuário capaz de logar até ser provisionada manualmente por fora do
-// produto (limitação conhecida, registrada em deferred-work.md).
+// "Nova conta" (Story 6.7): criar uma conta é PROVISIONÁ-LA INTEIRA. A linha
+// de Conta, os quatro perfis de acesso padrão — cada um com uma linha de
+// permissão por módulo configurável — e o vínculo do primeiro Administrador
+// são gravados na MESMA transação (AD-9): ou tudo, ou nada. Acabou a lacuna
+// registrada desde a Story 1.4, em que a conta nascia sem perfis e sem
+// ninguém capaz de entrar, e só era destravada mexendo no banco à mão.
+//
+// O corpo vive em `./provisionamento.ts` porque `prisma/seed.ts` — que roda
+// fora do runtime do Next, com o próprio PrismaClient — executa exatamente a
+// mesma função. Aqui só se abre a transação com o singleton.
+//
+// `enviarDefinicaoDeSenha` volta para a Server Action disparar o convite
+// DEPOIS do commit: o e-mail é efeito externo e não participa da transação —
+// uma falha no envio não pode desfazer um provisionamento já concluído.
+// As regras de corrida são as MESMAS do convite avulso (comRegrasDeCorrida):
+// um P2002 de `usuarios.email` — outra escrita criou a identidade no mesmo
+// instante — reexecuta o provisionamento UMA vez em vez de devolver erro, que
+// obrigaria o operador a redigitar os seis campos. Reexecutar é seguro porque a
+// transação anterior foi inteiramente desfeita. Um P2002 do vínculo numa conta
+// que acabou de nascer é estado impossível e vira erro, nunca sucesso parcial.
 export async function criarConta(dados: {
-  nome: string;
-  cnpj: string;
-  planoContratado: PlanoContratado;
-  status: StatusConta;
-}) {
-  return prisma.conta.create({ data: dados });
+  conta: DadosDaConta;
+  administrador: { nome: string; email: string };
+}): Promise<ResultadoProvisionamento> {
+  return comRegrasDeCorrida(
+    () =>
+      prisma.$transaction(
+        (tx) => provisionarContaEm(tx, dados),
+        OPCOES_DE_TRANSACAO_DE_PROVISIONAMENTO,
+      ),
+    () => {
+      throw new ProvisionamentoInconsistenteError(
+        "Vínculo preexistente numa conta recém-criada.",
+      );
+    },
+  );
 }
 
 // Edição: escopada por {id: contaId} — essa é a chave do alvo da edição, não

@@ -23,6 +23,10 @@ export function TabelaContas({ contas }: { contas: ContaListagem[] }) {
   const [linhaAberta, setLinhaAberta] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"all" | StatusConta>("all");
+  // Recado de sucesso ao operador (Story 6.7) — hoje, o administrador informado
+  // já tinha acesso à plataforma e por isso não recebeu e-mail de definição de
+  // senha. Vive aqui porque a linha de criação se desmonta ao concluir.
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const fecharLinha = () => setLinhaAberta(null);
 
@@ -46,7 +50,10 @@ export function TabelaContas({ contas }: { contas: ContaListagem[] }) {
         <button
           className="btn btn-primary"
           type="button"
-          onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
+          onClick={() => {
+            setAviso(null);
+            setLinhaAberta((atual) => (atual === "create" ? null : "create"));
+          }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
@@ -54,6 +61,8 @@ export function TabelaContas({ contas }: { contas: ContaListagem[] }) {
           Nova conta
         </button>
       </div>
+
+      {aviso ? <div className="form-success">{aviso}</div> : null}
 
       <div className="toolbar">
         <div className="search-box">
@@ -92,7 +101,13 @@ export function TabelaContas({ contas }: { contas: ContaListagem[] }) {
           </thead>
           <tbody>
             {linhaAberta === "create" ? (
-              <LinhaCriacao onFechar={fecharLinha} onSucesso={fecharLinha} />
+              <LinhaCriacao
+                onFechar={fecharLinha}
+                onSucesso={(avisoDaCriacao) => {
+                  setAviso(avisoDaCriacao ?? null);
+                  fecharLinha();
+                }}
+              />
             ) : null}
 
             {contasFiltradas.length === 0 ? (

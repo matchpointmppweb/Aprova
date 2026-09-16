@@ -6,6 +6,12 @@ import { Prisma } from "@prisma/client";
 import type { StatusUsuario } from "@prisma/client";
 
 import { prisma } from "./db";
+import {
+  comRegrasDeCorrida,
+  convidarEm,
+  type DadosConvite,
+  type ResultadoConvite,
+} from "./provisionamento";
 import { STATUS_COM_ACESSO } from "./vinculo-conta";
 
 // Permite que chamadores (Server Actions) passem um `tx` de
@@ -190,150 +196,35 @@ export async function listarUsuarios(contaId: string) {
 // simultâneos para o mesmo e-mail podem mesmo ler ambos "não existe". Quem
 // garante a unicidade são as CONSTRAINTS, e os dois P2002 possíveis são
 // traduzidos no `catch` abaixo, cada um para o desfecho que a story define.
-export type ResultadoConvite =
-  | { resultado: "convidado"; enviarDefinicaoDeSenha: boolean }
-  | { resultado: "ja-tem-acesso" };
+//
+// Story 6.7: o CORPO do convite mudou de arquivo — vive em
+// `./provisionamento.ts` como `convidarEm(tx, ...)`, porque o provisionamento
+// de uma conta nova precisa executá-lo DENTRO da transação dele (o Prisma não
+// tem transação aninhada). O que ficou aqui é a transação própria e o
+// tratamento de corrida, que só fazem sentido para o convite avulso.
+export type { ResultadoConvite };
 
 export async function criarUsuarioConvidado(
   contaId: string,
-  dados: { nome: string; email: string; perfilAcessoId: string },
+  dados: DadosConvite,
 ): Promise<ResultadoConvite> {
-  try {
-    return await executarConvite(contaId, dados);
-  } catch (erro) {
-    if (!(erro instanceof Prisma.PrismaClientKnownRequestError) || erro.code !== "P2002") {
-      throw erro;
-    }
-
-    if (eConstraintDoVinculo(erro)) {
-      // Convite concorrente para o mesmo e-mail NESTA conta criou o vínculo
-      // entre a leitura e a escrita — mesmo desfecho do ramo normal.
-      return { resultado: "ja-tem-acesso" };
-    }
-
-    if (eConstraintDeEmail(erro)) {
-      // Convite concorrente para o mesmo e-mail NOVO, em duas contas
-      // diferentes: o outro criou a identidade primeiro. Recusar com "e-mail
-      // indisponível" puniria um administrador inocente e não criaria vínculo
-      // nenhum. Reexecutar UMA vez resolve: a identidade agora existe, e o
-      // convite vira o ramo de vínculo novo — que é o desfecho correto. Uma
-      // única retentativa, e não um laço: um segundo P2002 de e-mail não é mais
-      // corrida, é defeito, e sobe.
-      return executarConvite(contaId, dados);
-    }
-
-    throw erro;
-  }
-}
-
-async function executarConvite(
-  contaId: string,
-  dados: { nome: string; email: string; perfilAcessoId: string },
-): Promise<ResultadoConvite> {
-  return prisma.$transaction(async (tx) => {
-      const identidade = await tx.usuario.findUnique({
-        where: { email: dados.email },
-        select: { id: true },
-      });
-
-      if (!identidade) {
-        // Nested create: atômico dentro da transação que já abrimos. O `status`
-        // da identidade nasce ConvitePendente porque ela ainda não concluiu o
-        // primeiro acesso; o do vínculo, porque o convite para ESTA conta ainda
-        // não foi aceito. `perfilAcessoId` vive só no vínculo (Story 6.3).
-        await tx.usuario.create({
-          data: {
-            nome: dados.nome,
-            email: dados.email,
-            status: "ConvitePendente",
-            vinculos: {
-              create: {
-                contaId,
-                perfilAcessoId: dados.perfilAcessoId,
-                status: "ConvitePendente",
-                nome: dados.nome,
-              },
-            },
-          },
-        });
-        // Identidade recém-criada nunca tem `Account` — o convite de definição
-        // de senha é o que vai criá-la.
-        return { resultado: "convidado", enviarDefinicaoDeSenha: true } as const;
-      }
-
-      const vinculo = await tx.vinculoConta.findUnique({
-        where: { usuarioId_contaId: { usuarioId: identidade.id, contaId } },
-        select: { id: true, status: true },
-      });
-
-      if (vinculo && vinculo.status !== "Inativo") {
-        return { resultado: "ja-tem-acesso" } as const;
-      }
-
-      if (vinculo) {
-        await tx.vinculoConta.update({
-          where: { id: vinculo.id },
-          data: {
-            perfilAcessoId: dados.perfilAcessoId,
-            status: "ConvitePendente",
-            nome: dados.nome,
-          },
-        });
-      } else {
-        await tx.vinculoConta.create({
-          data: {
-            usuarioId: identidade.id,
-            contaId,
-            perfilAcessoId: dados.perfilAcessoId,
-            status: "ConvitePendente",
-            nome: dados.nome,
-          },
-        });
-      }
-
-      // O vínculo reativado/novo nasce ConvitePendente mesmo que a identidade já
-      // esteja Ativa: é o estado que a 6.2/6.4 já sabem promover no primeiro
-      // acesso a ESTA conta, e é o que a tela de Usuários mostra como "Convite
-      // pendente".
-      //
-      // Identidade sem credencial (convidada antes e nunca aceita) recebe o link
-      // de definição de senha também por este ramo — ver o cabeçalho.
-      const credenciais = await tx.account.count({
-        where: { userId: identidade.id, providerId: "credential" },
-      });
-
-      return {
-        resultado: "convidado",
-        enviarDefinicaoDeSenha: credenciais === 0,
-      } as const;
-  });
-}
-
-// `meta.target` do P2002 vem ora como lista de campos, ora como nome do índice.
-function alvoDaConstraint(erro: Prisma.PrismaClientKnownRequestError): string[] {
-  const alvo = erro.meta?.target;
-  if (Array.isArray(alvo)) return alvo.map(String);
-  return typeof alvo === "string" ? [alvo] : [];
-}
-
-// Especificamente @@unique([usuarioId, contaId]) de `vinculos_de_conta`. Casar
-// `contaId` sozinho seria errado e perigoso: vários outros uniques do schema o
-// contêm (`perfis_de_acesso_contaId_nome_key`, `tipos_de_ativo_contaId_nome_key`,
-// `ativos_contaId_codigo_key`), e qualquer escrita futura dentro desta transação
-// que esbarrasse num deles seria reportada em silêncio como "já tem acesso".
-// Exige os DOIS campos, ou o nome exato do índice.
-function eConstraintDoVinculo(erro: Prisma.PrismaClientKnownRequestError): boolean {
-  const alvo = alvoDaConstraint(erro);
-  return (
-    (alvo.includes("usuarioId") && alvo.includes("contaId")) ||
-    alvo.includes("vinculos_de_conta_usuarioId_contaId_key")
+  // Retentativa única do P2002 de e-mail e tradução do P2002 do vínculo: o
+  // tratamento vive em `comRegrasDeCorrida` (provisionamento.ts) para que o
+  // provisionamento de conta nova receba exatamente as mesmas regras. Aqui, um
+  // vínculo criado em paralelo NESTA conta tem o mesmo desfecho do ramo normal.
+  return comRegrasDeCorrida(
+    () => executarConvite(contaId, dados),
+    () => ({ resultado: "ja-tem-acesso" }),
   );
 }
 
-// Unique global de `usuarios.email` (Story 6.3).
-function eConstraintDeEmail(erro: Prisma.PrismaClientKnownRequestError): boolean {
-  const alvo = alvoDaConstraint(erro);
-  return alvo.includes("email") || alvo.includes("usuarios_email_key");
+// A transação (AD-9) é aberta aqui; o corpo é `convidarEm`, compartilhado com o
+// provisionamento de conta nova (Story 6.7).
+async function executarConvite(
+  contaId: string,
+  dados: DadosConvite,
+): Promise<ResultadoConvite> {
+  return prisma.$transaction((tx) => convidarEm(tx, contaId, dados));
 }
 
 // Edição pela tela de Usuários. Os campos se dividem entre as duas tabelas:

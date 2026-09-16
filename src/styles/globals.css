@@ -137,6 +137,9 @@ button{font-family:inherit;}
   background:var(--red-bg);color:var(--red);border-radius:var(--radius-m);
   padding:10px 12px;font-size:13px;margin-bottom:16px;
 }
+.field-error{
+  color:var(--red);font-size:12px;margin-top:4px;
+}
 .form-success{
   background:var(--sage-pale);color:var(--pine-dark);border-radius:var(--radius-m);
   padding:10px 12px;font-size:13px;margin-bottom:16px;
