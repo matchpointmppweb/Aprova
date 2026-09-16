@@ -18,10 +18,14 @@
 // código de saída.
 
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { config as carregarEnv } from "dotenv";
+import EmbeddedPostgres from "embedded-postgres";
 
 const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -32,22 +36,74 @@ carregarEnv({ path: path.join(raiz, ".env") });
 // `--from-migrations` REPLICA as migrations num banco descartável para chegar
 // ao schema resultante — por isso o shadow é obrigatório, e por isso ele nunca
 // pode ser o banco de desenvolvimento: o Prisma o reseta.
-const shadow = process.env.SHADOW_DATABASE_URL;
+// Quando não há `SHADOW_DATABASE_URL` configurada, o shadow é SUBIDO AQUI: o
+// mesmo PostgreSQL embarcado que os testes usam, num diretório temporário,
+// derrubado ao fim. Antes esta checagem apenas AVISAVA e seguia, e o efeito
+// prático era a deriva nunca ser conferida na máquina de ninguém — o único
+// lugar onde um `ON DELETE` trocado à mão apareceria antes do deploy.
+//
+// A variável continua sendo respeitada quando existe: quem já tem um banco
+// descartável (um branch do Neon, por exemplo) não paga o custo de subir um.
+let shadow = process.env.SHADOW_DATABASE_URL;
+let embarcado;
+let diretorioEmbarcado;
 
-// AVISO, e não falha: esta checagem precisa rodar DESACOMPANHADA, dentro do
-// script agregador (`npm run verificar`), em máquinas que podem não ter um banco
-// descartável configurado. Saindo com erro, ela derrubava o agregador inteiro —
-// e o efeito prático era ninguém executá-la, que é justamente como a deriva
-// passa despercebida. Quem tem o shadow configurado continua tendo a checagem
-// real; quem não tem, lê em voz alta o que está deixando de conferir.
+async function portaLivre() {
+  return new Promise((resolver, rejeitar) => {
+    const servidor = net.createServer();
+    servidor.once("error", rejeitar);
+    servidor.listen(0, "127.0.0.1", () => {
+      const { port } = servidor.address();
+      servidor.close(() => resolver(port));
+    });
+  });
+}
+
+async function subirShadowEmbarcado() {
+  diretorioEmbarcado = fs.mkdtempSync(path.join(os.tmpdir(), "raiz-shadow-"));
+  const porta = await portaLivre();
+
+  embarcado = new EmbeddedPostgres({
+    databaseDir: diretorioEmbarcado,
+    user: "postgres",
+    password: "postgres",
+    port: porta,
+    persistent: true,
+    initdbFlags: ["--encoding=UTF8", "--locale=C"],
+    onLog: () => {},
+    onError: () => {},
+  });
+
+  await embarcado.initialise();
+  await embarcado.start();
+  await embarcado.createDatabase("raiz_shadow");
+
+  return `postgresql://postgres:postgres@127.0.0.1:${porta}/raiz_shadow`;
+}
+
+async function derrubarShadowEmbarcado() {
+  if (embarcado) {
+    try {
+      await embarcado.stop();
+    } catch {
+      // Derrubar o shadow não pode alterar o veredito da checagem.
+    }
+  }
+  if (diretorioEmbarcado) {
+    for (let tentativa = 0; tentativa < 10; tentativa++) {
+      try {
+        fs.rmSync(diretorioEmbarcado, { recursive: true, force: true });
+        break;
+      } catch {
+        await new Promise((resolver) => setTimeout(resolver, 300));
+      }
+    }
+  }
+}
+
 if (!shadow) {
-  console.warn(
-    "AVISO: SHADOW_DATABASE_URL não definida — deriva NÃO conferida.\n" +
-      "A checagem replica as migrations num banco DESCARTÁVEL (o Prisma o reseta),\n" +
-      "então aponte-a para um banco vazio e de uso exclusivo desta checagem —\n" +
-      "NUNCA para DATABASE_URL. Ver .env.example.",
-  );
-  process.exit(0);
+  console.log("SHADOW_DATABASE_URL ausente — subindo PostgreSQL efêmero local.");
+  shadow = await subirShadowEmbarcado();
 }
 
 const resultado = spawnSync(
@@ -67,6 +123,8 @@ const resultado = spawnSync(
   ],
   { cwd: raiz, stdio: "inherit", shell: process.platform === "win32" },
 );
+
+await derrubarShadowEmbarcado();
 
 if (resultado.status === 0) {
   console.log("Sem deriva: as migrations produzem exatamente o schema declarado.");

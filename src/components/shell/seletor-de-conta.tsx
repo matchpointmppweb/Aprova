@@ -15,9 +15,9 @@ import type { OpcaoDeAmbiente } from "@/src/components/auth/escolher-ambiente-fo
 // escolha é o conteúdo da página inteira; aqui ela divide 58px de topbar com
 // busca, notificações e o bloco de usuário. As classes são as que já existem em
 // globals.css (AD-4, UX-DR1) — `status-select` é o select da barra de filtros —
-// com sobreposições inline para caber na topbar escura, no mesmo padrão que
-// `escolher-ambiente-form.tsx` já usa. Nenhuma classe nova, nenhuma biblioteca
-// de UI.
+// com sobreposições inline de tamanho E DE COR para caber na topbar escura,
+// reusando os valores que `.topbar-search` já aplica ali. Nenhuma classe nova,
+// nenhuma biblioteca de UI.
 //
 // Quem renderiza isto (`Topbar`) é quem decide se ele existe: com um único
 // ambiente escolhível a topbar fica exatamente como era.
@@ -57,6 +57,17 @@ export function SeletorDeConta({
           maxWidth: 200,
           cursor: pendente ? "not-allowed" : "pointer",
           opacity: pendente ? 0.5 : 1,
+          // `status-select` nasceu para a barra de filtros CLARA (fundo branco,
+          // borda clara). Na topbar verde-escura isso vira uma caixa branca
+          // destoando de tudo em volta, então as cores seguem o padrão que a
+          // própria topbar já usa em `.topbar-search`: branco translúcido sobre
+          // o verde. `color-scheme: dark` é o que faz o navegador desenhar a
+          // seta do <select> e o menu suspenso nativo em tom escuro também —
+          // sem isso, o menu abre claro e o contraste se inverte.
+          background: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          color: "#fff",
+          colorScheme: "dark",
         }}
       >
         {opcoes.map((opcao) => (

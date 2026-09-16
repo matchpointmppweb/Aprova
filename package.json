@@ -11,7 +11,10 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:deriva": "node scripts/checar-deriva.mjs",
-    "verificar": "npm run lint && npm run prisma:deriva",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verificar": "npm run lint && npm run typecheck && npm run test && npm run prisma:deriva",
     "prisma:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
@@ -24,13 +27,15 @@
   },
   "devDependencies": {
     "@types/node": "^20",
-    "dotenv": "17.4.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "17.4.2",
+    "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "prisma": "6.19.3",
     "tsx": "^4.19.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
