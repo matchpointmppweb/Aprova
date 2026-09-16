@@ -150,6 +150,16 @@ async function main() {
       contaId: conta.id,
       perfilAcessoId: perfilAdministrador.id,
       isPlataformaOperador: true,
+      // Vínculo usuário<->conta<->perfil (Story 6.1) criado no mesmo nested
+      // create do usuário — atômico por natureza (AD-9), então um banco novo
+      // já nasce consistente sem depender do backfill da migration.
+      vinculos: {
+        create: {
+          contaId: conta.id,
+          perfilAcessoId: perfilAdministrador.id,
+          status: "Ativo",
+        },
+      },
     },
   });
 

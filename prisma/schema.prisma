@@ -165,6 +165,7 @@ model Conta {
   updatedAt       DateTime        @updatedAt
 
   usuarios          Usuario[]
+  vinculos          VinculoConta[]
   perfisAcesso      PerfilAcesso[]
   tiposDeAtivo      TipoAtivo[]
   ativos            Ativo[]
@@ -211,6 +212,11 @@ model Usuario {
 
   sessions Session[]
   accounts Account[]
+
+  /// Fase expand da Story 6.1 — o vínculo espelha contaId/perfilAcessoId/
+  /// status acima; as colunas continuam sendo a fonte de verdade até a
+  /// Story 6.2/6.3.
+  vinculos VinculoConta[]
 
   planosComoResponsavel   PlanoRevisional[]
   emissoesComoResponsavel Emissao[]
@@ -293,12 +299,58 @@ model PerfilAcesso {
 
   permissoes PermissaoModulo[]
   usuarios   Usuario[]
+  vinculos   VinculoConta[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([contaId, nome])
   @@map("perfis_de_acesso")
+}
+
+// ---------------------------------------------------------------------------
+// VinculoConta (Story 6.1) — a associação usuário <-> conta <-> perfil de
+// acesso como entidade de primeira classe, pré-requisito de FR21 (a mesma
+// pessoa pertencer a mais de uma conta sem duplicar identidade/senha).
+//
+// Esta é a fase **expand** de uma migração expand/contract: nesta story
+// `Usuario.contaId`/`Usuario.perfilAcessoId` continuam sendo a ÚNICA fonte de
+// verdade lida pela sessão e por can() — o vínculo é populado por backfill
+// versionado e mantido em dia por dual-write nos repositórios (AD-9, mesma
+// transação), para que nada divirja entre este deploy e o da Story 6.2, que é
+// quem passa as leituras a resolver conta/perfil por aqui. A Story 6.3 é quem
+// remove as colunas antigas — antecipar isso quebra a aplicação.
+//
+// `status` reutiliza deliberadamente o enum `StatusUsuario`: a semântica é
+// idêntica (Ativo/ConvitePendente/Inativo) e o projeto já reutiliza enums
+// entre entidades quando o domínio coincide. Carrega createdAt/updatedAt como
+// PerfilAcesso — é entidade que a Story 6.6 vai gerenciar por tela própria.
+// ---------------------------------------------------------------------------
+
+model VinculoConta {
+  id String @id @default(cuid())
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  perfilAcessoId String
+  perfilAcesso   PerfilAcesso @relation(fields: [perfilAcessoId], references: [id])
+
+  status StatusUsuario @default(ConvitePendente)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Uma pessoa nunca tem dois vínculos com a mesma conta. Também é o índice
+  /// que cobre `usuarioId` de graça — daí só contaId/perfilAcessoId
+  /// precisarem de índice explícito.
+  @@unique([usuarioId, contaId])
+  @@index([contaId])
+  @@index([perfilAcessoId])
+  @@map("vinculos_de_conta")
 }
 
 model PermissaoModulo {
