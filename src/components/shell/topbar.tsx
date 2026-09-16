@@ -1,3 +1,5 @@
+import type { OpcaoDeAmbiente } from "@/src/components/auth/escolher-ambiente-form";
+import { SeletorDeConta } from "@/src/components/shell/seletor-de-conta";
 import { sairAction } from "@/src/server/actions/auth";
 
 function iniciais(nome: string) {
@@ -9,7 +11,33 @@ function iniciais(nome: string) {
 // (`title="Sair"`) não existe no mockup original (a demo estática não tinha
 // logout funcional) — é a única adição necessária para uma casca de
 // aplicação real.
-export function Topbar({ nome, papel }: { nome: string; papel: string }) {
+//
+// Story 6.5: recebe também os ambientes escolhíveis e a conta ativa. O seletor
+// de conta só existe com MAIS DE UM ambiente — com um só, a topbar é
+// exatamente a de antes desta story (Boundaries). A decisão é feita aqui, e
+// não dentro do seletor, para que quem tem um ambiente só não baixe um Client
+// Component que nunca teria o que oferecer.
+export function Topbar({
+  nome,
+  papel,
+  opcoesDeConta,
+  contaAtivaId,
+}: {
+  nome: string;
+  papel: string;
+  opcoesDeConta: OpcaoDeAmbiente[];
+  contaAtivaId: string;
+}) {
+  // Mais de um ambiente E a conta ativa entre eles. A segunda metade não é
+  // paranoia: a guarda e a lista de opções são duas consultas, e um vínculo que
+  // some entre elas deixaria o `<select>` sem a opção correspondente ao valor
+  // que ele recebe — o navegador então exibiria a PRIMEIRA opção como se fosse a
+  // conta ativa, mentindo sobre em qual ambiente a pessoa está operando. Sem o
+  // seletor, a requisição seguinte cai na guarda, que corrige (NFR6).
+  const podeTrocarDeConta =
+    opcoesDeConta.length > 1 &&
+    opcoesDeConta.some((opcao) => opcao.contaId === contaAtivaId);
+
   return (
     <div className="topbar">
       <div className="brand-mark">
@@ -45,6 +73,9 @@ export function Topbar({ nome, papel }: { nome: string; papel: string }) {
       </form>
 
       <div className="topbar-user">
+        {podeTrocarDeConta ? (
+          <SeletorDeConta opcoes={opcoesDeConta} contaAtivaId={contaAtivaId} />
+        ) : null}
         <div className="avatar">{iniciais(nome)}</div>
         <div>
           <div className="name">{nome}</div>

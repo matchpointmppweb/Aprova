@@ -285,6 +285,106 @@ export async function definirContaAtivaDaSessao(
   });
 }
 
+// Troca de conta com a sessão já estabelecida (Story 6.5, FR23 — a revisão do
+// AD-24 está explicada em `trocarDeContaAction`). Irmã da função acima, com a
+// diferença que é a razão de ela existir: a mudança da conta ativa, a promoção
+// do convidado (quando o vínculo de destino ainda é ConvitePendente) e o
+// registro de auditoria acontecem na MESMA transação (AD-9).
+//
+// Os três juntos, e não dois deles: promover fora da transação deixaria um
+// vínculo Ativo sem troca nem auditoria quando a troca falhasse, e gravar a
+// auditoria fora dela deixaria a pessoa numa conta sem rastro de quem a levou
+// até lá.
+//
+// `where` endurecido com a CONTA ANTERIOR ESPERADA, além de sessão +
+// identidade: sem ela, uma troca concorrente em outra aba (A->C) seria
+// sobrescrita por esta (A->B) e a cadeia de auditoria passaria a declarar uma
+// origem já superada. Com ela, `count === 0` cobre os dois casos que o chamador
+// trata igual — sessão sumida/rotacionada e troca concorrente — e a transação é
+// abortada por exceção: NADA é gravado.
+//
+// Escreve sem validar o vínculo: quem chama já revalidou contra o banco as duas
+// pontas (a conta anterior e a nova), como a `escolherAmbienteAction` faz.
+class TrocaNaoAplicada extends Error {}
+
+export async function trocarContaAtivaDaSessao({
+  sessaoId,
+  usuarioId,
+  usuarioEmail,
+  contaAnteriorId,
+  contaAnteriorNome,
+  contaNovaId,
+  contaNovaNome,
+  promoverVinculo,
+}: {
+  sessaoId: string;
+  usuarioId: string;
+  usuarioEmail: string;
+  contaAnteriorId: string;
+  contaAnteriorNome: string;
+  contaNovaId: string;
+  contaNovaNome: string;
+  promoverVinculo: boolean;
+}) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.session.updateMany({
+        where: { id: sessaoId, userId: usuarioId, contaAtivaId: contaAnteriorId },
+        data: { contaAtivaId: contaNovaId },
+      });
+
+      if (count === 0) {
+        // Exceção, e não retorno: é o único jeito de desfazer o que já correu
+        // dentro da transação. Capturada logo abaixo e traduzida em
+        // `{ count: 0 }`, a mesma forma que os demais compare-and-set desta
+        // camada devolvem.
+        throw new TrocaNaoAplicada();
+      }
+
+      // Mesmo compare-and-set de `ativarUsuarioConvidado` (o `status` no WHERE
+      // das duas escritas, não só na leitura): quem desativasse a pessoa entre
+      // a revalidação e aqui teria a desativação revertida em silêncio por uma
+      // troca concorrente. A diferença é que aqui ele vive DENTRO da transação
+      // da troca — uma promoção sem troca é exatamente o que não pode sobrar.
+      if (promoverVinculo) {
+        const vinculoPromovido = await tx.vinculoConta.updateMany({
+          where: { usuarioId, contaId: contaNovaId, status: { not: "Inativo" } },
+          data: { status: "Ativo" },
+        });
+        if (vinculoPromovido.count === 0) {
+          throw new TrocaNaoAplicada();
+        }
+
+        const identidadePromovida = await tx.usuario.updateMany({
+          where: { id: usuarioId, status: { not: "Inativo" } },
+          data: { status: "Ativo" },
+        });
+        if (identidadePromovida.count === 0) {
+          throw new TrocaNaoAplicada();
+        }
+      }
+
+      await tx.trocaDeConta.create({
+        data: {
+          usuarioId,
+          usuarioEmail,
+          contaAnteriorId,
+          contaAnteriorNome,
+          contaNovaId,
+          contaNovaNome,
+        },
+      });
+    });
+  } catch (erro) {
+    if (erro instanceof TrocaNaoAplicada) {
+      return { count: 0 };
+    }
+    throw erro;
+  }
+
+  return { count: 1 };
+}
+
 // Conta ativa que deixou de ser válida (vínculo desativado/removido, conta
 // suspensa) é apagada da sessão em vez de derrubá-la: a pessoa volta à seleção
 // se ainda tiver outro ambiente, e só cai no login quando não sobra nenhum.

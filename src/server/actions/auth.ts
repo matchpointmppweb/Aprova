@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -11,7 +12,9 @@ import {
   definirContaAtivaDaSessao,
   resolveuAConta,
   resolverUsuarioAutenticadoPeloVinculo,
+  STATUS_COM_ACESSO,
   STATUS_COM_LOGIN,
+  trocarContaAtivaDaSessao,
   type UsuarioResolvidoPeloVinculo,
 } from "@/src/server/repositories/vinculo-conta";
 import { ROTA_CONTAS_PLATAFORMA, ROTA_ESCOLHER_AMBIENTE } from "@/src/lib/rotas";
@@ -238,6 +241,145 @@ export async function escolherAmbienteAction(
     return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
   }
 
+  redirect("/");
+}
+
+// Troca de conta com a sessão já estabelecida (Story 6.5, FR23). É a irmã da
+// `escolherAmbienteAction`, e a diferença entre as duas é deliberada: aquela
+// CONCLUI o login (e por isso recusa-se a mexer numa conta ativa já válida),
+// esta TROCA uma conta ativa válida por outra.
+//
+// AD-24 revisado (com confirmação de Fulvi): a troca muta a conta ativa da
+// SESSÃO em vez de emitir sessão nova. Emitir token novo não entregava a
+// proteção que aparentava — quem tem token válido pode acionar a troca e obter
+// o token da outra conta de qualquer forma —, e o Better Auth não expõe emissão
+// de sessão sem credenciais. O que a decisão original entregava de verdade era
+// auditoria, e ela é recuperada explicitamente aqui: toda troca bem-sucedida
+// grava identidade, conta anterior, conta nova e momento, na MESMA transação
+// da mudança (AD-9).
+//
+// O controle de acesso NÃO depende disto: continua sendo o NFR6 — o vínculo com
+// a conta ativa é revalidado contra o banco a cada requisição, então uma conta
+// que deixou de valer é rejeitada na requisição seguinte, qualquer que seja o
+// token.
+export async function trocarDeContaAction(
+  _estadoAnterior: EstadoAcaoAuth,
+  formData: FormData,
+): Promise<EstadoAcaoAuth> {
+  const contaId = String(formData.get("contaId") ?? "").trim();
+
+  if (!contaId) {
+    return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
+  }
+
+  const cabecalhos = await headers();
+  const sessao = await auth.api.getSession({ headers: cabecalhos });
+
+  if (!sessao) {
+    redirect("/login");
+  }
+
+  const usuarioSessao = sessao.user as unknown as UsuarioSessao;
+  const sessaoAtiva = sessao.session as unknown as SessaoAtiva;
+
+  // Parte 1 da revalidação: DE ONDE se está saindo. A conta anterior é o que a
+  // auditoria registra, e um registro de auditoria cuja razão de existir é ser
+  // exato não pode gravar uma conta que a sessão nunca apontou — gravar a conta
+  // errada é pior do que não gravar. Por isso a mesma checagem de DUAS partes
+  // que a guarda, a página e a `escolherAmbienteAction` fazem: `resolveuAConta`
+  // contra o PONTEIRO DA SESSÃO, e não só `tipo === "resolvido"` — sem vínculo
+  // com a conta apontada, a resolução cai em derivação e devolveria OUTRA conta.
+  const ponteiro = sessaoAtiva.contaAtivaId;
+  const atual = ponteiro
+    ? await resolverUsuarioAutenticadoPeloVinculo(
+        usuarioSessao.id,
+        STATUS_COM_ACESSO,
+        ponteiro,
+      )
+    : null;
+
+  // Ponteiro ausente ou morto tem desfecho PRÓPRIO, e não o mesmo da troca para
+  // a conta já ativa: aqui não há "de onde" — o seletor só existe com mais de um
+  // ambiente, e nesse caso a sessão tem de ter conta ativa válida. A tela de
+  // seleção é o lugar de escolher sem origem; a guarda corrige dali (ou cai no
+  // login, se não sobrou ambiente nenhum).
+  if (!ponteiro || !atual || !resolveuAConta(atual, ponteiro)) {
+    redirect(ROTA_ESCOLHER_AMBIENTE);
+  }
+
+  const contaAnteriorId = atual.usuario.contaId;
+
+  // Trocar para a conta já ativa não é troca: nada a gravar, e um registro de
+  // auditoria aqui seria ruído — "trocou de A para A" polui justamente o
+  // histórico que esta story existe para criar.
+  if (contaId === contaAnteriorId) {
+    redirect("/");
+  }
+
+  // Parte 2: PARA ONDE se está indo. `STATUS_COM_LOGIN` de propósito, e não
+  // `STATUS_COM_ACESSO` — é a mesma lista (STATUS_ESCOLHIVEL) que o seletor usa
+  // para oferecer as opções. Revalidar mais estrito que a oferta significaria
+  // recusar um ambiente que a topbar acabou de listar; um vínculo
+  // ConvitePendente é escolhível, e é promovido a Ativo junto da troca, logo
+  // abaixo.
+  const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
+    usuarioSessao.id,
+    STATUS_COM_LOGIN,
+    contaId,
+  );
+
+  // Não basta ter resolvido ALGO: sem vínculo com a conta pedida a resolução
+  // cai na derivação e pode devolver outra conta. Esta é a defesa contra a
+  // troca forjada e contra o vínculo revogado entre o render e o submit —
+  // recusa aqui, e a conta ativa anterior permanece intacta, sem auditoria
+  // nenhuma gravada (NFR2).
+  if (!resolveuAConta(resolucao, contaId)) {
+    return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
+  }
+
+  // A promoção do convidado NÃO passa por `concluirEntrada` aqui, e a diferença
+  // é toda de contexto: no login aquele caminho revoga a sessão quando a
+  // promoção falha, porque não há sessão legítima a preservar. Numa TROCA há —
+  // falhar ao entrar na conta B não pode deslogar quem está legitimamente na
+  // conta A. Por isso a promoção viaja para dentro da transação da troca, onde
+  // ou acontece junto dela, ou não acontece: promovida antes, uma troca
+  // recusada deixaria o vínculo Ativo sem troca e sem auditoria.
+  const promoverVinculo =
+    resolucao.usuario.status === "ConvitePendente" ||
+    resolucao.usuario.statusDoVinculo === "ConvitePendente";
+
+  // Conta ativa, promoção e auditoria numa transação só (AD-9). Os nomes e o
+  // e-mail são copiados para a linha de auditoria (ver o modelo): é o que a
+  // mantém legível quando a conta é renomeada ou apagada.
+  const { count } = await trocarContaAtivaDaSessao({
+    sessaoId: sessaoAtiva.id,
+    usuarioId: usuarioSessao.id,
+    usuarioEmail: resolucao.usuario.email,
+    contaAnteriorId,
+    contaAnteriorNome: atual.usuario.conta.nome,
+    contaNovaId: contaId,
+    contaNovaNome: resolucao.usuario.conta.nome,
+    promoverVinculo,
+  });
+
+  // count 0 NÃO é escolha inválida, e por isso não devolve a mensagem de
+  // escolha: é a sessão que sumiu/rotacionou, ou outra aba que já trocou a conta
+  // ativa no meio do caminho. Nenhum dos dois se resolve escolhendo de novo —
+  // insistir contra uma sessão morta seria um laço sem fim. "/" entrega o caso à
+  // guarda, que é quem sabe o desfecho certo para cada um: login para a sessão
+  // que não existe mais, painel da conta que a outra aba escolheu para a troca
+  // concorrente.
+  if (count === 0) {
+    redirect("/");
+  }
+
+  // Melhor esforço, como no login: falhar aqui não desfaz uma troca já gravada.
+  await registrarUltimoAcesso(usuarioSessao.id).catch(() => {});
+
+  // A casca autenticada inteira (dados, `can()` e paleta — AD-11) é derivada da
+  // conta ativa no layout; sem invalidar o layout, a navegação de cliente
+  // poderia reexibir a árvore da conta anterior.
+  revalidatePath("/", "layout");
   redirect("/");
 }
 

@@ -171,6 +171,9 @@ model Conta {
   vinculos          VinculoConta[]
   /// Sessões que elegeram esta conta como conta ativa (Story 6.4).
   sessoes           Session[]
+  /// Auditoria de troca de conta (Story 6.5) — os dois lados de cada troca.
+  trocasDeSaida     TrocaDeConta[] @relation("TrocaDeContaAnterior")
+  trocasDeEntrada   TrocaDeConta[] @relation("TrocaDeContaNova")
   perfisAcesso      PerfilAcesso[]
   tiposDeAtivo      TipoAtivo[]
   ativos            Ativo[]
@@ -235,6 +238,9 @@ model Usuario {
   /// Única fonte de "a que contas esta pessoa pertence e com qual perfil em
   /// cada uma" desde a Story 6.3.
   vinculos VinculoConta[]
+
+  /// Histórico de trocas de conta feitas por esta identidade (Story 6.5).
+  trocasDeConta TrocaDeConta[]
 
   /// Responsável de plano/emissão continua apontando para a IDENTIDADE
   /// (AD-25), nunca para o vínculo.
@@ -391,6 +397,71 @@ model VinculoConta {
   @@index([contaId])
   @@index([perfilAcessoId])
   @@map("vinculos_de_conta")
+}
+
+// ---------------------------------------------------------------------------
+// TrocaDeConta (Story 6.5) — histórico de auditoria da troca de conta ativa
+// feita com a sessão já estabelecida. É o que o AD-24 revisado se comprometeu a
+// entregar; a justificativa completa da revisão está em UM lugar só,
+// `trocarDeContaAction` (src/server/actions/auth.ts), e em `epics.md`.
+//
+// Escrito SEMPRE na mesma transação da mudança de `Session.contaAtivaId`
+// (AD-9): uma troca gravada sem registro, ou um registro sem troca, seria pior
+// do que não ter histórico nenhum.
+//
+// Nunca é lido por caminho de autorização — é histórico. Quem autoriza é o
+// vínculo, revalidado contra o banco a cada requisição (NFR6).
+// ---------------------------------------------------------------------------
+
+model TrocaDeConta {
+  id String @id @default(cuid())
+
+  /// A IDENTIDADE que trocou — nunca o vínculo: o vínculo com a conta anterior
+  /// pode ser removido depois, e é justamente essa a hora em que o registro
+  /// importa.
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  /// `SetNull`, e NÃO `Cascade`: apagar uma conta não pode apagar o histórico
+  /// de quem passou por ela — é justamente aí que auditoria serve para algo. O
+  /// id vira NULL, e os nomes copiados abaixo mantêm a linha legível. Mesma
+  /// escolha (e mesmo motivo) do `Session.contaAtivaId`.
+  contaAnteriorId String?
+  contaAnterior   Conta?  @relation("TrocaDeContaAnterior", fields: [contaAnteriorId], references: [id], onDelete: SetNull)
+
+  contaNovaId String?
+  contaNova   Conta?  @relation("TrocaDeContaNova", fields: [contaNovaId], references: [id], onDelete: SetNull)
+
+  /// Cópia do essencial NO MOMENTO DA TROCA — é o que sobra quando as FKs acima
+  /// viram NULL, e também o que responde "de qual conta ela saiu?" depois de
+  /// aquela conta ser renomeada, que a FK sozinha nunca responderia.
+  ///
+  /// `usuarioEmail` existe pelo mesmo motivo com um agravante: `usuarioId` é
+  /// `Cascade` e não pode deixar de ser — a migration de colapso da Story 6.3
+  /// apaga identidades perdedoras, e um `Restrict` aqui a quebraria. Enquanto a
+  /// linha existir, é o e-mail que diz de quem ela fala.
+  ///
+  /// Desnormalização deliberada: NUNCA sincronizados depois de escritos, porque
+  /// o valor histórico é o ponto.
+  contaAnteriorNome String
+  contaNovaNome     String
+  usuarioEmail      String
+
+  /// O momento da troca. Só `createdAt`: o registro é um FATO consumado, nunca
+  /// editado — por isso não há `updatedAt` aqui, ao contrário das entidades de
+  /// domínio.
+  createdAt DateTime @default(now())
+
+  /// Índice pela identidade + momento: a pergunta que este histórico responde é
+  /// sempre "o que esta pessoa fez, em ordem cronológica".
+  @@index([usuarioId, createdAt])
+  /// O Postgres NÃO indexa coluna referenciadora automaticamente. Sem estes
+  /// dois, apagar uma Conta varre a tabela inteira para resolver o cascade, e a
+  /// outra pergunta natural da auditoria — "o que aconteceu NESTA conta" — não
+  /// tem índice nenhum.
+  @@index([contaAnteriorId])
+  @@index([contaNovaId])
+  @@map("trocas_de_conta")
 }
 
 model PermissaoModulo {

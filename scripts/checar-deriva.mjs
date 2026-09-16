@@ -34,14 +34,20 @@ carregarEnv({ path: path.join(raiz, ".env") });
 // pode ser o banco de desenvolvimento: o Prisma o reseta.
 const shadow = process.env.SHADOW_DATABASE_URL;
 
+// AVISO, e não falha: esta checagem precisa rodar DESACOMPANHADA, dentro do
+// script agregador (`npm run verificar`), em máquinas que podem não ter um banco
+// descartável configurado. Saindo com erro, ela derrubava o agregador inteiro —
+// e o efeito prático era ninguém executá-la, que é justamente como a deriva
+// passa despercebida. Quem tem o shadow configurado continua tendo a checagem
+// real; quem não tem, lê em voz alta o que está deixando de conferir.
 if (!shadow) {
-  console.error(
-    "SHADOW_DATABASE_URL não definida.\n" +
+  console.warn(
+    "AVISO: SHADOW_DATABASE_URL não definida — deriva NÃO conferida.\n" +
       "A checagem replica as migrations num banco DESCARTÁVEL (o Prisma o reseta),\n" +
       "então aponte-a para um banco vazio e de uso exclusivo desta checagem —\n" +
       "NUNCA para DATABASE_URL. Ver .env.example.",
   );
-  process.exit(1);
+  process.exit(0);
 }
 
 const resultado = spawnSync(
