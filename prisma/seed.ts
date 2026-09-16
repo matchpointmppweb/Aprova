@@ -160,6 +160,10 @@ async function main() {
           contaId: conta.id,
           perfilAcessoId: perfilAdministrador.id,
           status: "Ativo",
+          // Story 6.6: o nome pelo qual ESTA conta conhece a pessoa vive no
+          // vínculo. Preenchido aqui pelo mesmo motivo do vínculo em si — um
+          // banco novo nasce consistente sem depender do backfill da migration.
+          nome: adminNome,
         },
       },
     },

@@ -3,6 +3,7 @@ import "server-only";
 import type { StatusPlanoRevisional } from "@prisma/client";
 
 import { prisma } from "./db";
+import { aplicarNomeDoVinculo, aplicarNomeDoVinculoEmLista } from "./vinculo-conta";
 
 // Única via de leitura/escrita de PlanoRevisional/PlanoItemRevisional (AD-1)
 // — contaId sempre obrigatório e sempre aplicado ao `where`. Mesmo formato
@@ -44,22 +45,29 @@ const INCLUDE_LISTAGEM = {
 // itens (Code Map) para a tabela montar "Vinculado a"/"Itens revisionais"
 // sem N+1. Status/próxima revisão NUNCA vêm daqui — a página agrega
 // resolverAtivosDoPlano por planoId à parte (AD-8).
+//
+// O nome do responsável passa pela resolução por vínculo (Story 6.6): o que a
+// relação com `Usuario` traz é o nome da IDENTIDADE, que pode ter sido digitado
+// por outra conta — exibi-lo aqui reabriria a sondagem de nomes que a story
+// fechou no convite (NFR2).
 export async function listarPlanos(contaId: string) {
-  return prisma.planoRevisional.findMany({
+  const planos = await prisma.planoRevisional.findMany({
     where: { contaId },
     include: INCLUDE_LISTAGEM,
     orderBy: { nome: "asc" },
   });
+  return aplicarNomeDoVinculoEmLista(contaId, planos);
 }
 
 // Busca um único plano (para o modal de edição) com itens completos —
 // escopado por {id, contaId} (AD-1), um id de outra conta nunca é
 // encontrado.
 export async function buscarPlano(contaId: string, id: string) {
-  return prisma.planoRevisional.findFirst({
+  const plano = await prisma.planoRevisional.findFirst({
     where: { id, contaId },
     include: INCLUDE_LISTAGEM,
   });
+  return aplicarNomeDoVinculo(contaId, plano);
 }
 
 // Cria PlanoRevisional + PlanoItemRevisional[] juntos numa única transação

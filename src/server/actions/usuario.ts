@@ -12,6 +12,7 @@ import {
   atualizarUsuario,
   contarAdministradoresAtivos,
   criarUsuarioConvidado,
+  type ResultadoConvite,
 } from "@/src/server/repositories/usuario";
 import type { EstadoAcaoUsuario } from "./usuario-estado";
 
@@ -25,6 +26,11 @@ const STATUS_VALIDOS: StatusUsuario[] = ["Ativo", "ConvitePendente", "Inativo"];
 // anti-enumeração que entrarAction e solicitarResetSenhaAction mantêm de
 // propósito.
 const ERRO_EMAIL_INDISPONIVEL = "Não foi possível usar este e-mail.";
+// Story 6.6: o ÚNICO caso em que o convite ainda recusa um e-mail. Diferente do
+// anterior, esta mensagem pode ser específica sem abrir enumeração — ela só
+// afirma algo que o administrador já vê na própria listagem desta conta, e nada
+// sobre a existência da pessoa na plataforma.
+const ERRO_JA_TEM_ACESSO = "Esta pessoa já tem acesso a esta conta.";
 // Validação básica de formato, suficiente para recusar e-mails claramente
 // malformados antes de persistir ou repassar para
 // auth.api.requestPasswordReset (cujo zod interno rejeitaria de qualquer
@@ -40,17 +46,22 @@ function normalizarEmail(valor: FormDataEntryValue | null) {
 class UltimoAdministradorAtivoError extends Error {}
 
 // Nunca expõe detalhe de banco/constraint (Boundaries) — só reconhece a
-// violação da constraint única de `Usuario.email` para traduzir num erro de
-// validação de campo. Desde a Story 6.3 essa constraint é GLOBAL (era
-// @@unique([contaId, email])): o e-mail pode estar em uso por uma identidade de
-// OUTRA conta. Convidar alguém que já tem identidade na plataforma (criando só
-// um vínculo novo, em vez de recusar) é a Story 6.6.
+// violação da constraint única (GLOBAL desde a Story 6.3) de `Usuario.email`
+// para traduzir num erro de validação de campo.
 //
-// O `meta.target` é checado, e não só o código: o convite agora cria
-// identidade e vínculo no mesmo nested write, então um P2002 de
-// @@unique([usuarioId, contaId]) também chegaria aqui e viraria, erradamente,
-// um erro no campo "email". O target vem ora como lista de campos
-// (["email"]), ora como nome do índice ("usuarios_email_key") — os dois casam.
+// A Story 6.6 tirou daqui o caminho NORMAL do e-mail já existente: convidar
+// alguém que já tem identidade agora cria só um vínculo e é SUCESSO, decidido
+// dentro da transação de `criarUsuarioConvidado`. O que ainda pode chegar aqui
+// pelo convite é a corrida rara (duas identidades com o mesmo e-mail criadas no
+// mesmo instante) e, pela edição, uma troca de e-mail para um já usado — os dois
+// merecem a recusa neutra.
+//
+// O `meta.target` é checado, e não só o código: o convite escreve identidade e
+// vínculo na mesma transação, então um P2002 de @@unique([usuarioId, contaId])
+// também chegaria aqui e viraria, erradamente, um erro no campo "email" (o
+// repositório já o traduz, mas a guarda fica). O target vem ora como lista de
+// campos (["email"]), ora como nome do índice ("usuarios_email_key") — os dois
+// casam.
 function isErroDeEmailDuplicado(erro: unknown): boolean {
   if (
     !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -67,11 +78,16 @@ function isErroDeEmailDuplicado(erro: unknown): boolean {
   return campos.some((campo) => campo === "email" || campo.includes("email"));
 }
 
-// Given Administrador autenticado, when convida um usuário com nome, e-mail
-// e um perfil existente -> Usuario criado com status ConvitePendente; o link
-// de definição de senha é logado no console (modo dev), reaproveitando o
-// fluxo de reset de senha já existente do Better Auth (Intent/Approach desta
-// story — sem Account/senha no momento do convite).
+// Given Administrador autenticado, when convida alguém com nome, e-mail e um
+// perfil existente -> a pessoa passa a ter ACESSO A ESTA CONTA.
+//
+// Story 6.6: o convite opera sobre VÍNCULOS. Sem identidade na plataforma,
+// identidade e vínculo nascem juntos e o link de definição de senha é enviado
+// (logado no console em modo dev, reaproveitando o fluxo de reset do Better
+// Auth). COM identidade, cria-se apenas o vínculo — senha e demais vínculos
+// intactos, identidade jamais renomeada, nenhum e-mail disparado. A resposta é
+// indistinguível nos dois casos (NFR2); o único desfecho diferente é a pessoa
+// já ter acesso a esta conta, que devolve erro no campo e-mail.
 export async function convidarUsuarioAction(
   _estadoAnterior: EstadoAcaoUsuario,
   formData: FormData,
@@ -112,8 +128,13 @@ export async function convidarUsuarioAction(
     };
   }
 
+  let convite: ResultadoConvite;
   try {
-    await criarUsuarioConvidado(usuarioSessao.contaId, { nome, email, perfilAcessoId });
+    convite = await criarUsuarioConvidado(usuarioSessao.contaId, {
+      nome,
+      email,
+      perfilAcessoId,
+    });
   } catch (erro) {
     if (isErroDeEmailDuplicado(erro)) {
       return {
@@ -124,14 +145,32 @@ export async function convidarUsuarioAction(
     return { ok: false, error: ERRO_GENERICO };
   }
 
+  // Único erro de campo que o convite ainda produz (Story 6.6): a pessoa já tem
+  // vínculo Ativo/ConvitePendente com ESTA conta. Nada foi escrito — nenhum
+  // vínculo duplicado existe.
+  if (convite.resultado === "ja-tem-acesso") {
+    return { ok: false, error: [{ field: "email", message: ERRO_JA_TEM_ACESSO }] };
+  }
+
   // Mesmo endpoint usado por "esqueci minha senha" — gera o token/link e
   // aciona sendResetPassword (server/auth/index.ts), que loga via
   // logarLinkDeDefinicaoDeSenha (modo dev). Uma falha aqui não desfaz o
   // convite já criado (o usuário aparece na listagem mesmo assim); nunca
   // expõe detalhe interno.
-  await auth.api
-    .requestPasswordReset({ body: { email, redirectTo: "/redefinir-senha" } })
-    .catch(() => {});
+  //
+  // SÓ quando a identidade não tem credencial (Story 6.6) — critério decidido
+  // dentro da transação, em `criarUsuarioConvidado`. Cobre tanto a identidade
+  // recém-criada quanto a de alguém convidado antes que nunca aceitou: sem isso,
+  // convidá-lo para uma segunda conta o deixaria sem como definir senha e sem
+  // como entrar em lugar nenhum. Quem já tem senha não recebe nada — ela continua
+  // valendo, e emitir um token de redefinição sobre a credencial dela não é
+  // assunto desta conta. A resposta devolvida abaixo é a MESMA nos dois
+  // caminhos — a ausência do e-mail não é observável por quem convidou (NFR2).
+  if (convite.enviarDefinicaoDeSenha) {
+    await auth.api
+      .requestPasswordReset({ body: { email, redirectTo: "/redefinir-senha" } })
+      .catch(() => {});
+  }
 
   revalidatePath("/usuarios");
   return { ok: true };

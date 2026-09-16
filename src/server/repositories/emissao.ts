@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma, type Setor, type StatusEmissao } from "@prisma/client";
 
 import { prisma } from "./db";
+import { aplicarNomeDoVinculo, aplicarNomeDoVinculoEmLista } from "./vinculo-conta";
 
 // Única via de leitura/escrita de Emissao/ItemExecutadoEmissao (AD-1) —
 // contaId sempre obrigatório e sempre aplicado ao `where`. Mesmo formato de
@@ -54,22 +55,28 @@ const INCLUDE_LISTAGEM = {
 
 // Listagem da tela Emissão — inclui ativo/plano/responsavel/itens (Code Map)
 // para a tabela montar as colunas sem N+1.
+//
+// O nome do responsável passa pela resolução por vínculo (Story 6.6), pelo mesmo
+// motivo de listarPlanos: a relação com `Usuario` traz o nome da IDENTIDADE, que
+// pode ter sido digitado por outra conta (NFR2).
 export async function listarEmissoes(contaId: string) {
-  return prisma.emissao.findMany({
+  const emissoes = await prisma.emissao.findMany({
     where: { contaId },
     include: INCLUDE_LISTAGEM,
     orderBy: [{ ano: "desc" }, { seq: "desc" }],
   });
+  return aplicarNomeDoVinculoEmLista(contaId, emissoes);
 }
 
 // Busca uma única emissão (para o modal de edição) com itens completos —
 // escopado por {id, contaId} (AD-1), um id de outra conta nunca é
 // encontrado.
 export async function buscarEmissao(contaId: string, id: string) {
-  return prisma.emissao.findFirst({
+  const emissao = await prisma.emissao.findFirst({
     where: { id, contaId },
     include: INCLUDE_LISTAGEM,
   });
+  return aplicarNomeDoVinculo(contaId, emissao);
 }
 
 export type DadosItemExecutadoNovo = {

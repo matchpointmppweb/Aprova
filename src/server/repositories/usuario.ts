@@ -104,6 +104,16 @@ export async function buscarIdentidadeAtiva(usuarioId: string) {
 //   - `status` é o do VÍNCULO, sobrescrevendo o status global vindo do spread.
 //     É o status daquela conta que a tela de Usuários mostra, filtra e edita,
 //     e é ele que o FR24 encerra ao remover alguém de uma conta.
+//   - `nome` é o do VÍNCULO (Story 6.6) — o nome pelo qual ESTA conta conhece a
+//     pessoa. Exibir o da identidade deixaria um administrador descobrir, só
+//     convidando um e-mail qualquer, o nome do dono dele (NFR2). A coluna é NOT
+//     NULL desde `20260916180000_nome_no_vinculo_obrigatorio`, então não há queda
+//     para o nome da identidade — que era justamente o valor vazado.
+//
+// A ordenação passou para memória junto com a troca da chave: ordenar pela
+// coluna antiga (`usuario.nome`) deixaria a tela exibindo um nome e ordenando
+// por outro, e o critério de comparação aqui é explícito, o que nenhum `orderBy`
+// do Prisma oferece.
 //
 // NÃO filtra por `status`: a tela de Usuários lista e filtra os três estados
 // (Ativo/Convite pendente/Inativo) do lado do cliente, e quem foi desativado
@@ -117,65 +127,239 @@ export async function listarUsuarios(contaId: string) {
       usuario: true,
       perfilAcesso: { select: { id: true, nome: true } },
     },
-    orderBy: { usuario: { nome: "asc" } },
   });
 
-  return vinculos.map((vinculo) => ({
-    ...vinculo.usuario,
-    status: vinculo.status,
-    perfilAcesso: vinculo.perfilAcesso,
-  }));
+  return vinculos
+    .map((vinculo) => ({
+      ...vinculo.usuario,
+      nome: vinculo.nome,
+      status: vinculo.status,
+      perfilAcesso: vinculo.perfilAcesso,
+    }))
+    // Locale e opções EXPLÍCITOS: sem eles, acentuação e caixa ficariam por
+    // conta do ICU do runtime, e a mesma lista poderia sair em ordens
+    // diferentes entre a máquina de dev e o servidor. `id` como desempate
+    // porque dois homônimos — que esta tela tem todo o direito de ter — sairiam
+    // em ordem não determinística entre requisições.
+    .sort(
+      (a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR", {
+          sensitivity: "base",
+          numeric: true,
+        }) || a.id.localeCompare(b.id),
+    );
 }
 
-// Convite: cria a identidade e o vínculo JUNTOS, no mesmo nested create —
-// atômico por natureza, sem $transaction explícito (mesmo padrão de
-// criarPerfilAcesso/seed.ts): falha em qualquer lado reverte os dois. Nenhuma
-// linha em Account — a senha só existe depois que o convidado passa pelo mesmo
-// fluxo de definição de senha do Better Auth (auth.api.requestPasswordReset),
-// em src/server/actions/usuario.ts.
+// Convite (Story 6.6): a operação é sobre VÍNCULOS, não sobre cadastros. O
+// e-mail é resolvido primeiro e a função ramifica em quatro:
 //
-// `perfilAcessoId` vive SÓ no vínculo (Story 6.3). O `status` da identidade
-// nasce ConvitePendente porque ela ainda não concluiu o primeiro acesso; o do
-// vínculo, porque o convite para ESTA conta ainda não foi aceito.
+//   - sem identidade na plataforma  -> identidade + vínculo, juntos;
+//   - identidade em outra conta     -> APENAS o vínculo novo (senha e demais
+//                                      vínculos intactos, identidade jamais
+//                                      renomeada);
+//   - vínculo Inativo nesta conta   -> reativado com o perfil e o nome de
+//                                      agora — é o caminho natural de "removi e
+//                                      quis de volta", nunca um vínculo
+//                                      duplicado;
+//   - vínculo Ativo/ConvitePendente -> recusa ("ja-tem-acesso"), o único caso
+//                                      que devolve erro de campo.
+//
+// Os três primeiros são indistinguíveis para o chamador exceto por
+// `enviarDefinicaoDeSenha`, que existe por UM motivo só: decidir se o convite de
+// definição de senha sai.
+//
+// O critério é **"esta identidade não tem credencial"**, e NÃO "a identidade
+// nasceu agora". A segunda formulação parece equivalente e não é: este próprio
+// fluxo produz identidades sem `Account` — nenhum ramo aqui cria credencial, ela
+// só nasce quando o convidado percorre o link de definição de senha. Alguém
+// convidado para a conta A que nunca aceitou tem identidade e não tem senha;
+// convidá-lo para a conta B cairia no ramo "identidade já existe", nenhum e-mail
+// sairia, e a pessoa ficaria sem como entrar em lugar nenhum. O mesmo valia para
+// a reativação de vínculo inativo. Quem JÁ tem credencial continua não recebendo
+// nada — a senha dela vale, e emitir um token de redefinição sobre uma
+// credencial que não pertence a esta conta é o que a story proíbe.
+//
+// A checagem roda DENTRO da transação, junto da leitura que decide o ramo: fora
+// dela, a credencial poderia nascer (ou sumir) entre uma coisa e outra e o
+// convite decidiria pelo estado errado.
+//
+// Tudo numa transação (AD-9) para que a leitura que decide o ramo e a escrita
+// que o executa formem uma unidade — mas a transação NÃO é o que impede convites
+// concorrentes de colidirem: o `$transaction` interativo do Prisma roda no
+// isolamento padrão do Postgres (Read Committed), em que dois convites
+// simultâneos para o mesmo e-mail podem mesmo ler ambos "não existe". Quem
+// garante a unicidade são as CONSTRAINTS, e os dois P2002 possíveis são
+// traduzidos no `catch` abaixo, cada um para o desfecho que a story define.
+export type ResultadoConvite =
+  | { resultado: "convidado"; enviarDefinicaoDeSenha: boolean }
+  | { resultado: "ja-tem-acesso" };
+
 export async function criarUsuarioConvidado(
   contaId: string,
   dados: { nome: string; email: string; perfilAcessoId: string },
-) {
-  return prisma.usuario.create({
-    data: {
-      nome: dados.nome,
-      email: dados.email,
-      status: "ConvitePendente",
-      vinculos: {
-        create: {
-          contaId,
-          perfilAcessoId: dados.perfilAcessoId,
-          status: "ConvitePendente",
-        },
-      },
-    },
+): Promise<ResultadoConvite> {
+  try {
+    return await executarConvite(contaId, dados);
+  } catch (erro) {
+    if (!(erro instanceof Prisma.PrismaClientKnownRequestError) || erro.code !== "P2002") {
+      throw erro;
+    }
+
+    if (eConstraintDoVinculo(erro)) {
+      // Convite concorrente para o mesmo e-mail NESTA conta criou o vínculo
+      // entre a leitura e a escrita — mesmo desfecho do ramo normal.
+      return { resultado: "ja-tem-acesso" };
+    }
+
+    if (eConstraintDeEmail(erro)) {
+      // Convite concorrente para o mesmo e-mail NOVO, em duas contas
+      // diferentes: o outro criou a identidade primeiro. Recusar com "e-mail
+      // indisponível" puniria um administrador inocente e não criaria vínculo
+      // nenhum. Reexecutar UMA vez resolve: a identidade agora existe, e o
+      // convite vira o ramo de vínculo novo — que é o desfecho correto. Uma
+      // única retentativa, e não um laço: um segundo P2002 de e-mail não é mais
+      // corrida, é defeito, e sobe.
+      return executarConvite(contaId, dados);
+    }
+
+    throw erro;
+  }
+}
+
+async function executarConvite(
+  contaId: string,
+  dados: { nome: string; email: string; perfilAcessoId: string },
+): Promise<ResultadoConvite> {
+  return prisma.$transaction(async (tx) => {
+      const identidade = await tx.usuario.findUnique({
+        where: { email: dados.email },
+        select: { id: true },
+      });
+
+      if (!identidade) {
+        // Nested create: atômico dentro da transação que já abrimos. O `status`
+        // da identidade nasce ConvitePendente porque ela ainda não concluiu o
+        // primeiro acesso; o do vínculo, porque o convite para ESTA conta ainda
+        // não foi aceito. `perfilAcessoId` vive só no vínculo (Story 6.3).
+        await tx.usuario.create({
+          data: {
+            nome: dados.nome,
+            email: dados.email,
+            status: "ConvitePendente",
+            vinculos: {
+              create: {
+                contaId,
+                perfilAcessoId: dados.perfilAcessoId,
+                status: "ConvitePendente",
+                nome: dados.nome,
+              },
+            },
+          },
+        });
+        // Identidade recém-criada nunca tem `Account` — o convite de definição
+        // de senha é o que vai criá-la.
+        return { resultado: "convidado", enviarDefinicaoDeSenha: true } as const;
+      }
+
+      const vinculo = await tx.vinculoConta.findUnique({
+        where: { usuarioId_contaId: { usuarioId: identidade.id, contaId } },
+        select: { id: true, status: true },
+      });
+
+      if (vinculo && vinculo.status !== "Inativo") {
+        return { resultado: "ja-tem-acesso" } as const;
+      }
+
+      if (vinculo) {
+        await tx.vinculoConta.update({
+          where: { id: vinculo.id },
+          data: {
+            perfilAcessoId: dados.perfilAcessoId,
+            status: "ConvitePendente",
+            nome: dados.nome,
+          },
+        });
+      } else {
+        await tx.vinculoConta.create({
+          data: {
+            usuarioId: identidade.id,
+            contaId,
+            perfilAcessoId: dados.perfilAcessoId,
+            status: "ConvitePendente",
+            nome: dados.nome,
+          },
+        });
+      }
+
+      // O vínculo reativado/novo nasce ConvitePendente mesmo que a identidade já
+      // esteja Ativa: é o estado que a 6.2/6.4 já sabem promover no primeiro
+      // acesso a ESTA conta, e é o que a tela de Usuários mostra como "Convite
+      // pendente".
+      //
+      // Identidade sem credencial (convidada antes e nunca aceita) recebe o link
+      // de definição de senha também por este ramo — ver o cabeçalho.
+      const credenciais = await tx.account.count({
+        where: { userId: identidade.id, providerId: "credential" },
+      });
+
+      return {
+        resultado: "convidado",
+        enviarDefinicaoDeSenha: credenciais === 0,
+      } as const;
   });
 }
 
-// Edição pela tela de Usuários. Os campos se dividem entre as duas tabelas
-// (Story 6.3): `nome`/`email` são da identidade, `perfilAcessoId`/`status` são
-// do vínculo daquela conta.
+// `meta.target` do P2002 vem ora como lista de campos, ora como nome do índice.
+function alvoDaConstraint(erro: Prisma.PrismaClientKnownRequestError): string[] {
+  const alvo = erro.meta?.target;
+  if (Array.isArray(alvo)) return alvo.map(String);
+  return typeof alvo === "string" ? [alvo] : [];
+}
+
+// Especificamente @@unique([usuarioId, contaId]) de `vinculos_de_conta`. Casar
+// `contaId` sozinho seria errado e perigoso: vários outros uniques do schema o
+// contêm (`perfis_de_acesso_contaId_nome_key`, `tipos_de_ativo_contaId_nome_key`,
+// `ativos_contaId_codigo_key`), e qualquer escrita futura dentro desta transação
+// que esbarrasse num deles seria reportada em silêncio como "já tem acesso".
+// Exige os DOIS campos, ou o nome exato do índice.
+function eConstraintDoVinculo(erro: Prisma.PrismaClientKnownRequestError): boolean {
+  const alvo = alvoDaConstraint(erro);
+  return (
+    (alvo.includes("usuarioId") && alvo.includes("contaId")) ||
+    alvo.includes("vinculos_de_conta_usuarioId_contaId_key")
+  );
+}
+
+// Unique global de `usuarios.email` (Story 6.3).
+function eConstraintDeEmail(erro: Prisma.PrismaClientKnownRequestError): boolean {
+  const alvo = alvoDaConstraint(erro);
+  return alvo.includes("email") || alvo.includes("usuarios_email_key");
+}
+
+// Edição pela tela de Usuários. Os campos se dividem entre as duas tabelas:
+// `email` é da identidade; `nome`, `perfilAcessoId` e `status` são do vínculo
+// daquela conta.
+//
+// Story 6.6: `nome` MUDOU DE LADO. Era campo de identidade (com a trava
+// cross-tenant abaixo), e agora é sempre do vínculo — a mesma coluna que o
+// convite grava e que a listagem exibe. Assim a conta rotula a pessoa como a
+// conhece sem nunca renomear a identidade dela, que é o que a 6.3 proíbe e o
+// que faria a listagem virar oráculo de nomes alheios (NFR2).
 //
 // Retorna false (sem lançar) se a pessoa não tiver vínculo com esta conta,
 // para a Server Action decidir como responder sem expor detalhe interno — e,
 // nesse caso, NADA é escrito: o vínculo é o que dá o escopo multi-tenant desta
 // operação (AD-1), no lugar do antigo `where: { id, contaId }`.
 //
-// **Campos de identidade são recusados para quem tem mais de um vínculo.** A
-// identidade agora atravessa contas: escrever `email` a partir da conta A
-// mudaria o LOGIN de alguém que também pertence à conta B e que, somado ao
-// fluxo de definição de senha, entregaria a conta dessa pessoa ao
-// administrador de A. Como não há tela que arbitre isso antes da Story 6.4/6.6,
-// a recusa é fail-closed: multivínculo => só `perfilAcessoId`/`status` (que são
-// do vínculo, sempre escopados a ESTA conta) passam; uma tentativa real de
-// mudar `nome`/`email` devolve false, sem escrever nada. Reenviar os mesmos
-// valores não é tentativa de alteração — o formulário sempre manda os quatro
-// campos — e segue adiante.
+// **O e-mail é recusado para quem tem mais de um vínculo.** A identidade
+// atravessa contas: escrever `email` a partir da conta A mudaria o LOGIN de
+// alguém que também pertence à conta B e que, somado ao fluxo de definição de
+// senha, entregaria a conta dessa pessoa ao administrador de A. A recusa é
+// fail-closed: multivínculo => só os campos do vínculo (`nome`,
+// `perfilAcessoId`, `status`, sempre escopados a ESTA conta) passam; uma
+// tentativa real de trocar o `email` devolve false, sem escrever nada. Reenviar
+// o mesmo valor não é tentativa de alteração — o formulário sempre manda os
+// quatro campos — e segue adiante.
 //
 // Leitura e escrita rodam sempre na MESMA transação: o chamador
 // (editarUsuarioAction) abre uma Serializable para a guarda de último
@@ -203,23 +387,20 @@ export async function atualizarUsuario(
     }
 
     const camposDaIdentidade: Prisma.UsuarioUpdateInput = {};
-    if (dados.nome !== undefined || dados.email !== undefined) {
+    if (dados.email !== undefined) {
       const identidade = await tx.usuario.findUniqueOrThrow({
         where: { id: usuarioId },
-        select: { nome: true, email: true },
+        select: { email: true },
       });
-      const alteraIdentidade =
-        (dados.nome !== undefined && dados.nome !== identidade.nome) ||
-        (dados.email !== undefined && dados.email !== identidade.email);
 
-      if (alteraIdentidade && vinculos.length > 1) {
+      if (dados.email !== identidade.email && vinculos.length > 1) {
         return false;
       }
-      if (dados.nome !== undefined) camposDaIdentidade.nome = dados.nome;
-      if (dados.email !== undefined) camposDaIdentidade.email = dados.email;
+      camposDaIdentidade.email = dados.email;
     }
 
     const camposDoVinculo: Prisma.VinculoContaUpdateWithoutUsuarioInput = {};
+    if (dados.nome !== undefined) camposDoVinculo.nome = dados.nome;
     if (dados.perfilAcessoId !== undefined) {
       camposDoVinculo.perfilAcesso = { connect: { id: dados.perfilAcessoId } };
     }

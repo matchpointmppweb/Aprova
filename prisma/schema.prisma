@@ -387,6 +387,27 @@ model VinculoConta {
 
   status StatusUsuario @default(ConvitePendente)
 
+  /// O nome pelo qual esta pessoa é conhecida NESTA conta (Story 6.6).
+  ///
+  /// Existe para fechar um vazamento real: a partir da 6.6 convidar um e-mail
+  /// que já tem identidade cria só um vínculo, e exibir o nome da IDENTIDADE
+  /// deixaria qualquer administrador descobrir o nome do dono de um e-mail
+  /// arbitrário apenas convidando-o. Com o nome no vínculo, cada conta rotula a
+  /// pessoa como a conhece e a identidade nunca é renomeada de fora (regra da
+  /// 6.3).
+  ///
+  /// **Obrigatório.** Nasceu opcional (migration
+  /// `20260916170000_nome_no_vinculo`) só para os vínculos anteriores à 6.6
+  /// sobreviverem ao backfill; `20260916180000_nome_no_vinculo_obrigatorio` o
+  /// tornou NOT NULL assim que todos os pontos de criação passaram a preenchê-lo.
+  ///
+  /// Continuar nullable era risco com consequência nomeada: um vínculo criado
+  /// sem nome não falharia — ele REABRIRIA o vazamento, porque a queda de
+  /// leitura é justamente para o nome da identidade. Obrigatório, o TypeScript
+  /// cobra o campo em todo ponto de criação novo (inclusive o provisionamento da
+  /// Story 6.7), que é onde o vazamento voltaria a entrar.
+  nome String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

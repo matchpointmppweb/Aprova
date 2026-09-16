@@ -144,6 +144,13 @@ export type UsuarioResolvidoPeloVinculo = ReturnType<typeof compor>;
 function compor(vinculo: VinculoComRelacoes) {
   return {
     ...vinculo.usuario,
+    // `nome` é o do VÍNCULO (Story 6.6), a MESMA origem de `listarUsuarios`.
+    // Depois desta story nada volta a escrever `nome` na identidade: sem isto, o
+    // cabeçalho e a sessão congelariam no nome que a PRIMEIRA conta digitou, e
+    // renomear alguém atualizaria a tela de Usuários sem atualizar o próprio
+    // cabeçalho da pessoa. É também a coerência com a decisão da story de que o
+    // nome exibido é sempre o daquela conta.
+    nome: vinculo.nome,
     contaId: vinculo.contaId,
     perfilAcessoId: vinculo.perfilAcessoId,
     conta: vinculo.conta,
@@ -261,6 +268,64 @@ export async function listarOpcoesDeAmbiente(usuarioId: string) {
     contaNome: vinculo.conta.nome,
     perfilNome: vinculo.perfilAcesso.nome,
   }));
+}
+
+// Nome pelo qual ESTA conta conhece as pessoas apontadas como `responsavel`
+// (Story 6.6). Ponto ÚNICO de resolução, e é por isso que ele vive aqui, junto
+// da coluna que responde a pergunta — e não copiado em plano.ts e emissao.ts.
+//
+// O vazamento que fecha é concreto: `INCLUDE_LISTAGEM` das duas telas traz
+// `responsavel: { select: { id, nome } }` da relação com `Usuario`, ou seja, o
+// nome que OUTRA conta digitou. Um administrador convidaria um e-mail qualquer,
+// o atribuiria como responsável e leria o nome do dono — exatamente a sondagem
+// que esta story existe para impedir (NFR2). O dropdown das mesmas telas já
+// vinha de `listarUsuarios`, que exibe o nome do vínculo: sem isto, a tabela e o
+// seu próprio seletor mostrariam nomes diferentes para a mesma pessoa.
+//
+// A regra é a MESMA de `listarUsuarios` (o nome do vínculo daquela conta), e
+// precisa ser: duas respostas diferentes para a mesma pergunta voltariam a
+// divergir na primeira tela nova. Desde
+// `20260916180000_nome_no_vinculo_obrigatorio` a coluna é NOT NULL, então não há
+// mais queda para o nome da identidade — que era justamente o valor vazado.
+//
+// Uma consulta só para a lista inteira (sem N+1), e nunca uma por linha. Quem
+// não tem vínculo com esta conta mantém o nome que veio — é o caso do
+// responsável já removido da conta, que continua precisando de rótulo legível na
+// linha histórica.
+type ComResponsavel = { responsavel: { id: string; nome: string } };
+
+export async function aplicarNomeDoVinculoEmLista<T extends ComResponsavel>(
+  contaId: string,
+  registros: T[],
+): Promise<T[]> {
+  const ids = [...new Set(registros.map((registro) => registro.responsavel.id))];
+  if (ids.length === 0) {
+    return registros;
+  }
+
+  const vinculos = await prisma.vinculoConta.findMany({
+    where: { contaId, usuarioId: { in: ids } },
+    select: { usuarioId: true, nome: true },
+  });
+  const nomePorUsuario = new Map(vinculos.map((v) => [v.usuarioId, v.nome]));
+
+  return registros.map((registro) => {
+    const nome = nomePorUsuario.get(registro.responsavel.id);
+    return nome === undefined
+      ? registro
+      : { ...registro, responsavel: { ...registro.responsavel, nome } };
+  });
+}
+
+// Mesma resolução para o registro único dos modais de edição — delega, para não
+// existir uma segunda cópia da regra.
+export async function aplicarNomeDoVinculo<T extends ComResponsavel>(
+  contaId: string,
+  registro: T | null,
+): Promise<T | null> {
+  if (!registro) return null;
+  const [resolvido] = await aplicarNomeDoVinculoEmLista(contaId, [registro]);
+  return resolvido;
 }
 
 // A conta ativa vive na SESSÃO (`model Session`), que é tabela do nosso banco
