@@ -19,10 +19,24 @@ import {
 } from "@/src/server/repositories/vinculo-conta";
 import { ROTA_CONTAS_PLATAFORMA, ROTA_ESCOLHER_AMBIENTE } from "@/src/lib/rotas";
 import { auth } from "@/src/server/auth";
+import {
+  ipDosCabecalhos,
+  limparFalhas,
+  limparTentativasAntigas,
+  registrarFalha,
+  tentativaPermitida,
+} from "@/src/server/auth/limite-de-tentativas";
 import type { SessaoAtiva, UsuarioSessao } from "@/src/server/auth/tipos";
 import type { EstadoAcaoAuth } from "./auth-estado";
 
 const ERRO_CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
+
+// Distinta da mensagem de credencial inválida, e é seguro que seja: ela não
+// revela se o e-mail existe — só que houve tentativas demais a partir daqui.
+// Esconder o bloqueio faria a pessoa legítima insistir contra uma parede sem
+// entender por quê.
+const ERRO_MUITAS_TENTATIVAS =
+  "Tentativas demais. Aguarde alguns minutos antes de tentar novamente.";
 
 // Story 6.4 (FR22): esta mensagem só aparece DEPOIS da senha correta. Ela
 // confirma, a quem já provou saber a senha, que a identidade existe — e isso
@@ -105,6 +119,15 @@ export async function entrarAction(
     return { ok: false, error: "Informe e-mail e senha." };
   }
 
+  // Contenção de força bruta. A consulta vem ANTES de `signInEmail` de
+  // propósito: verificar a senha custa um hash caro (é o ponto dele), e deixar
+  // esse custo acessível a quem já estourou o limite transformaria a própria
+  // defesa em vetor de sobrecarga.
+  const ip = ipDosCabecalhos(await headers());
+  if (!(await tentativaPermitida("login", email, ip))) {
+    return { ok: false, error: ERRO_MUITAS_TENTATIVAS };
+  }
+
   let usuarioSessao: UsuarioSessao | null = null;
   try {
     const resultado = await auth.api.signInEmail({
@@ -112,8 +135,17 @@ export async function entrarAction(
     });
     usuarioSessao = resultado.user as unknown as UsuarioSessao;
   } catch {
+    await registrarFalha("login", email, ip);
+    // Oportunista: não há tarefa agendada no projeto, e este caminho já é
+    // lento por natureza.
+    await limparTentativasAntigas();
     return { ok: false, error: ERRO_CREDENCIAIS_INVALIDAS };
   }
+
+  // Senha correta zera o histórico DAQUELE e-mail (nunca o do IP — ver
+  // `limparFalhas`), para que erros espalhados ao longo de semanas não se
+  // somem em bloqueio para quem de fato é dono da conta.
+  await limparFalhas("login", email);
 
   // Usuario.status/Conta.status não são checados pelo Better Auth — um
   // usuário Inativo ou uma conta com pagamento pendente não autentica,
@@ -395,15 +427,34 @@ export async function solicitarResetSenhaAction(
     return { ok: false, error: "Informe seu e-mail." };
   }
 
-  try {
-    await auth.api.requestPasswordReset({
-      body: { email, redirectTo: "/redefinir-senha" },
-    });
-  } catch {
-    // Ignorado de propósito: a resposta ao usuário é sempre a mesma,
-    // exista o e-mail ou não.
+  // Limite próprio, mais apertado que o do login: cada solicitação dispara um
+  // e-mail, então sem contenção este formulário vira ferramenta para inundar a
+  // caixa de entrada de alguém. Cota separada da do login porque errar a senha
+  // não pode gastar a cota de RECUPERAÇÃO — que é justamente o caminho de quem
+  // errou a senha.
+  const ip = ipDosCabecalhos(await headers());
+  const permitida = await tentativaPermitida("reset", email, ip);
+
+  if (permitida) {
+    try {
+      await auth.api.requestPasswordReset({
+        body: { email, redirectTo: "/redefinir-senha" },
+      });
+    } catch {
+      // Ignorado de propósito: a resposta ao usuário é sempre a mesma,
+      // exista o e-mail ou não.
+    }
+
+    // Aqui TODA solicitação conta, e não só as que falham: não existe
+    // "solicitação errada" a distinguir, e é o volume que precisa ser contido.
+    await registrarFalha("reset", email, ip);
+    await limparTentativasAntigas();
   }
 
+  // MESMA resposta com ou sem limite estourado. Dizer "muitas tentativas" aqui
+  // revelaria que aquele e-mail existe — exatamente a enumeração que a
+  // mensagem genérica abaixo existe para impedir. Quem estourou o limite
+  // simplesmente não recebe e-mail.
   return {
     ok: true,
     message:

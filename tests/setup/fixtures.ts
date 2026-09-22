@@ -15,7 +15,7 @@ export const db = new PrismaClient();
 export async function limparBanco() {
   await db.$executeRawUnsafe(`
     TRUNCATE TABLE
-      "trocas_de_conta", "sessoes", "contas_de_login", "verificacoes",
+      "tentativas_de_acesso", "trocas_de_conta", "sessoes", "contas_de_login", "verificacoes",
       "servicos_emissao", "itens_executados_emissao", "emissoes",
       "plano_itens_revisionais", "planos_revisionais", "itens_revisionais",
       "ativos", "tipos_de_ativo",

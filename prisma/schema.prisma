@@ -329,6 +329,40 @@ model Verification {
   @@map("verificacoes")
 }
 
+/// Tentativas de autenticação FALHADAS, para conter força bruta (adiado desde
+/// a Story 1.1, e alcançável desde que o app foi exposto publicamente).
+///
+/// Por que uma tabela, e não um contador em memória: em serverless cada
+/// instância tem a sua, e um atacante distribui as tentativas entre elas sem
+/// nunca encostar no limite. O estado precisa ser compartilhado.
+///
+/// Por que o limitador do Better Auth não cobre isto: ele protege as rotas
+/// HTTP do próprio plugin, e o login daqui chama `auth.api.signInEmail` de
+/// dentro de uma Server Action — não passa por aquelas rotas.
+///
+/// Só FALHAS entram aqui. Sucesso apaga as tentativas da chave, para que um
+/// dia distraído não acumule bloqueio ao longo de semanas.
+model TentativaDeAcesso {
+  id String @id @default(cuid())
+
+  /// O que está sendo limitado: "login" ou "reset". Chaves de tipos
+  /// diferentes nunca se somam — errar a senha não pode gastar a cota de
+  /// recuperação, que é o caminho de quem justamente esqueceu a senha.
+  tipo String
+
+  /// Alvo da limitação, já normalizado. Duas formas convivem: "email:<e-mail>"
+  /// e "ip:<endereço>". A primeira protege UMA conta de ataque dirigido; a
+  /// segunda contém a pulverização — tentar uma senha comum contra centenas de
+  /// e-mails diferentes nunca encosta no limite por e-mail.
+  chave String
+
+  criadoEm DateTime @default(now())
+
+  /// A consulta é sempre "quantas falhas desta chave depois de tal instante".
+  @@index([tipo, chave, criadoEm])
+  @@map("tentativas_de_acesso")
+}
+
 // ---------------------------------------------------------------------------
 // PerfilAcesso / PermissaoModulo (CAP-9) — matriz de permissões por módulo
 // (perfis-de-acesso.md). Edição de perfis é escopo da Story 1.3; aqui só o
