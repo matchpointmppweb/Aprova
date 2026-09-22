@@ -1,8 +1,5 @@
-import Link from "next/link";
-
 import type { OpcaoDeAmbiente } from "@/src/components/auth/escolher-ambiente-form";
 import { SeletorDeConta } from "@/src/components/shell/seletor-de-conta";
-import { ROTA_CONTAS_PLATAFORMA } from "@/src/lib/rotas";
 import { sairAction } from "@/src/server/actions/auth";
 
 function iniciais(nome: string) {
@@ -25,13 +22,11 @@ export function Topbar({
   papel,
   opcoesDeConta,
   contaAtivaId,
-  ehOperadorDePlataforma,
 }: {
   nome: string;
   papel: string;
   opcoesDeConta: OpcaoDeAmbiente[];
   contaAtivaId: string;
-  ehOperadorDePlataforma: boolean;
 }) {
   // Mais de um ambiente E a conta ativa entre eles. A segunda metade não é
   // paranoia: a guarda e a lista de opções são duas consultas, e um vínculo que
@@ -66,38 +61,6 @@ export function Topbar({
         </svg>
         <span className="dot" />
       </button>
-
-      {/* Acesso à área de plataforma, visível SÓ para quem é operador. A
-          segregação do AD-13 continua inteira — quem não é operador não vê nada
-          aqui, e o gate de verdade segue sendo `exigirOperadorDePlataforma()`
-          na própria rota, nunca este link.
-
-          Existe porque o desenho original supunha que o operador de plataforma
-          NÃO teria vínculo com conta alguma (é o que `ROTA_CONTAS_PLATAFORMA`
-          faz no login: manda para cá quem entra sem vínculo). Um operador que
-          também é Administrador de uma conta — o caso do administrador raiz —
-          caía no painel da conta-cliente sem nenhum caminho de volta, exceto
-          digitar a URL. Esconder a porta de quem tem a chave não era o
-          objetivo. */}
-      {ehOperadorDePlataforma ? (
-        <Link
-          href={ROTA_CONTAS_PLATAFORMA}
-          className="topbar-icon"
-          title="Área de plataforma"
-          // `.topbar-icon` traz `margin-left:auto` — é o que empurra o bloco de
-          // ícones para a direita. Num segundo elemento com a mesma classe e
-          // filho direto da topbar, o espaço passaria a ser DIVIDIDO entre os
-          // dois, afastando este do sino. O `auto` do sino, que vem antes, já
-          // cumpre o papel.
-          style={{ marginLeft: 0 }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="6" rx="1" />
-            <rect x="3" y="14" width="18" height="6" rx="1" />
-            <path d="M7 7h.01M7 17h.01" />
-          </svg>
-        </Link>
-      ) : null}
 
       <form action={sairAction}>
         <button type="submit" className="topbar-icon" title="Sair">

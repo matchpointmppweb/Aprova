@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { ROTA_CONTAS_PLATAFORMA } from "@/src/lib/rotas";
+
 function ChevIcon() {
   return (
     <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -27,12 +29,16 @@ function ehRotaAtiva(pathname: string, href: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-// Navegação portada de Mockup.html (#view-app .sidebar, AD-4). "Contas" foi
-// deliberadamente omitido: é área segregada do operador de plataforma
-// (AD-13), nunca visível para o Administrador de uma conta-cliente, e sua
-// página é escopo da Story 1.4 — diferente do mockup, que mostrava todos os
-// itens numa demo estática única.
-export function Sidebar() {
+// Navegação portada de Mockup.html (#view-app .sidebar, AD-4). "Contas" volta
+// à posição que o mockup lhe dava (dentro de Configurações, entre Usuários e
+// Perfil de acesso), mas CONDICIONADO a `ehOperadorDePlataforma`: no mockup,
+// uma demo estática única, todos os itens apareciam para todos; aqui, quem
+// administra uma conta-cliente não pode enxergá-lo (AD-13).
+export function Sidebar({
+  ehOperadorDePlataforma,
+}: {
+  ehOperadorDePlataforma: boolean;
+}) {
   const pathname = usePathname();
   const [cadastrosAberto, setCadastrosAberto] = useState(true);
   // Configurações nasce fechado por padrão, mas abre automaticamente quando
@@ -116,6 +122,16 @@ export function Sidebar() {
         </button>
         <div className={`side-sub${configAberto ? "" : " hidden"}`}>
           <Link href="/usuarios" className={`side-item nav-item${ehRotaAtiva(pathname, "/usuarios") ? " active" : ""}`}>Usuários</Link>
+          {/* Só para operador de plataforma (AD-13) — quem administra uma
+              conta-cliente não vê este item. Diferente dos vizinhos, ele leva
+              para FORA desta casca: /contas vive em app/(plataforma), que tem
+              layout próprio e não renderiza esta sidebar. Por isso nunca fica
+              "active": quando a rota é /contas, este menu não está na tela.
+              A segregação é essa, e o controle de verdade continua sendo
+              exigirOperadorDePlataforma() na rota — nunca este link. */}
+          {ehOperadorDePlataforma ? (
+            <Link href={ROTA_CONTAS_PLATAFORMA} className="side-item nav-item">Contas</Link>
+          ) : null}
           <Link href="/perfil-acesso" className={`side-item nav-item${ehRotaAtiva(pathname, "/perfil-acesso") ? " active" : ""}`}>Perfil de acesso</Link>
           <Link href="/aparencia" className={`side-item nav-item${ehRotaAtiva(pathname, "/aparencia") ? " active" : ""}`}>Aparência</Link>
         </div>
