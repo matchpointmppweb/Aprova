@@ -37,6 +37,7 @@ export default async function DashboardLayout({
         papel={usuario.perfilAcesso.nome}
         opcoesDeConta={opcoesDeConta}
         contaAtivaId={usuario.contaId}
+        ehOperadorDePlataforma={usuario.isPlataformaOperador}
       />
       <Sidebar />
       <div className="main">{children}</div>

@@ -128,7 +128,15 @@ button{font-family:inherit;}
   border-radius:var(--radius-m);font-size:14px;font-family:inherit;
   background:var(--paper);color:var(--ink);
 }
-.field input:focus{outline:2px solid var(--sage);outline-offset:0;border-color:var(--pine);}
+/* O mockup não tinha <select> dentro de .field — o primeiro é o da escolha de
+   ambiente (Story 6.4). Mesma caixa do input, para os dois campos de um mesmo
+   formulário não terem alturas e bordas diferentes. */
+.field select{
+  width:100%;padding:10px 12px;border:1px solid var(--line-strong);
+  border-radius:var(--radius-m);font-size:14px;font-family:inherit;
+  background:var(--paper);color:var(--ink);cursor:pointer;
+}
+.field input:focus,.field select:focus{outline:2px solid var(--sage);outline-offset:0;border-color:var(--pine);}
 .field-row{display:flex;align-items:center;justify-content:space-between;margin:2px 0 20px;font-size:13px;}
 .field-row label{display:flex;align-items:center;gap:7px;color:var(--ink-soft);font-weight:400;}
 .login-submit{width:100%;justify-content:center;padding:11px;font-size:14px;}
