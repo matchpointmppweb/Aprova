@@ -368,6 +368,145 @@ export function minutosAcumuladosDeServico(linhas: readonly LinhaServicoDerivave
   return somarMinutos(minutos);
 }
 
+// ---------------------------------------------------------------------------
+// Story 7.4 — estado DERIVADO de um item da aba Itens (AD-31)
+// ---------------------------------------------------------------------------
+// Três níveis computados na LEITURA, a partir de `executado` mais a existência
+// de lançamentos daquele item. Nunca coluna no banco, nunca campo editável:
+// acrescentar um terceiro lugar para a mesma verdade é como o estado passa a
+// mentir depois da primeira remoção de lançamento.
+//
+// Vive aqui, e não dentro do componente, pelo mesmo motivo de
+// `minutosDaLinhaDeServico`: regra presa num `.tsx` é regra não testada (o
+// projeto não tem render de componente em teste).
+
+export type EstadoDoItem = "pendente" | "parcial" | "concluido";
+
+// Os rótulos do mockup (L2284). `parcial` é "Serviço apontado" e não "Parcial":
+// a classe CSS herda o nome curto do mockup (AD-4), o texto diz o que a pessoa
+// precisa entender.
+export const LABEL_POR_ESTADO_DO_ITEM: Record<EstadoDoItem, string> = {
+  pendente: "Pendente",
+  parcial: "Serviço apontado",
+  concluido: "Concluído",
+};
+
+// Forma mínima do que a derivação precisa de um lançamento: o item a que ele
+// pertence. A chave é o `itemRevisionalId` — NUNCA o nome do item, como o
+// mockup faz (L2384): dois itens homônimos misturariam lançamentos, e renomear
+// um item revisional faria os dele sumirem da linha.
+export type LancamentoDoItem = { itemRevisionalId: string };
+
+export function lancamentosDoItem<T extends LancamentoDoItem>(
+  lancamentos: readonly T[],
+  itemRevisionalId: string,
+): T[] {
+  return lancamentos.filter((lancamento) => lancamento.itemRevisionalId === itemRevisionalId);
+}
+
+// Precedência, não soma (Design Notes): `executado` vence sempre, mesmo sem
+// nenhum lançamento — quem marcou declarou que terminou, e o sistema não tem
+// por que discordar. "Serviço apontado" existe só para o trabalho sem conclusão
+// declarada.
+export function estadoDerivadoDoItem(entrada: {
+  itemRevisionalId: string;
+  executado: boolean;
+  lancamentos: readonly LancamentoDoItem[];
+}): EstadoDoItem {
+  if (entrada.executado) return "concluido";
+  return lancamentosDoItem(entrada.lancamentos, entrada.itemRevisionalId).length > 0
+    ? "parcial"
+    : "pendente";
+}
+
+// ---------------------------------------------------------------------------
+// Story 7.4 — validação do lançamento feito NA LINHA do item (UX-DR17)
+// ---------------------------------------------------------------------------
+// A caixa embutida sempre lança no modo `Periodo` (pessoa + início + fim), e
+// recusa tudo o que `src/lib/duracao.ts` recusa — reusando
+// `minutosDaLinhaDeServico` e a MESMA tabela de mensagens que a aba Serviço,
+// para a caixa nunca aceitar um lançamento que o submit vai recusar depois.
+//
+// Diverge do mockup (`confirmarServicoItem`, L2410) em três pontos
+// (Boundaries): o teto é aplicado, a pessoa é obrigatória, e a recusa é uma
+// mensagem na própria caixa em vez de um `alert()`.
+export type LancamentoDaCaixa = {
+  pessoaId: string;
+  inicio: string;
+  fim: string;
+};
+
+export type ResultadoDaCaixa =
+  | { tipo: "ok"; minutos: number }
+  | { tipo: "recusado"; mensagem: string };
+
+export function validarLancamentoDaCaixa(entrada: LancamentoDaCaixa): ResultadoDaCaixa {
+  if (!entrada.pessoaId) {
+    return { tipo: "recusado", mensagem: "Selecione a pessoa do serviço." };
+  }
+  // Marco ausente é caso próprio: `minutosDaLinhaDeServico` devolveria
+  // `formato-invalido` ("período inválido"), que manda a pessoa revisar o que
+  // ela simplesmente ainda não preencheu.
+  if (!entrada.inicio.trim() || !entrada.fim.trim()) {
+    return { tipo: "recusado", mensagem: "Informe o início e o fim do serviço." };
+  }
+
+  const resultado = minutosDaLinhaDeServico({
+    modo: "Periodo",
+    horas: "",
+    inicio: entrada.inicio,
+    fim: entrada.fim,
+  });
+  if (resultado.tipo === "recusado") {
+    return { tipo: "recusado", mensagem: MENSAGEM_POR_MOTIVO_PERIODO[resultado.motivo] };
+  }
+  return { tipo: "ok", minutos: resultado.minutos };
+}
+
+// Linha da aba "Serviço" montada a partir de um lançamento da caixa embutida
+// (UX-DR17). Vive aqui, e não no componente, pelo mesmo motivo das demais
+// regras deste módulo: dentro do `.tsx` trocar o modo para "Duracao" ou passar
+// o item errado deixaria a suíte inteira verde.
+//
+// Sempre `Periodo` com `horas` vazio — a caixa só oferece início e fim — e
+// sempre amarrada ao `itemRevisionalId` da linha, nunca ao nome do item.
+export type LinhaServicoDaCaixa = {
+  pessoaId: string;
+  itemRevisionalId: string;
+  modo: ModoDeLancamento;
+  horas: string;
+  inicio: string;
+  fim: string;
+};
+
+export function linhaDeServicoDaCaixa(
+  itemRevisionalId: string,
+  entrada: LancamentoDaCaixa,
+): LinhaServicoDaCaixa {
+  return {
+    pessoaId: entrada.pessoaId,
+    itemRevisionalId,
+    modo: "Periodo",
+    horas: "",
+    inicio: entrada.inicio,
+    fim: entrada.fim,
+  };
+}
+
+// "2026-01-15T08:30" -> "15/01/2026 08:30" (mockup: formatarDataHora, L2403).
+// Formatação de EXIBIÇÃO da string crua do input — nada de `new Date()` aqui,
+// que reintroduziria a conversão de fuso que paraDatetimeLocal existe para
+// evitar. O formato INTEIRO é validado antes: uma data incompleta antes do
+// "T" renderizava "undefined/undefined/...".
+export function formatarDataHoraDigitada(valor: string): string {
+  const bruto = valor.trim();
+  if (!bruto) return "—";
+  const partes = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(bruto);
+  if (!partes) return bruto;
+  const [, ano, mes, dia, hora, minuto] = partes;
+  return `${dia}/${mes}/${ano} ${hora}:${minuto}`;
+}
+
 // Valida as linhas da aba "Serviço" (Story 5.5, reescrita na 7.3). Zero linhas
 // continua sendo um estado válido (Never: nunca exigir ao menos um serviço).
 // Pessoa e item revisional são obrigatórios em cada linha existente; o vínculo

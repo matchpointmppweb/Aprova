@@ -18,15 +18,24 @@ import {
   reprovarEmissaoAction,
 } from "@/src/server/actions/emissao";
 import {
+  estadoDerivadoDoItem,
   estadoInicialAcaoEmissao,
+  formatarDataHoraDigitada,
+  LABEL_POR_ESTADO_DO_ITEM,
   LABEL_POR_SETOR,
+  lancamentosDoItem,
+  linhaDeServicoDaCaixa,
   mensagemDeErro,
   minutosAcumuladosDeServico,
   minutosDaLinhaDeServico,
   SETOR_PADRAO,
   SETORES,
+  validarLancamentoDaCaixa,
   type EstadoAcaoEmissao,
+  type EstadoDoItem,
+  type LancamentoDaCaixa,
   type ModoDeLancamento,
+  type ResultadoDaCaixa,
 } from "@/src/server/actions/emissao-estado";
 import { BADGE_POR_STATUS } from "./tipos";
 import type {
@@ -307,6 +316,7 @@ const CONTROLES: {
 type LinhaItem = {
   itemRevisionalId: string;
   nome: string;
+  descricao: string | null;
   controles: { key: "dias" | "km" | "horas"; label: string; valorEsperado: number | null; campoMedicao: string }[];
   executadoInicial: boolean;
   medicaoInicial: { dias: number | null; km: number | null; horas: number | null };
@@ -368,67 +378,272 @@ function controlesParaLinhaExistente(
   });
 }
 
-// Uma linha do checklist com estado de "executado" próprio, inicializado a
-// partir de `linha.executadoInicial` — remontada (via `key` no chamador,
-// que inclui o plano selecionado) sempre que a origem da linha muda
-// (criação/troca de plano vs. edição sem troca), então o estado inicial
-// nunca precisa ser resincronizado por um useEffect (evita setState em
-// cascata dentro de efeito).
-function LinhaItemEmissaoRow({ linha }: { linha: LinhaItem }) {
-  const [marcado, setMarcado] = useState(linha.executadoInicial);
+// Instante atual como valor de <input type="datetime-local"> (mockup:
+// nowLocalDateTime, L2084). Getters LOCAIS aqui, ao contrário de
+// paraDatetimeLocal acima: o que se quer é o relógio de parede de quem está
+// preenchendo. A string resultante entra no mesmo fluxo de sempre —
+// parseDataHora a interpreta como wall-clock e paraDatetimeLocal a devolve
+// idêntica ao reabrir —, então o round trip continua fechado.
+function agoraDatetimeLocal(): string {
+  const agora = new Date();
+  const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
+  return (
+    `${agora.getFullYear()}-${doisDigitos(agora.getMonth() + 1)}-${doisDigitos(agora.getDate())}` +
+    `T${doisDigitos(agora.getHours())}:${doisDigitos(agora.getMinutes())}`
+  );
+}
+
+// Uma linha da tabela da aba Itens (Story 7.4, UX-DR15) — <tr> do mockup, mais
+// a <tr> irmã da caixa de lançamento (UX-DR17).
+//
+// `marcado` NÃO vive mais aqui (Story 7.4/Design Notes): ele subiu para o modal
+// porque o estado derivado o consome junto dos lançamentos. O que continua
+// local é só o que ninguém mais precisa saber: se a caixa está aberta e o que
+// está digitado dentro dela.
+//
+// Medição e observação seguem NÃO-CONTROLADAS, lidas do FormData no submit:
+// elas não alimentam derivação nenhuma, e campo desabilitado não entra no
+// FormData — é esse comportamento que faz "item não executado não grava
+// medição" (Story 5.5). Desmarcar desabilita sem apagar; remarcar devolve os
+// valores porque a linha nunca é remontada.
+function LinhaItemEmissaoRow({
+  linha,
+  marcado,
+  onMarcar,
+  estado,
+  lancamentos,
+  pessoas,
+  onLancar,
+  onRemoverLancamento,
+}: {
+  linha: LinhaItem;
+  marcado: boolean;
+  onMarcar: (marcado: boolean) => void;
+  estado: EstadoDoItem;
+  lancamentos: LinhaServico[];
+  pessoas: PessoaOpcao[];
+  onLancar: (entrada: LancamentoDaCaixa) => ResultadoDaCaixa;
+  onRemoverLancamento: (chave: number) => void;
+}) {
+  const [aberta, setAberta] = useState(false);
+  const [pessoaId, setPessoaId] = useState("");
+  const [inicio, setInicio] = useState("");
+  const [fim, setFim] = useState("");
+  const [erroDaCaixa, setErroDaCaixa] = useState<string | undefined>(undefined);
+
+  // Desmarcar recolhe a caixa (mockup: toggleItemTr, L2359). Ajuste durante o
+  // render, nunca em efeito — mesmo padrão do reposicionamento de aba no modal:
+  // setState dentro de useEffect dispara render em cascata e é barrado pelo
+  // lint do projeto.
+  if (!marcado && aberta) setAberta(false);
+
+  const nomeDaPessoa = (id: string) => pessoas.find((pessoa) => pessoa.id === id)?.nome ?? "—";
+
+  const abrirCaixa = () => {
+    // Só o INÍCIO nasce pré-preenchido com o instante atual, e só quando ainda
+    // está vazio (para não descartar o que a pessoa digitou e não confirmou ao
+    // fechar e reabrir). Pessoa fica vazia de propósito: escolher a primeira da
+    // lista atribuiria o trabalho a alguém sem decisão humana e neutralizaria a
+    // regra "pessoa obrigatória". O fim também fica vazio — pré-preenchê-lo com
+    // o mesmo instante do início faria a caixa nascer num estado que o próprio
+    // validador recusa ("o fim precisa ser depois do início").
+    setInicio((atual) => atual || agoraDatetimeLocal());
+    setErroDaCaixa(undefined);
+    setAberta(true);
+  };
+
+  const confirmar = () => {
+    const resultado = onLancar({ pessoaId, inicio, fim });
+    if (resultado.tipo === "recusado") {
+      // Recusa, nunca zero (NFR7/AD-30): nada é acrescentado e a mensagem fica
+      // visível NA caixa — o mockup usa alert() e aceita períodos acima do teto
+      // e sem pessoa (Boundaries: divergir).
+      setErroDaCaixa(resultado.mensagem);
+      return;
+    }
+    setErroDaCaixa(undefined);
+    // Próximo lançamento parte do instante atual de novo — fim vazio, pelo
+    // mesmo motivo de abrirCaixa.
+    setInicio(agoraDatetimeLocal());
+    setFim("");
+  };
 
   return (
-    <div className="item-row">
-      <label className="item-check">
-        <input
-          type="checkbox"
-          name={`itemExecutado-${linha.itemRevisionalId}`}
-          checked={marcado}
-          onChange={(evento) => setMarcado(evento.target.checked)}
-        />
-        <span>{linha.nome}</span>
-      </label>
-      <div className="item-badges">
-        {linha.controles.map((controle) => (
-          <span className="tag tag-neutral" key={controle.key}>
-            {controle.label} esperado: {controle.valorEsperado ?? "—"}
-          </span>
-        ))}
-      </div>
-      <div className="item-fields">
-        {linha.controles.map((controle) => {
-          const valorInicial =
-            controle.key === "dias"
-              ? linha.medicaoInicial.dias
-              : controle.key === "km"
-                ? linha.medicaoInicial.km
-                : linha.medicaoInicial.horas;
-          return (
-            <div className="f" key={controle.key}>
-              <label htmlFor={controle.campoMedicao}>{controle.label} medido</label>
-              <input
-                id={controle.campoMedicao}
-                name={controle.campoMedicao}
-                type="number"
-                min={0}
-                defaultValue={valorInicial ?? ""}
-                disabled={!marcado}
-              />
+    <>
+      <tr className={`st-${estado}`}>
+        <td className="col-chk">
+          <input
+            type="checkbox"
+            aria-label={`Item executado: ${linha.nome}`}
+            name={`itemExecutado-${linha.itemRevisionalId}`}
+            checked={marcado}
+            onChange={(evento) => onMarcar(evento.target.checked)}
+          />
+        </td>
+        <td className="col-item">
+          {linha.nome}
+          <div>
+            <span className={`st-tag st-${estado}`}>
+              <span className="dot" />
+              {LABEL_POR_ESTADO_DO_ITEM[estado]}
+            </span>
+          </div>
+        </td>
+        {/* Descrição real do ItemRevisional (mockup); travessão quando nula.
+            O valor esperado de cada controle vive junto do medidor dele, onde
+            é útil para comparar com o que foi medido. */}
+        <td className="col-desc">{linha.descricao?.trim() ? linha.descricao : "—"}</td>
+        <td>
+          <div className="medidores">
+            {linha.controles.map((controle) => {
+              const valorInicial =
+                controle.key === "dias"
+                  ? linha.medicaoInicial.dias
+                  : controle.key === "km"
+                    ? linha.medicaoInicial.km
+                    : linha.medicaoInicial.horas;
+              return (
+                <div className="f" key={controle.key}>
+                  <label htmlFor={controle.campoMedicao}>
+                    {controle.label}
+                    {controle.valorEsperado === null
+                      ? null
+                      : ` (esperado: ${controle.valorEsperado})`}
+                  </label>
+                  <input
+                    id={controle.campoMedicao}
+                    name={controle.campoMedicao}
+                    type="number"
+                    min={0}
+                    defaultValue={valorInicial ?? ""}
+                    disabled={!marcado}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </td>
+        <td>
+          <div className="f">
+            <input
+              id={`itemObs-${linha.itemRevisionalId}`}
+              name={`itemObs-${linha.itemRevisionalId}`}
+              type="text"
+              aria-label={`Observação: ${linha.nome}`}
+              defaultValue={linha.observacaoInicial}
+              disabled={!marcado}
+            />
+          </div>
+        </td>
+        <td className="col-acao">
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            disabled={!marcado}
+            onClick={() => (aberta ? setAberta(false) : abrirCaixa())}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Serviço
+          </button>
+        </td>
+      </tr>
+      {aberta ? (
+        <tr className="item-servico-tr">
+          <td />
+          <td colSpan={5} className="item-servico-box">
+            <div className="servico-existentes">
+              <div className="sx-title">
+                {lancamentos.length === 0
+                  ? "Serviços lançados neste item"
+                  : `Serviços lançados neste item (${lancamentos.length})`}
+              </div>
+              {lancamentos.length === 0 ? (
+                <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                  Nenhum serviço lançado ainda.
+                </p>
+              ) : (
+                lancamentos.map((lancamento) => {
+                  const total = minutosDaLinhaDeServico(lancamento);
+                  return (
+                    <div className="sx-item" key={lancamento.chave}>
+                      <span className="sx-pessoa">{nomeDaPessoa(lancamento.pessoaId)}</span>
+                      <span className="sx-periodo">
+                        {lancamento.modo === "Duracao"
+                          ? "Lançamento por horas"
+                          : `${formatarDataHoraDigitada(lancamento.inicio)} → ${formatarDataHoraDigitada(lancamento.fim)}`}
+                      </span>
+                      <span className="sx-horas">
+                        {total.tipo === "ok" ? formatarMinutos(total.minutos) : DURACAO_INVALIDA}
+                      </span>
+                      {/* Remove da MESMA lista que a aba Serviço edita — some
+                          dos dois lados e o rodapé recalcula sozinho. */}
+                      <button
+                        className="icon-btn"
+                        type="button"
+                        title="Remover serviço"
+                        aria-label={`Remover lançamento de ${nomeDaPessoa(lancamento.pessoaId)}`}
+                        onClick={() => onRemoverLancamento(lancamento.chave)}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
             </div>
-          );
-        })}
-      </div>
-      <div className="f item-obs">
-        <label htmlFor={`itemObs-${linha.itemRevisionalId}`}>Observação</label>
-        <input
-          id={`itemObs-${linha.itemRevisionalId}`}
-          name={`itemObs-${linha.itemRevisionalId}`}
-          type="text"
-          defaultValue={linha.observacaoInicial}
-          disabled={!marcado}
-        />
-      </div>
-    </div>
+            {/* Sem `name` em nenhum destes campos, de propósito: a caixa não
+                submete nada por si — ela escreve em `linhasServico`, e são os
+                inputs `servico-{i}-*` da aba Serviço que vão ao FormData. */}
+            <div className="servico-inline">
+              <div className="f">
+                <label htmlFor={`caixa-pessoa-${linha.itemRevisionalId}`}>Pessoa</label>
+                <select
+                  id={`caixa-pessoa-${linha.itemRevisionalId}`}
+                  value={pessoaId}
+                  onChange={(evento) => setPessoaId(evento.target.value)}
+                >
+                  <option value="">Selecione a pessoa</option>
+                  {pessoas.map((pessoa) => (
+                    <option key={pessoa.id} value={pessoa.id}>
+                      {pessoa.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="f" style={{ width: 200 }}>
+                <label htmlFor={`caixa-inicio-${linha.itemRevisionalId}`}>Data/hora início</label>
+                <input
+                  id={`caixa-inicio-${linha.itemRevisionalId}`}
+                  type="datetime-local"
+                  value={inicio}
+                  onChange={(evento) => setInicio(evento.target.value)}
+                />
+              </div>
+              <div className="f" style={{ width: 200 }}>
+                <label htmlFor={`caixa-fim-${linha.itemRevisionalId}`}>Data/hora fim</label>
+                <input
+                  id={`caixa-fim-${linha.itemRevisionalId}`}
+                  type="datetime-local"
+                  value={fim}
+                  onChange={(evento) => setFim(evento.target.value)}
+                />
+              </div>
+              <button className="btn btn-primary btn-sm" type="button" onClick={confirmar}>
+                Adicionar ao serviço
+              </button>
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAberta(false)}>
+                Fechar
+              </button>
+            </div>
+            <ErroDeCampo mensagem={erroDaCaixa} alerta />
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
@@ -453,10 +668,24 @@ type LinhaServico = {
   fim: string;
 };
 
-function ErroDeCampo({ mensagem }: { mensagem: string | undefined }) {
+// `alerta` marca a mensagem com role="alert" para o leitor de tela anunciá-la
+// assim que ela aparece — a caixa de lançamento da linha precisa disso porque
+// substituiu o alert() do mockup, que era anunciado. Os erros das células da
+// aba Serviço vêm de um submit e já têm o banner do topo, então não precisam.
+function ErroDeCampo({
+  mensagem,
+  alerta = false,
+}: {
+  mensagem: string | undefined;
+  alerta?: boolean;
+}) {
   if (!mensagem) return null;
   return (
-    <div className="form-error" style={{ margin: "6px 0 0", padding: "6px 8px", fontSize: 11.5 }}>
+    <div
+      className="form-error"
+      role={alerta ? "alert" : undefined}
+      style={{ margin: "6px 0 0", padding: "6px 8px", fontSize: 11.5 }}
+    >
       {mensagem}
     </div>
   );
@@ -788,6 +1017,7 @@ export function ModalEmissao({
         return {
           itemRevisionalId: item.itemRevisionalId,
           nome: itemReal?.nome ?? "Item revisional",
+          descricao: itemReal?.descricao ?? null,
           controles: controlesParaLinhaExistente(itemReal, item).map((controle) => ({
             key: controle.key,
             label: controle.label,
@@ -821,6 +1051,7 @@ export function ModalEmissao({
       return {
         itemRevisionalId: itemDoPlano.itemRevisionalId,
         nome: itemReal?.nome ?? "Item revisional",
+        descricao: itemReal?.descricao ?? null,
         controles: controlesReais(itemReal).map((controle) => {
           const override =
             controle.key === "dias"
@@ -843,6 +1074,53 @@ export function ModalEmissao({
       };
     });
   }, [emissao, trocouPlano, planoId, planos, itensRevisionaisPorId]);
+
+  // Story 7.4 — `executado` SOBE para o modal (Design Notes): o estado derivado
+  // de cada item o consome junto dos lançamentos, e a faixa de resumo da
+  // próxima build precisa da contagem. Ler o DOM (`.item-exec:checked`, como o
+  // mockup faz na L2262) é justamente o padrão que torna a regra intestável.
+  //
+  // Antes o estado morava na linha e era ressincronizado pela `key` de
+  // remontagem; agora ele vive aqui, então a troca de origem das linhas
+  // (criação/troca de plano vs. edição sem troca) precisa reinicializá-lo —
+  // durante o render, comparando com a última origem tratada, nunca num
+  // useEffect (mesmo padrão do reposicionamento de aba acima).
+  const origemDasLinhas = `${emissao?.id ?? "nova"}|${planoId}`;
+  const [executados, setExecutados] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(linhas.map((linha) => [linha.itemRevisionalId, linha.executadoInicial])),
+  );
+  const [origemTratada, setOrigemTratada] = useState(origemDasLinhas);
+  if (origemDasLinhas !== origemTratada) {
+    setOrigemTratada(origemDasLinhas);
+    setExecutados(
+      Object.fromEntries(linhas.map((linha) => [linha.itemRevisionalId, linha.executadoInicial])),
+    );
+  }
+
+  const marcarItem = (itemRevisionalId: string, marcado: boolean) => {
+    setExecutados((atual) => ({ ...atual, [itemRevisionalId]: marcado }));
+  };
+
+  // Lançamento vindo da caixa da linha (UX-DR17): entra na MESMA
+  // `linhasServico` que a aba Serviço edita e o rodapé soma — nunca uma
+  // segunda lista —, sempre no modo `Periodo`, amarrado ao `itemRevisionalId`
+  // da linha (nunca ao nome do item, como o mockup faz).
+  const lancarPelaCaixa = (
+    itemRevisionalId: string,
+    entrada: LancamentoDaCaixa,
+  ): ResultadoDaCaixa => {
+    const resultado = validarLancamentoDaCaixa(entrada);
+    if (resultado.tipo === "recusado") return resultado;
+
+    setErrosDeServicoObsoletos(true);
+    const chave = proximaChave.current;
+    proximaChave.current += 1;
+    setLinhasServico((atual) => [
+      ...atual,
+      { chave, ...linhaDeServicoDaCaixa(itemRevisionalId, entrada) },
+    ]);
+    return resultado;
+  };
 
   return (
     // `modal-full` (Story 7.3, portado do mockup L1860): a tabela de serviços
@@ -1037,21 +1315,56 @@ export function ModalEmissao({
 
             <div className={`modal-tab-panel${aba === "itens" ? "" : " hidden"}`}>
               <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
-                Marque os itens revisionais executados nesta emissão e registre a medição
-                realizada.
+                Marque os itens revisionais executados nesta emissão, registre a medição
+                realizada e, se necessário, adicione o serviço executado no item.
               </p>
-              <div id="emissao-itens-list">
-                {linhas.length === 0 ? (
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    {planoId
-                      ? "O plano selecionado não tem itens revisionais."
-                      : "Selecione um plano revisional na aba Geral."}
-                  </p>
-                ) : null}
-                {linhas.map((linha) => (
-                  <LinhaItemEmissaoRow key={`${planoId}-${linha.itemRevisionalId}`} linha={linha} />
-                ))}
-              </div>
+              {linhas.length === 0 ? (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  {planoId
+                    ? "O plano selecionado não tem itens revisionais."
+                    : "Selecione um plano revisional na aba Geral."}
+                </p>
+              ) : (
+                <div className="table-wrap table-wrap-rolavel">
+                  <table className="itens-table">
+                    <thead>
+                      <tr>
+                        <th scope="col" className="col-chk" />
+                        <th scope="col" className="col-item">Item</th>
+                        <th scope="col" className="col-desc">Descrição</th>
+                        <th scope="col">Medidores (dias, horas, km)</th>
+                        <th scope="col">Observação</th>
+                        <th scope="col" className="col-acao">Serviço</th>
+                      </tr>
+                    </thead>
+                    <tbody id="emissao-itens-list">
+                      {linhas.map((linha) => (
+                        <LinhaItemEmissaoRow
+                          key={`${planoId}-${linha.itemRevisionalId}`}
+                          linha={linha}
+                          // Entrada ausente cai no `executadoInicial` da própria
+                          // linha, nunca num `false` cego: `linhas` é um useMemo
+                          // que pode ganhar um item sem que `origemDasLinhas`
+                          // mude, e um `false` aqui gravaria "não executado"
+                          // para um item que estava executado.
+                          marcado={executados[linha.itemRevisionalId] ?? linha.executadoInicial}
+                          onMarcar={(marcado) => marcarItem(linha.itemRevisionalId, marcado)}
+                          estado={estadoDerivadoDoItem({
+                            itemRevisionalId: linha.itemRevisionalId,
+                            executado:
+                              executados[linha.itemRevisionalId] ?? linha.executadoInicial,
+                            lancamentos: linhasServico,
+                          })}
+                          lancamentos={lancamentosDoItem(linhasServico, linha.itemRevisionalId)}
+                          pessoas={pessoas}
+                          onLancar={(entrada) => lancarPelaCaixa(linha.itemRevisionalId, entrada)}
+                          onRemoverLancamento={removerServico}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Visibilidade por classe ".hidden" (mesmo padrão dos outros

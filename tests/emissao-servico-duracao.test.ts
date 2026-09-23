@@ -2,9 +2,14 @@ import { describe, expect, test } from "vitest";
 
 import { TETO_DE_MINUTOS, formatarMinutos } from "@/src/lib/duracao";
 import {
+  estadoDerivadoDoItem,
+  formatarDataHoraDigitada,
+  lancamentosDoItem,
   lerServicos,
+  linhaDeServicoDaCaixa,
   minutosAcumuladosDeServico,
   minutosDaLinhaDeServico,
+  validarLancamentoDaCaixa,
   validarServicos,
   type LinhaServicoBruta,
   type LinhaServicoDerivavel,
@@ -385,4 +390,243 @@ describe("total derivado da tela", () => {
     expect(minutosAcumuladosDeServico([])).toBe(0);
     expect(formatarMinutos(minutosAcumuladosDeServico([]))).toBe("0:00");
   });
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.4 — estado DERIVADO do item (AD-31)
+// ---------------------------------------------------------------------------
+// O que estes testes prendem, e que nada mais prende: que o estado é COMPUTADO
+// de `executado` + lançamentos na leitura (nunca lido de coluna), que
+// "executado" tem PRECEDÊNCIA sobre a ausência de lançamento, e que o
+// casamento item↔lançamento é por `itemRevisionalId` — o mockup casa por NOME
+// (L2384), e dois itens homônimos misturariam lançamentos.
+describe("estado derivado do item", () => {
+  const OUTRO_ITEM = "item-2";
+
+  test("intocado: não executado e sem lançamento é Pendente", () => {
+    expect(
+      estadoDerivadoDoItem({ itemRevisionalId: ITEM, executado: false, lancamentos: [] }),
+    ).toBe("pendente");
+  });
+
+  test("com serviço: não executado e com lançamento é Serviço apontado", () => {
+    expect(
+      estadoDerivadoDoItem({
+        itemRevisionalId: ITEM,
+        executado: false,
+        lancamentos: [{ itemRevisionalId: ITEM }],
+      }),
+    ).toBe("parcial");
+  });
+
+  test("executado com lançamento é Concluído", () => {
+    expect(
+      estadoDerivadoDoItem({
+        itemRevisionalId: ITEM,
+        executado: true,
+        lancamentos: [{ itemRevisionalId: ITEM }],
+      }),
+    ).toBe("concluido");
+  });
+
+  // Precedência, não soma: quem marcou declarou que terminou.
+  test("executado SEM nenhum lançamento é Concluído, nunca Pendente", () => {
+    expect(
+      estadoDerivadoDoItem({ itemRevisionalId: ITEM, executado: true, lancamentos: [] }),
+    ).toBe("concluido");
+  });
+
+  // O ponto: lançamento de OUTRO item não pinta esta linha.
+  test("lançamento de outro item não tira esta linha de Pendente", () => {
+    expect(
+      estadoDerivadoDoItem({
+        itemRevisionalId: ITEM,
+        executado: false,
+        lancamentos: [{ itemRevisionalId: OUTRO_ITEM }],
+      }),
+    ).toBe("pendente");
+  });
+
+  test("a caixa só enxerga os lançamentos do próprio itemRevisionalId", () => {
+    const lancamentos = [
+      { itemRevisionalId: ITEM, chave: 1 },
+      { itemRevisionalId: OUTRO_ITEM, chave: 2 },
+      { itemRevisionalId: ITEM, chave: 3 },
+    ];
+    expect(lancamentosDoItem(lancamentos, ITEM).map((l) => l.chave)).toEqual([1, 3]);
+    expect(lancamentosDoItem(lancamentos, OUTRO_ITEM).map((l) => l.chave)).toEqual([2]);
+  });
+
+  // Reabrir a emissão recomputa: o MESMO item vira outro estado só porque um
+  // lançamento existe — nada de estado lido de coluna.
+  test("remover o último lançamento devolve o item a Pendente", () => {
+    const antes = estadoDerivadoDoItem({
+      itemRevisionalId: ITEM,
+      executado: false,
+      lancamentos: [{ itemRevisionalId: ITEM }],
+    });
+    const depois = estadoDerivadoDoItem({
+      itemRevisionalId: ITEM,
+      executado: false,
+      lancamentos: [],
+    });
+    expect([antes, depois]).toEqual(["parcial", "pendente"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.4 — recusa da caixa embutida na linha (NFR7/AD-30, UX-DR17)
+// ---------------------------------------------------------------------------
+// O mockup (`confirmarServicoItem`, L2410) valida só marcos e ordem, por
+// alert(), e aceita período sem pessoa e acima do teto. Cada teste abaixo é um
+// ponto em que esta implementação diverge — e nenhuma recusa vira zero.
+describe("validarLancamentoDaCaixa", () => {
+  const BASE = { pessoaId: PESSOA, inicio: "2026-01-15T08:00", fim: "2026-01-15T09:55" };
+
+  test("pessoa + período válido rende os minutos do período", () => {
+    expect(validarLancamentoDaCaixa(BASE)).toEqual({ tipo: "ok", minutos: 115 });
+  });
+
+  test.each([
+    ["sem início", { ...BASE, inicio: "" }],
+    ["sem fim", { ...BASE, fim: "" }],
+    ["sem nenhum marco", { ...BASE, inicio: "", fim: "" }],
+  ])("%s é recusado com mensagem", (_rotulo, entrada) => {
+    const resultado = validarLancamentoDaCaixa(entrada);
+    expect(resultado.tipo).toBe("recusado");
+    expect(resultado).toMatchObject({ mensagem: expect.stringMatching(/início e o fim/) });
+  });
+
+  test("período invertido é recusado", () => {
+    const resultado = validarLancamentoDaCaixa({
+      ...BASE,
+      inicio: "2026-01-15T10:00",
+      fim: "2026-01-15T08:00",
+    });
+    expect(resultado.tipo).toBe("recusado");
+    expect(resultado).toMatchObject({ mensagem: expect.stringMatching(/anterior ao início/) });
+  });
+
+  // Zero não é lançamento (NFR7) — o mockup recusa este caso, mas com alert().
+  test("fim igual ao início é recusado, nunca vira 0:00", () => {
+    const resultado = validarLancamentoDaCaixa({ ...BASE, fim: BASE.inicio });
+    expect(resultado.tipo).toBe("recusado");
+    expect(resultado).not.toEqual({ tipo: "ok", minutos: 0 });
+  });
+
+  // Divergência do mockup: ele não tem teto nenhum nesta caixa.
+  test("período acima do teto é recusado, citando o teto do módulo", () => {
+    const resultado = validarLancamentoDaCaixa({
+      ...BASE,
+      inicio: "2026-01-01T00:00",
+      fim: "2026-02-02T00:00",
+    });
+    expect(resultado.tipo).toBe("recusado");
+    expect(resultado).toMatchObject({
+      mensagem: expect.stringContaining(formatarMinutos(TETO_DE_MINUTOS)),
+    });
+  });
+
+  test("o teto exato ainda é aceito", () => {
+    expect(
+      validarLancamentoDaCaixa({ ...BASE, inicio: "2026-01-01T00:00", fim: "2026-02-01T00:00" }),
+    ).toEqual({ tipo: "ok", minutos: TETO_DE_MINUTOS });
+  });
+
+  // Divergência do mockup: ele nunca checa a pessoa (o <select> dele não tem
+  // opção vazia). Aqui ela é obrigatória, e a recusa acontece ANTES de olhar os
+  // marcos — a mensagem aponta o que de fato falta.
+  test("sem pessoa é recusado mesmo com período válido", () => {
+    const resultado = validarLancamentoDaCaixa({ ...BASE, pessoaId: "" });
+    expect(resultado.tipo).toBe("recusado");
+    expect(resultado).toMatchObject({ mensagem: expect.stringMatching(/pessoa/i) });
+  });
+
+  // O lançamento que a caixa aceita é o mesmo que o submit aceita: divergir
+  // faria a caixa prometer um lançamento que a Server Action recusa depois.
+  test("o que a caixa aceita atravessa validarServicos como modo Periodo", () => {
+    expect(validarLancamentoDaCaixa(BASE).tipo).toBe("ok");
+    const { erros, servicos } = validarServicos([
+      linha({ modo: "Periodo", inicio: BASE.inicio, fim: BASE.fim }),
+    ]);
+    expect(erros).toEqual([]);
+    expect(servicos[0]).toMatchObject({ modo: "Periodo", itemRevisionalId: ITEM });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.4 — a linha de serviço MONTADA a partir da caixa (UX-DR17)
+// ---------------------------------------------------------------------------
+// Enquanto esta montagem vivia dentro do .tsx, trocar `modo` para "Duracao" ou
+// passar o item errado deixava a suíte inteira verde — exatamente o que estes
+// testes existem para impedir.
+describe("linhaDeServicoDaCaixa", () => {
+  const ENTRADA = { pessoaId: PESSOA, inicio: "2026-01-15T08:00", fim: "2026-01-15T09:55" };
+
+  test("carrega o item da linha, o modo Periodo, horas vazias e os marcos digitados", () => {
+    expect(linhaDeServicoDaCaixa(ITEM, ENTRADA)).toEqual({
+      pessoaId: PESSOA,
+      itemRevisionalId: ITEM,
+      modo: "Periodo",
+      horas: "",
+      inicio: "2026-01-15T08:00",
+      fim: "2026-01-15T09:55",
+    });
+  });
+
+  test("o item vem do argumento, nunca do lançamento", () => {
+    expect(linhaDeServicoDaCaixa("outro-item", ENTRADA).itemRevisionalId).toBe("outro-item");
+  });
+
+  // A linha montada aqui é a mesma que o submit envia: se ela não atravessasse
+  // validarServicos, a caixa aceitaria um lançamento que a Server Action recusa.
+  test("atravessa validarServicos como lançamento válido", () => {
+    const montada = linhaDeServicoDaCaixa(ITEM, ENTRADA);
+    const { erros, servicos } = validarServicos([{ indice: 0, ...montada }]);
+    expect(erros).toEqual([]);
+    expect(servicos).toEqual([
+      {
+        pessoaId: PESSOA,
+        itemRevisionalId: ITEM,
+        modo: "Periodo",
+        inicio: new Date(Date.UTC(2026, 0, 15, 8, 0)),
+        fim: new Date(Date.UTC(2026, 0, 15, 9, 55)),
+      },
+    ]);
+  });
+
+  // Derivação e submit veem a mesma linha: o total exibido na caixa é o mesmo
+  // que o servidor vai gravar.
+  test("a linha montada rende os minutos do período na derivação", () => {
+    expect(minutosDaLinhaDeServico(linhaDeServicoDaCaixa(ITEM, ENTRADA))).toEqual({
+      tipo: "ok",
+      minutos: 115,
+    });
+  });
+});
+
+describe("formatarDataHoraDigitada", () => {
+  test("formata o valor completo do input em dd/mm/aaaa hh:mm", () => {
+    expect(formatarDataHoraDigitada("2026-01-15T08:30")).toBe("15/01/2026 08:30");
+  });
+
+  test("aceita o valor com segundos, descartando-os", () => {
+    expect(formatarDataHoraDigitada("2026-01-15T08:30:45")).toBe("15/01/2026 08:30");
+  });
+
+  test("vazio vira travessão", () => {
+    expect(formatarDataHoraDigitada("")).toBe("—");
+    expect(formatarDataHoraDigitada("   ")).toBe("—");
+  });
+
+  // O bug que isto prende: validar só a presença do "T" fazia uma data
+  // incompleta renderizar "undefined/undefined/2026 08:30" na tela.
+  test.each(["2026-01T08:30", "2026T08:30", "15/01/2026", "2026-01-15", "2026-01-15T8:30"])(
+    "valor malformado (%s) volta cru, nunca com 'undefined'",
+    (valor) => {
+      const saida = formatarDataHoraDigitada(valor);
+      expect(saida).toBe(valor);
+      expect(saida).not.toContain("undefined");
+    },
+  );
 });

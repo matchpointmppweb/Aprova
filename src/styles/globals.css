@@ -395,6 +395,11 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .radio-row{display:flex;gap:18px;padding:2px 0 4px;}
 .radio-row label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);font-weight:400;}
 
+/* Lista de cartões de item (Story 4.1) — AINDA EM USO pelo checklist de itens
+   do modal de Plano revisional (src/components/planos-revisionais/
+   modal-plano.tsx). A aba Itens da Emissão deixou de usá-la na 7.4 (tabela
+   abaixo), mas estas regras só podem sair quando o modal de plano também for
+   portado. */
 .item-row{
   display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;
 }
@@ -406,6 +411,59 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .item-fields .f{width:110px;}
 .item-fields .f label{font-size:10.5px;}
 .item-obs{flex:1;min-width:180px;}
+
+/* Tabela da aba "Itens" do modal de Emissão (Story 7.4, UX-DR15) — portada de
+   Mockups/atual.html:412-463. */
+.itens-table{width:100%;border-collapse:collapse;background:transparent;}
+.itens-table th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
+  color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.itens-table td{padding:10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:top;}
+.itens-table .col-chk{width:34px;}
+.itens-table .col-item{width:210px;font-weight:500;}
+.itens-table .col-desc{color:var(--ink-soft);font-size:13px;}
+.itens-table .col-acao{width:140px;text-align:right;}
+.itens-table input[type=checkbox]{width:16px;height:16px;}
+.medidores{display:flex;gap:8px;flex-wrap:wrap;}
+.medidores .f{width:92px;}
+.medidores .f label{font-size:10.5px;}
+
+/* Caixa de lançamento embutida na própria linha do item (UX-DR17). */
+.item-servico-box{background:var(--paper-2);border-left:2px solid var(--pine);}
+.servico-inline{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.servico-inline .f{width:160px;}
+.servico-inline .f label{font-size:10.5px;}
+
+/* Semáforo de estado DERIVADO do item (AD-31) — a cor da linha e a etiqueta
+   saem da mesma derivação, nunca de coluna no banco. */
+.itens-table tr.st-pendente > td{background:#FDF1F1;}
+.itens-table tr.st-parcial > td{background:#FEF8E7;}
+.itens-table tr.st-concluido > td{background:#F1F8F2;}
+.itens-table tr.item-servico-tr > td{background:var(--paper-2);}
+.st-tag{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;
+  padding:3px 9px;border-radius:100px;border:1px solid transparent;margin-top:5px;
+}
+.st-tag .dot{width:7px;height:7px;border-radius:50%;}
+.st-tag.st-pendente{background:#FBE4E4;border-color:#F2C9C9;color:#8C2F2F;}
+.st-tag.st-pendente .dot{background:#C64B4B;}
+.st-tag.st-parcial{background:#FCF1D6;border-color:#F0DFAE;color:#8A6416;}
+.st-tag.st-parcial .dot{background:#D9A521;}
+.st-tag.st-concluido{background:#E2F1E5;border-color:#C2E0C9;color:#2C6E4F;}
+.st-tag.st-concluido .dot{background:#3C8F63;}
+
+/* Lançamentos já feitos naquele item, dentro da caixa — vista filtrada da
+   MESMA lista que a aba Serviço edita, nunca uma segunda lista. */
+.servico-existentes{margin-bottom:12px;}
+.servico-existentes .sx-title{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:6px;}
+.sx-item{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--radius-s);padding:7px 10px;margin-bottom:6px;font-size:12.5px;
+}
+.sx-item .sx-pessoa{font-weight:500;}
+.sx-item .sx-periodo{color:var(--ink-soft);}
+.sx-item .sx-horas{margin-left:auto;font-weight:600;}
 
 /* Modal em tela cheia, à direita do menu (Story 7.3) — portado de
    Mockups/atual.html:387-396. O top/left espelham a altura da .topbar (58px) e

@@ -128,6 +128,10 @@ export interface PessoaOpcao {
 export interface ItemRevisionalOpcao {
   id: string;
   nome: string;
+  // A coluna "Descrição" da aba Itens (Story 7.4) exibe este valor — ele já
+  // vinha de listarItensRevisionais() (findMany sem select), só não estava
+  // declarado aqui.
+  descricao: string | null;
   diasPadrao: number | null;
   kmPadrao: number | null;
   horasPadrao: number | null;
