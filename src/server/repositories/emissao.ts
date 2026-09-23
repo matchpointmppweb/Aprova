@@ -120,13 +120,14 @@ export type DadosServicoEmissao =
       modo?: undefined;
       duracaoMinutos?: undefined;
     })
-  // Período explícito: as datas mandam, duração nunca é preenchida. As duas
-  // continuam podendo ser nulas — o aperto "período exige as duas datas" é da
-  // 7.3 (Design Notes).
+  // Período explícito: as datas mandam, duração nunca é preenchida. Story 7.3 —
+  // os dois marcos são OBRIGATÓRIOS aqui, espelhando o ramo `Periodo` da CHECK,
+  // que deixou de aceitar período sem datas: o erro passa a aparecer na
+  // compilação em vez de só em runtime.
   | (IdentidadeDoServico & {
       modo: "Periodo";
-      inicio: Date | null;
-      fim: Date | null;
+      inicio: Date;
+      fim: Date;
       duracaoMinutos?: null;
     })
   // Duração digitada: minutos INTEIROS obrigatórios (AD-28) e datas
@@ -162,6 +163,23 @@ function formatarCodigo(ano: number, seq: number) {
 
 function isErroDeColisaoDeCodigo(erro: unknown): boolean {
   return erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002";
+}
+
+// Story 7.3 — a CHECK `servicos_emissao_modo_coerente` é REDE, não caminho: a
+// Server Action valida o mesmo conjunto de regras antes (Design Notes), então
+// uma violação aqui só acontece se a validação e o banco divergirem. Mesmo
+// assim ela é CLASSIFICADA em vez de relançada, para a Server Action devolver
+// um desfecho de campo — nunca um erro cru do Prisma nem um 500 (I/O Matrix).
+//
+// O Prisma não modela CHECK, então não há código de erro estável para ela: o
+// reconhecimento é pelo NOME da constraint, que aparece na mensagem tanto no
+// PrismaClientKnownRequestError (P2010) quanto no Unknown. É por isso que o
+// nome vive nesta constante — mudá-lo na migration sem mudar aqui volta a
+// produzir erro genérico, e é o teste de banco real que percebe.
+const CONSTRAINT_MODO_COERENTE = "servicos_emissao_modo_coerente";
+
+export function isViolacaoDeServicoIncoerente(erro: unknown): boolean {
+  return erro instanceof Error && erro.message.includes(CONSTRAINT_MODO_COERENTE);
 }
 
 const MAX_TENTATIVAS_CODIGO = 5;
@@ -209,10 +227,15 @@ export async function criarEmissao(contaId: string, dados: DadosCriarEmissao) {
               create: dados.servicos.map((servico) => ({
                 pessoaId: servico.pessoaId,
                 itemRevisionalId: servico.itemRevisionalId,
+                // Sem `?? "Periodo"` (Story 7.3): o valor vem dos dados. Quando
+                // o caminho legado o omite, `undefined` deixa o
+                // `@default(Periodo)` do datamodel responder — o mesmo
+                // resultado, sem um fallback que possa um dia apagar um modo
+                // real.
                 inicio: servico.inicio,
                 fim: servico.fim,
-                modo: servico.modo ?? "Periodo",
-                duracaoMinutos: servico.duracaoMinutos ?? null,
+                modo: servico.modo,
+                duracaoMinutos: servico.duracaoMinutos,
               })),
             },
             itens: {
@@ -269,7 +292,7 @@ export type DadosEditarEmissao =
 
 export type ResultadoAtualizarEmissao =
   | { ok: true }
-  | { ok: false; motivo: "nao-encontrado" | "conflito" };
+  | { ok: false; motivo: "nao-encontrado" | "conflito" | "servico-incoerente" };
 
 // Edição de uma emissão existente — exige `updatedAtEsperado` na cláusula
 // `where` da atualização da emissão pai (lock otimista, AD-9), mesmo padrão
@@ -322,8 +345,8 @@ export async function atualizarEmissao(
             itemRevisionalId: servico.itemRevisionalId,
             inicio: servico.inicio,
             fim: servico.fim,
-            modo: servico.modo ?? "Periodo",
-            duracaoMinutos: servico.duracaoMinutos ?? null,
+            modo: servico.modo,
+            duracaoMinutos: servico.duracaoMinutos,
           })),
         });
       }
@@ -380,6 +403,11 @@ export async function atualizarEmissao(
         select: { id: true },
       });
       return { ok: false, motivo: aindaExiste ? "conflito" : "nao-encontrado" };
+    }
+    if (isViolacaoDeServicoIncoerente(erro)) {
+      // A transação já abortou por inteiro — nenhuma linha de serviço nem de
+      // item sobreviveu (AD-9). Desfecho classificado em vez de erro cru.
+      return { ok: false, motivo: "servico-incoerente" };
     }
     throw erro;
   }

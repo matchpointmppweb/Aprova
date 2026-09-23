@@ -7,6 +7,16 @@
 // plano-estado.ts).
 import type { Setor } from "@prisma/client";
 
+import {
+  duracaoDoPeriodo,
+  formatarMinutos,
+  interpretarDuracao,
+  somarMinutos,
+  TETO_DE_MINUTOS,
+  type MotivoDeRecusa,
+  type ResultadoDeDuracao,
+} from "@/src/lib/duracao";
+
 export type ErroDeValidacao = { field: string; message: string };
 
 export type EstadoAcaoEmissao<T = undefined> = {
@@ -106,16 +116,83 @@ export type LinhaServicoBruta = {
   indice: number;
   pessoaId: string;
   itemRevisionalId: string;
+  /// Cru do <select> de modo (`Duracao` | `Periodo`). String, não o enum: o
+  /// valor vem do cliente e um request adulterado nunca é tratado como enum
+  /// válido sem passar por isModoValido.
+  modo: string;
+  /// Texto digitado no modo `Duracao` ("1:55"). Nunca minutos: o cliente jamais
+  /// envia total calculado (AD-29), o servidor reinterpreta o texto.
+  horas: string;
   inicio: string;
   fim: string;
 };
 
-export type ServicoValidado = {
-  pessoaId: string;
-  itemRevisionalId: string;
-  inicio: Date | null;
-  fim: Date | null;
-};
+// Linhas da aba "Serviço" (Story 5.5). Convenção do Boundaries: contagem
+// explícita em `servicoCount` + campos indexados `servico-{i}-*` — NUNCA
+// getAll() posicional, que embaralharia as colunas quando um campo vem
+// vazio/desabilitado. Um índice cuja linha não tem NENHUM campo preenchido
+// é ignorado (linha fantasma), mas uma linha parcialmente preenchida cai na
+// validação de campo obrigatório de validarServicos.
+export const MAX_LINHAS_SERVICO = 200;
+
+// Acima do teto a requisição é REJEITADA, nunca truncada: truncar salvaria
+// um subconjunto silencioso das linhas enviadas e ainda responderia ok.
+export const ERRO_EXCESSO_SERVICOS = `Uma emissão aceita no máximo ${MAX_LINHAS_SERVICO} serviços.`;
+
+// Vive aqui, e não em actions/emissao.ts, porque um módulo "use server" só pode
+// exportar função assíncrona — e o contrato de NOMES do FormData
+// (`servico-{i}-modo`, `-horas`, ...) precisa ser testável contra os mesmos
+// nomes que o componente renderiza: renomear só um dos dois lados não é erro de
+// compilação (são template strings), e sem teste a suíte ficaria verde com a
+// funcionalidade quebrada.
+export function lerServicos(
+  formData: FormData,
+): { ok: true; linhas: LinhaServicoBruta[] } | { ok: false; erro: string } {
+  const totalBruto = Number(String(formData.get("servicoCount") ?? "0").trim());
+  if (!Number.isFinite(totalBruto) || !Number.isInteger(totalBruto) || totalBruto <= 0) {
+    return { ok: true, linhas: [] };
+  }
+  if (totalBruto > MAX_LINHAS_SERVICO) {
+    return { ok: false, erro: ERRO_EXCESSO_SERVICOS };
+  }
+  const total = totalBruto;
+
+  const linhas: LinhaServicoBruta[] = [];
+  for (let indice = 0; indice < total; indice++) {
+    const pessoaId = String(formData.get(`servico-${indice}-pessoaId`) ?? "").trim();
+    const itemRevisionalId = String(
+      formData.get(`servico-${indice}-itemRevisionalId`) ?? "",
+    ).trim();
+    // Story 7.3: o modo e o texto de horas viajam pelos mesmos nomes indexados.
+    // `modo` fica FORA da checagem de linha fantasma de propósito — o <select>
+    // sempre manda um valor, então incluí-lo faria toda linha em branco parecer
+    // preenchida e virar erro de campo obrigatório.
+    const modo = String(formData.get(`servico-${indice}-modo`) ?? "").trim();
+    const horas = String(formData.get(`servico-${indice}-horas`) ?? "").trim();
+    const inicio = String(formData.get(`servico-${indice}-inicio`) ?? "").trim();
+    const fim = String(formData.get(`servico-${indice}-fim`) ?? "").trim();
+
+    if (!pessoaId && !itemRevisionalId && !horas && !inicio && !fim) continue;
+    linhas.push({ indice, pessoaId, itemRevisionalId, modo, horas, inicio, fim });
+  }
+  return { ok: true, linhas };
+}
+
+// Story 7.3 — união DISCRIMINADA por `modo`, espelhando DadosServicoEmissao do
+// repositório: o tipo torna inexprimível a linha `Duracao` com datas e a linha
+// `Periodo` sem marcos. Os dois marcos deixam de ser `Date | null` porque a
+// validação passou a EXIGIR os dois no modo período (I/O Matrix: "Período
+// incompleto").
+export type ServicoValidado =
+  | { pessoaId: string; itemRevisionalId: string; modo: "Duracao"; duracaoMinutos: number }
+  | { pessoaId: string; itemRevisionalId: string; modo: "Periodo"; inicio: Date; fim: Date };
+
+export const MODOS_DE_LANCAMENTO = ["Duracao", "Periodo"] as const;
+export type ModoDeLancamento = (typeof MODOS_DE_LANCAMENTO)[number];
+
+export function isModoValido(valor: string): valor is ModoDeLancamento {
+  return (MODOS_DE_LANCAMENTO as readonly string[]).includes(valor);
+}
 
 // Input type="datetime-local" manda "YYYY-MM-DDTHH:mm" (ou com segundos).
 // O valor é interpretado como wall-clock UTC (Date.UTC) — NUNCA pelo fuso
@@ -224,11 +301,84 @@ export function validarCamposGerais(campos: {
   return erros;
 }
 
-// Valida as linhas da aba "Serviço" (Story 5.5). Zero linhas é um estado
-// válido (Never: nunca exigir ao menos um serviço). Pessoa e item revisional
-// são obrigatórios em cada linha existente; o vínculo cross-tenant de cada
-// id é checado à parte pela Server Action, contra os dados reais da conta
-// (AD-1), do mesmo jeito que ativo/plano/responsável.
+// Teto escrito com a MESMA função que formata o total na tela (7.2) — nenhum
+// "744" literal na mensagem: mudar TETO_DE_MINUTOS muda o texto sozinho.
+const TETO_FORMATADO = formatarMinutos(TETO_DE_MINUTOS);
+
+// Os quatro motivos de MotivoDeRecusa viram quatro mensagens distintas
+// (Boundaries) — e DUAS tabelas, porque a mesma recusa quer dizer coisas
+// diferentes nos dois modos: "não positivo" é "digite mais que zero" quando a
+// pessoa digitou o texto, e "o fim precisa ser depois do início" quando ela
+// escolheu dois marcos. Um mapa só forçaria uma das duas a mentir.
+const MENSAGEM_POR_MOTIVO_HORAS: Record<MotivoDeRecusa, string> = {
+  "formato-invalido": "Informe as horas no formato 1:55.",
+  "nao-positivo": "As horas do serviço precisam ser maiores que zero.",
+  "acima-do-teto": `O serviço não pode passar de ${TETO_FORMATADO}.`,
+  // Inalcançável por interpretarDuracao (não existe período aqui); presente
+  // porque o Record é exaustivo — acrescentar um motivo na 7.2 quebra a
+  // compilação aqui, que é o ponto.
+  "periodo-invertido": "Informe as horas no formato 1:55.",
+};
+
+const MENSAGEM_POR_MOTIVO_PERIODO: Record<MotivoDeRecusa, string> = {
+  "formato-invalido": "Informe um período de serviço válido.",
+  "nao-positivo": "O fim do serviço precisa ser depois do início.",
+  "acima-do-teto": `O período do serviço não pode passar de ${TETO_FORMATADO}.`,
+  "periodo-invertido": "O fim do serviço não pode ser anterior ao início.",
+};
+
+// Total DERIVADO de uma linha da aba Serviço (AD-29), na forma que a TELA
+// precisa: minutos a cada tecla, antes de qualquer submit, a partir do texto
+// cru dos inputs. Vive aqui, e não dentro do componente, por dois motivos:
+// é a MESMA aritmética que `validarServicos` aplica logo abaixo (divergir
+// faria a tela prometer um total que o servidor recusa), e dentro de um
+// componente "use client" ela seria intestável — o projeto não tem render de
+// componente em teste.
+//
+// Recusa é recusa: uma linha que o módulo não aceita NUNCA vale zero (NFR7).
+// A célula exibe DURACAO_INVALIDA e a linha simplesmente não entra na soma,
+// em vez de contribuir com o zero silencioso que o mockup produz.
+export type LinhaServicoDerivavel = {
+  modo: ModoDeLancamento;
+  horas: string;
+  inicio: string;
+  fim: string;
+};
+
+export function minutosDaLinhaDeServico(linha: LinhaServicoDerivavel): ResultadoDeDuracao {
+  if (linha.modo === "Duracao") return interpretarDuracao(linha.horas);
+
+  const inicio = parseDataHora(linha.inicio);
+  const fim = parseDataHora(linha.fim);
+  // Período ainda incompleto ou malformado — nada a somar, e nunca "0:00".
+  if (!(inicio instanceof Date) || !(fim instanceof Date)) {
+    return { tipo: "recusado", motivo: "formato-invalido" };
+  }
+  return duracaoDoPeriodo(inicio, fim);
+}
+
+// Horas acumuladas do rodapé (AD-29): soma SÓ as linhas que o módulo aceita.
+// Lista vazia soma 0, e esse "0:00" é o único zero honesto da tela.
+export function minutosAcumuladosDeServico(linhas: readonly LinhaServicoDerivavel[]): number {
+  const minutos: number[] = [];
+  for (const linha of linhas) {
+    const resultado = minutosDaLinhaDeServico(linha);
+    if (resultado.tipo === "ok") minutos.push(resultado.minutos);
+  }
+  return somarMinutos(minutos);
+}
+
+// Valida as linhas da aba "Serviço" (Story 5.5, reescrita na 7.3). Zero linhas
+// continua sendo um estado válido (Never: nunca exigir ao menos um serviço).
+// Pessoa e item revisional são obrigatórios em cada linha existente; o vínculo
+// cross-tenant de cada id é checado à parte pela Server Action, contra os dados
+// reais da conta (AD-1), do mesmo jeito que ativo/plano/responsável.
+//
+// Story 7.3 — é AQUI que a recusa da NFR7 nasce: toda entrada que
+// `src/lib/duracao.ts` não aceita vira erro NO CAMPO daquela linha, e uma linha
+// com erro nunca entra em `servicos`. Como a Server Action aborta inteira
+// quando `erros` não está vazio, nada é gravado pela metade (AD-30) — o
+// contrário do mockup, que devolve `0` em cada um desses casos.
 export function validarServicos(linhas: LinhaServicoBruta[]): {
   erros: ErroDeValidacao[];
   servicos: ServicoValidado[];
@@ -238,50 +388,89 @@ export function validarServicos(linhas: LinhaServicoBruta[]): {
 
   for (const linha of linhas) {
     const prefixo = `servico-${linha.indice}`;
+    const errosDaLinha: ErroDeValidacao[] = [];
+
     if (!linha.pessoaId) {
-      erros.push({ field: `${prefixo}-pessoaId`, message: "Selecione a pessoa do serviço." });
+      errosDaLinha.push({ field: `${prefixo}-pessoaId`, message: "Selecione a pessoa do serviço." });
     }
     if (!linha.itemRevisionalId) {
-      erros.push({
+      errosDaLinha.push({
         field: `${prefixo}-itemRevisionalId`,
         message: "Selecione o item trabalhado do serviço.",
       });
     }
 
+    // O <select> sempre manda um dos dois valores; um request adulterado com
+    // qualquer outro é recusado aqui e nunca chega ao Prisma (mesmo padrão de
+    // `setor` em validarCamposGerais).
+    if (!isModoValido(linha.modo)) {
+      errosDaLinha.push({
+        field: `${prefixo}-modo`,
+        message: "Selecione um modo de lançamento válido.",
+      });
+      erros.push(...errosDaLinha);
+      continue;
+    }
+
+    if (linha.modo === "Duracao") {
+      const resultado = interpretarDuracao(linha.horas);
+      if (resultado.tipo === "recusado") {
+        errosDaLinha.push({
+          field: `${prefixo}-horas`,
+          message: MENSAGEM_POR_MOTIVO_HORAS[resultado.motivo],
+        });
+      } else if (errosDaLinha.length === 0) {
+        servicos.push({
+          pessoaId: linha.pessoaId,
+          itemRevisionalId: linha.itemRevisionalId,
+          modo: "Duracao",
+          duracaoMinutos: resultado.minutos,
+        });
+      }
+
+      erros.push(...errosDaLinha);
+      continue;
+    }
+
+    // Modo `Periodo`: os dois marcos passam a ser OBRIGATÓRIOS (Design Notes —
+    // é o que permite a CHECK do banco apertar nesta story). parseDataHora é
+    // reusado, não reescrito.
     const inicio = parseDataHora(linha.inicio);
     const fim = parseDataHora(linha.fim);
     if (inicio === "invalido") {
-      erros.push({ field: `${prefixo}-inicio`, message: "Informe um início de serviço válido." });
+      errosDaLinha.push({ field: `${prefixo}-inicio`, message: "Informe um início de serviço válido." });
     }
     if (fim === "invalido") {
-      erros.push({ field: `${prefixo}-fim`, message: "Informe um fim de serviço válido." });
+      errosDaLinha.push({ field: `${prefixo}-fim`, message: "Informe um fim de serviço válido." });
     }
-
-    // Ordem cronológica da linha: só checável com os dois marcos preenchidos
-    // e válidos (ambos são opcionais, como na aba Geral).
-    const foraDeOrdem =
-      inicio instanceof Date && fim instanceof Date && fim.getTime() < inicio.getTime();
-    if (foraDeOrdem) {
-      erros.push({
+    if (inicio === null || fim === null) {
+      // Período incompleto — o erro vai para `-fim` (I/O Matrix), o campo que
+      // fecha o lançamento.
+      errosDaLinha.push({
         field: `${prefixo}-fim`,
-        message: "O fim do serviço não pode ser anterior ao início.",
+        message: "Informe o início e o fim do serviço.",
       });
     }
 
-    if (
-      linha.pessoaId &&
-      linha.itemRevisionalId &&
-      inicio !== "invalido" &&
-      fim !== "invalido" &&
-      !foraDeOrdem
-    ) {
-      servicos.push({
-        pessoaId: linha.pessoaId,
-        itemRevisionalId: linha.itemRevisionalId,
-        inicio,
-        fim,
-      });
+    if (inicio instanceof Date && fim instanceof Date) {
+      const resultado = duracaoDoPeriodo(inicio, fim);
+      if (resultado.tipo === "recusado") {
+        errosDaLinha.push({
+          field: `${prefixo}-fim`,
+          message: MENSAGEM_POR_MOTIVO_PERIODO[resultado.motivo],
+        });
+      } else if (errosDaLinha.length === 0) {
+        servicos.push({
+          pessoaId: linha.pessoaId,
+          itemRevisionalId: linha.itemRevisionalId,
+          modo: "Periodo",
+          inicio,
+          fim,
+        });
+      }
     }
+
+    erros.push(...errosDaLinha);
   }
 
   return { erros, servicos };

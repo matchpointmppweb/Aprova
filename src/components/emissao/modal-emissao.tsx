@@ -4,6 +4,11 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { StatusBadge } from "@/src/components/shared/status-badge";
+// Story 7.3 — `src/lib/duracao.ts` é a ÚNICA aritmética dos dois lados
+// (Boundaries): o cliente interpreta, formata e soma com as mesmas funções que
+// a Server Action usa para validar e gravar. Nenhum parse próprio, nenhum
+// `padStart`, nenhum teto reescrito aqui.
+import { DURACAO_INVALIDA, formatarMinutos } from "@/src/lib/duracao";
 import {
   aprovarEmissaoAction,
   criarEmissaoAction,
@@ -16,9 +21,12 @@ import {
   estadoInicialAcaoEmissao,
   LABEL_POR_SETOR,
   mensagemDeErro,
+  minutosAcumuladosDeServico,
+  minutosDaLinhaDeServico,
   SETOR_PADRAO,
   SETORES,
   type EstadoAcaoEmissao,
+  type ModoDeLancamento,
 } from "@/src/server/actions/emissao-estado";
 import { BADGE_POR_STATUS } from "./tipos";
 import type {
@@ -424,23 +432,51 @@ function LinhaItemEmissaoRow({ linha }: { linha: LinhaItem }) {
   );
 }
 
-// Uma linha da aba "Serviço" (Story 5.5). `indice` é só o que compõe o NOME
-// dos campos no FormData (`servico-{i}-*`, convenção indexada do
-// Boundaries); a identidade React da linha vem da `key` estável do chamador,
-// nunca do índice — remover uma linha do meio renumera os `name` sem
-// remontar os inputs não-controlados, preservando o que o usuário digitou
-// em cada linha remanescente.
+// Uma linha da aba "Serviço" (Story 5.5, reescrita como <tr> da tabela do
+// mockup na 7.3 — UX-DR16). `indice` é só o que compõe o NOME dos campos no
+// FormData (`servico-{i}-*`, convenção indexada do Boundaries); a identidade
+// React da linha vem da `key` estável do chamador, nunca do índice.
+//
+// Story 7.3 — a linha passa a ser CONTROLADA (Design Notes): o total da linha e
+// o acumulado do rodapé recalculam a cada tecla, e a coluna "Início / Horas"
+// troca de natureza conforme o modo. Os dois exigem que o componente conheça os
+// valores, o que inputs não-controlados não permitiam.
+type LinhaServico = {
+  chave: number;
+  pessoaId: string;
+  itemRevisionalId: string;
+  modo: ModoDeLancamento;
+  /// Texto do modo `Duracao` ("1:55"). O cliente NUNCA envia o total calculado
+  /// (AD-29) — o servidor reinterpreta este mesmo texto.
+  horas: string;
+  inicio: string;
+  fim: string;
+};
+
+function ErroDeCampo({ mensagem }: { mensagem: string | undefined }) {
+  if (!mensagem) return null;
+  return (
+    <div className="form-error" style={{ margin: "6px 0 0", padding: "6px 8px", fontSize: 11.5 }}>
+      {mensagem}
+    </div>
+  );
+}
+
 function LinhaServicoRow({
   indice,
-  inicial,
+  linha,
   pessoas,
   itensRevisionais,
+  erros,
+  onMudar,
   onRemover,
 }: {
   indice: number;
-  inicial: { pessoaId: string; itemRevisionalId: string; inicio: string; fim: string };
+  linha: LinhaServico;
   pessoas: PessoaOpcao[];
   itensRevisionais: ItemRevisionalOpcao[];
+  erros: Map<string, string>;
+  onMudar: (campos: Partial<LinhaServico>) => void;
   onRemover: () => void;
 }) {
   // Só itens revisionais "Ativo" ficam selecionáveis para um vínculo novo
@@ -448,50 +484,20 @@ function LinhaServicoRow({
   // função); o item que ESTA linha já referencia continua na lista mesmo se
   // arquivado depois, para a edição não perder o valor existente.
   const opcoesItem = itensRevisionais.filter(
-    (item) => item.status === "Ativo" || item.id === inicial.itemRevisionalId,
+    (item) => item.status === "Ativo" || item.id === linha.itemRevisionalId,
   );
+  const prefixo = `servico-${indice}`;
+  const total = minutosDaLinhaDeServico(linha);
 
   return (
-    <div className="servico-row">
-      <div className="f">
-        <label htmlFor={`servico-${indice}-pessoaId`}>Pessoa</label>
+    <tr>
+      <td>
         <select
-          id={`servico-${indice}-pessoaId`}
-          name={`servico-${indice}-pessoaId`}
-          defaultValue={inicial.pessoaId}
-        >
-          <option value="">Selecione a pessoa</option>
-          {pessoas.map((pessoa) => (
-            <option key={pessoa.id} value={pessoa.id}>
-              {pessoa.nome}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="f">
-        <label htmlFor={`servico-${indice}-inicio`}>Data/hora início</label>
-        <input
-          id={`servico-${indice}-inicio`}
-          name={`servico-${indice}-inicio`}
-          type="datetime-local"
-          defaultValue={inicial.inicio}
-        />
-      </div>
-      <div className="f">
-        <label htmlFor={`servico-${indice}-fim`}>Data/hora fim</label>
-        <input
-          id={`servico-${indice}-fim`}
-          name={`servico-${indice}-fim`}
-          type="datetime-local"
-          defaultValue={inicial.fim}
-        />
-      </div>
-      <div className="f">
-        <label htmlFor={`servico-${indice}-itemRevisionalId`}>Item trabalhado</label>
-        <select
-          id={`servico-${indice}-itemRevisionalId`}
-          name={`servico-${indice}-itemRevisionalId`}
-          defaultValue={inicial.itemRevisionalId}
+          id={`${prefixo}-itemRevisionalId`}
+          name={`${prefixo}-itemRevisionalId`}
+          aria-label="Item revisional"
+          value={linha.itemRevisionalId}
+          onChange={(evento) => onMudar({ itemRevisionalId: evento.target.value })}
         >
           <option value="">Selecione o item</option>
           {opcoesItem.map((item) => (
@@ -500,18 +506,97 @@ function LinhaServicoRow({
             </option>
           ))}
         </select>
-      </div>
-      <button
-        className="icon-btn servico-remove"
-        type="button"
-        title="Remover serviço"
-        onClick={onRemover}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
-        </svg>
-      </button>
-    </div>
+        <ErroDeCampo mensagem={erros.get(`${prefixo}-itemRevisionalId`)} />
+      </td>
+      <td>
+        <select
+          id={`${prefixo}-pessoaId`}
+          name={`${prefixo}-pessoaId`}
+          aria-label="Pessoa"
+          value={linha.pessoaId}
+          onChange={(evento) => onMudar({ pessoaId: evento.target.value })}
+        >
+          <option value="">Selecione a pessoa</option>
+          {pessoas.map((pessoa) => (
+            <option key={pessoa.id} value={pessoa.id}>
+              {pessoa.nome}
+            </option>
+          ))}
+        </select>
+        <ErroDeCampo mensagem={erros.get(`${prefixo}-pessoaId`)} />
+      </td>
+      <td>
+        <select
+          id={`${prefixo}-modo`}
+          name={`${prefixo}-modo`}
+          aria-label="Modo de lançamento"
+          value={linha.modo}
+          onChange={(evento) => onMudar({ modo: evento.target.value as ModoDeLancamento })}
+        >
+          <option value="Duracao">Apenas horas</option>
+          <option value="Periodo">Data/hora início e fim</option>
+        </select>
+        <ErroDeCampo mensagem={erros.get(`${prefixo}-modo`)} />
+      </td>
+      {/* A mesma célula hospeda os dois modos (mockup). Os NOMES continuam
+          distintos por modo de propósito (Design Notes): o campo do erro diz
+          qual regra falhou, e um erro de duração nunca aparece grudado num
+          input de data/hora que não está sequer na tela. O input do modo
+          inativo não é renderizado, então não entra no FormData. */}
+      {linha.modo === "Duracao" ? (
+        <>
+          <td>
+            <input
+              id={`${prefixo}-horas`}
+              name={`${prefixo}-horas`}
+              type="text"
+              inputMode="text"
+              placeholder="1:55"
+              aria-label="Horas trabalhadas"
+              value={linha.horas}
+              onChange={(evento) => onMudar({ horas: evento.target.value })}
+            />
+            <ErroDeCampo mensagem={erros.get(`${prefixo}-horas`)} />
+          </td>
+          <td className="muted">—</td>
+        </>
+      ) : (
+        <>
+          <td>
+            <input
+              id={`${prefixo}-inicio`}
+              name={`${prefixo}-inicio`}
+              type="datetime-local"
+              aria-label="Início do serviço"
+              value={linha.inicio}
+              onChange={(evento) => onMudar({ inicio: evento.target.value })}
+            />
+            <ErroDeCampo mensagem={erros.get(`${prefixo}-inicio`)} />
+          </td>
+          <td>
+            <input
+              id={`${prefixo}-fim`}
+              name={`${prefixo}-fim`}
+              type="datetime-local"
+              aria-label="Fim do serviço"
+              value={linha.fim}
+              onChange={(evento) => onMudar({ fim: evento.target.value })}
+            />
+            <ErroDeCampo mensagem={erros.get(`${prefixo}-fim`)} />
+          </td>
+        </>
+      )}
+      <td className="col-total">
+        {total.tipo === "ok" ? formatarMinutos(total.minutos) : DURACAO_INVALIDA}
+      </td>
+      <td className="col-acao-sv">
+        <button className="icon-btn" type="button" title="Remover serviço" onClick={onRemover}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+          </svg>
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -556,16 +641,22 @@ export function ModalEmissao({
   const [responsavelId, setResponsavelId] = useState(emissao?.responsavelId ?? "");
   const [setor, setSetor] = useState(emissao?.setor ?? SETOR_PADRAO);
 
-  // Linhas da aba Serviço: só a LISTA é estado (add/remover); os valores de
-  // cada linha ficam nos próprios inputs não-controlados, lidos do FormData
-  // no submit. `chave` é um contador local monotônico — nunca o índice do
-  // array (Boundaries): remover uma linha do meio com key=índice
-  // reembaralharia os defaultValue das linhas seguintes.
-  const [linhasServico, setLinhasServico] = useState(() =>
+  // Linhas da aba Serviço: agora TODO o valor é estado (Story 7.3/Design
+  // Notes) — o total da linha e o acumulado dependem dele. `chave` continua um
+  // contador local monotônico — nunca o índice do array (Boundaries): remover
+  // uma linha do meio com key=índice reembaralharia as linhas seguintes.
+  //
+  // A ida e volta da edição vive aqui: uma linha gravada como `Duracao` volta
+  // com o modo dela e com os minutos reformatados pelo MESMO `formatarMinutos`
+  // que o servidor reinterpreta com `interpretarDuracao` — "115" -> "1:55" ->
+  // 115. Sem isso, reabrir e salvar transformaria a linha em `Periodo` vazio.
+  const [linhasServico, setLinhasServico] = useState<LinhaServico[]>(() =>
     (emissao?.servicos ?? []).map((servico, indice) => ({
       chave: indice,
       pessoaId: servico.pessoaId,
       itemRevisionalId: servico.itemRevisionalId,
+      modo: servico.modo,
+      horas: servico.duracaoMinutos === null ? "" : formatarMinutos(servico.duracaoMinutos),
       inicio: paraDatetimeLocal(servico.inicio),
       fim: paraDatetimeLocal(servico.fim),
     })),
@@ -576,17 +667,35 @@ export function ModalEmissao({
   // mesma `key`.
   const proximaChave = useRef((emissao?.servicos.length ?? 0) + 1);
 
+  // Os erros de campo de serviço são indexados por POSIÇÃO
+  // (`servico-{i}-horas`) e vêm do último submit — remover uma linha acima da
+  // culpada faria a mensagem antiga pintar a linha errada. Qualquer mudança nas
+  // linhas os marca como obsoletos; só uma nova resposta da action os traz de
+  // volta.
+  const [errosDeServicoObsoletos, setErrosDeServicoObsoletos] = useState(false);
+
   const adicionarServico = () => {
+    setErrosDeServicoObsoletos(true);
     const chave = proximaChave.current;
     proximaChave.current += 1;
     setLinhasServico((atual) => [
       ...atual,
-      { chave, pessoaId: "", itemRevisionalId: "", inicio: "", fim: "" },
+      // Nasce em "Apenas horas", como no mockup: é o lançamento que a story
+      // existe para permitir.
+      { chave, pessoaId: "", itemRevisionalId: "", modo: "Duracao", horas: "", inicio: "", fim: "" },
     ]);
   };
 
   const removerServico = (chave: number) => {
+    setErrosDeServicoObsoletos(true);
     setLinhasServico((atual) => atual.filter((linha) => linha.chave !== chave));
+  };
+
+  const mudarServico = (chave: number, campos: Partial<LinhaServico>) => {
+    setErrosDeServicoObsoletos(true);
+    setLinhasServico((atual) =>
+      atual.map((linha) => (linha.chave === chave ? { ...linha, ...campos } : linha)),
+    );
   };
 
   useEffect(() => {
@@ -607,16 +716,44 @@ export function ModalEmissao({
   const [estadoTratado, setEstadoTratado] = useState(estado);
   if (estado !== estadoTratado) {
     setEstadoTratado(estado);
+    // Resposta nova: os erros de serviço dela descrevem as linhas atuais.
+    setErrosDeServicoObsoletos(false);
     if (
       !estado.ok &&
       Array.isArray(estado.error) &&
-      estado.error.some((item) => item.field.startsWith("servico-"))
+      // "servico" sem hífen: cobre tanto os campos indexados
+      // (`servico-{i}-horas`) quanto o desfecho de linha incoerente devolvido
+      // pelo repositório (`servico-lancamentos`).
+      estado.error.some((item) => item.field.startsWith("servico"))
     ) {
       setAba("servico");
     }
   }
 
   const erro = mensagemDeErro(estado.error);
+
+  // Erros por campo, para a mensagem aparecer NA célula culpada (a story) além
+  // do banner do topo.
+  const errosPorCampo = useMemo(() => {
+    const mapa = new Map<string, string>();
+    if (Array.isArray(estado.error)) {
+      for (const item of estado.error) {
+        // Um erro de serviço já obsoleto some por inteiro em vez de grudar
+        // numa linha que hoje é outra.
+        if (errosDeServicoObsoletos && item.field.startsWith("servico")) continue;
+        if (!mapa.has(item.field)) mapa.set(item.field, item.message);
+      }
+    }
+    return mapa;
+  }, [estado.error, errosDeServicoObsoletos]);
+
+  // Horas acumuladas: derivadas na exibição, NUNCA gravadas nem enviadas
+  // (AD-29). A regra de quem entra na soma vive em emissao-estado.ts, junto da
+  // validação que usa a mesma aritmética.
+  const minutosAcumulados = useMemo(
+    () => minutosAcumuladosDeServico(linhasServico),
+    [linhasServico],
+  );
 
   const itensRevisionaisPorId = useMemo(
     () => new Map(itensRevisionais.map((item) => [item.id, item])),
@@ -708,7 +845,9 @@ export function ModalEmissao({
   }, [emissao, trocouPlano, planoId, planos, itensRevisionaisPorId]);
 
   return (
-    <div className="modal-overlay" onClick={onFechar}>
+    // `modal-full` (Story 7.3, portado do mockup L1860): a tabela de serviços
+    // tem 7 colunas e não cabe nos 760px do modal padrão.
+    <div className="modal-overlay modal-full" onClick={onFechar}>
       <div className="modal" onClick={(evento) => evento.stopPropagation()}>
         <div className="modal-header">
           <h2>{emissao ? `Editar emissão · ${emissao.codigo}` : "Nova emissão"}</h2>
@@ -916,41 +1055,67 @@ export function ModalEmissao({
             </div>
 
             {/* Visibilidade por classe ".hidden" (mesmo padrão dos outros
-                painéis), NUNCA desmontando o conteúdo: os inputs das linhas
-                de serviço são não-controlados, desmontar o painel ao trocar
-                de aba perderia tudo o que foi digitado aqui antes do submit
-                (e tiraria os campos do FormData). */}
+                painéis), NUNCA desmontando o conteúdo: desmontar o painel ao
+                trocar de aba tiraria os campos de serviço do FormData, e o
+                submit gravaria zero linhas. */}
             <div className={`modal-tab-panel${aba === "servico" ? "" : " hidden"}`}>
               <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
-                Registre quem executou o serviço, o período trabalhado e o item revisional
-                relacionado (aba Itens).
+                Selecione o item revisional e informe as horas trabalhadas — lançando apenas a
+                duração (ex.: 1:55) ou data/hora de início e fim para o sistema calcular.
               </p>
               {/* Contagem explícita lida pelo servidor (lerServicos) junto
                   dos campos indexados `servico-{i}-*` — nunca getAll()
                   posicional (Boundaries). */}
               <input type="hidden" name="servicoCount" value={linhasServico.length} />
-              <div id="emissao-servico-list">
-                {linhasServico.length === 0 ? (
-                  <p className="muted" style={{ fontSize: 13, margin: "0 0 10px" }}>
-                    Nenhum serviço adicionado ainda.
-                  </p>
-                ) : null}
-                {linhasServico.map((linha, indice) => (
-                  <LinhaServicoRow
-                    key={linha.chave}
-                    indice={indice}
-                    inicial={linha}
-                    pessoas={pessoas}
-                    itensRevisionais={itensRevisionais}
-                    onRemover={() => removerServico(linha.chave)}
-                  />
-                ))}
+              <ErroDeCampo mensagem={errosPorCampo.get("servico-lancamentos")} />
+              <div className="table-wrap table-wrap-rolavel">
+                <table className="servicos-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Item revisional</th>
+                      <th scope="col">Pessoa</th>
+                      <th scope="col">Lançamento</th>
+                      <th scope="col">Início / Horas</th>
+                      <th scope="col">Fim</th>
+                      <th scope="col" className="col-total">Total</th>
+                      <th scope="col" className="col-acao-sv" />
+                    </tr>
+                  </thead>
+                  <tbody id="emissao-servico-list">
+                    {linhasServico.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="servicos-empty">
+                          Nenhum serviço adicionado ainda.
+                        </td>
+                      </tr>
+                    ) : null}
+                    {linhasServico.map((linha, indice) => (
+                      <LinhaServicoRow
+                        key={linha.chave}
+                        indice={indice}
+                        linha={linha}
+                        pessoas={pessoas}
+                        itensRevisionais={itensRevisionais}
+                        erros={errosPorCampo}
+                        onMudar={(campos) => mudarServico(linha.chave, campos)}
+                        onRemover={() => removerServico(linha.chave)}
+                      />
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={5}>Horas acumuladas de serviço</td>
+                      <td className="col-total">{formatarMinutos(minutosAcumulados)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
               <button
                 className="btn btn-ghost btn-sm"
                 type="button"
                 onClick={adicionarServico}
-                style={{ marginTop: 10 }}
+                style={{ marginTop: 12 }}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 5v14M5 12h14" />

@@ -5,6 +5,7 @@ import {
   atualizarEmissao,
   buscarEmissao,
   criarEmissao,
+  isViolacaoDeServicoIncoerente,
 } from "@/src/server/repositories/emissao";
 
 import { criarEmissaoCompleta, db, limparBanco } from "./setup/fixtures";
@@ -42,11 +43,16 @@ async function inserirServico(dados: {
 }
 
 describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
-  test("backfill: linha já existente fica com modo Periodo, com ou sem datas", async () => {
+  test("backfill: linha já existente fica com modo Periodo", async () => {
     const cenario = await criarEmissaoCompleta();
 
     // O caminho legado: escrita que não conhece os campos novos. É o mesmo
     // efeito que o DEFAULT da migration produziu nas linhas já gravadas.
+    //
+    // Story 7.3: a linha PRECISA agora trazer os dois marcos — o ramo `Periodo`
+    // da CHECK deixou de aceitar período sem datas (o caso "sem datas" migrou
+    // para a matriz de recusas abaixo). O que continua valendo, e é o ponto
+    // deste teste, é que a omissão de `modo` cai em `Periodo`.
     const comDatas = await db.servicoEmissao.create({
       data: {
         emissaoId: cenario.emissao.id,
@@ -56,17 +62,9 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         fim: new Date(Date.UTC(2026, 0, 15, 9, 55)),
       },
     });
-    const semDatas = await db.servicoEmissao.create({
-      data: {
-        emissaoId: cenario.emissao.id,
-        pessoaId: cenario.pessoa.id,
-        itemRevisionalId: cenario.item.id,
-      },
-    });
 
     expect(comDatas.modo).toBe("Periodo");
     expect(comDatas.duracaoMinutos).toBeNull();
-    expect(semDatas.modo).toBe("Periodo");
 
     // AC: "nenhuma linha fica com `modo` nulo". O Prisma nem deixa expressar a
     // pergunta (a coluna é NOT NULL no datamodel) — daí o SQL cru.
@@ -89,12 +87,17 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
     const cenario = await criarEmissaoCompleta();
 
     await db.$executeRawUnsafe(
-      `INSERT INTO "servicos_emissao" ("id","emissaoId","pessoaId","itemRevisionalId")
-       VALUES ($1,$2,$3,$4)`,
+      // `inicio`/`fim` vão explícitos porque o ramo `Periodo` da CHECK passou a
+      // exigi-los (Story 7.3) — a coluna que este teste OMITE, e cuja resposta
+      // ele quer do banco, continua sendo `modo`.
+      `INSERT INTO "servicos_emissao" ("id","emissaoId","pessoaId","itemRevisionalId","inicio","fim")
+       VALUES ($1,$2,$3,$4,$5,$6)`,
       "servico-sql-cru",
       cenario.emissao.id,
       cenario.pessoa.id,
       cenario.item.id,
+      new Date(Date.UTC(2026, 0, 15, 8, 0)),
+      new Date(Date.UTC(2026, 0, 15, 9, 0)),
     );
 
     const [linha] = await db.$queryRawUnsafe<{ modo: string }[]>(
@@ -228,6 +231,62 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
       ).rejects.toThrow();
       expect(await db.servicoEmissao.count()).toBe(1);
     });
+
+    // Story 7.3 — o ramo `Periodo`, que a 7.1 deixou frouxo de propósito e só
+    // agora pôde apertar (a Server Action passou a exigir os dois marcos e a
+    // validar o intervalo ANTES). A CHECK recusa exatamente o que
+    // `duracaoDoPeriodo` recusa: nem mais (período que a tela aceita e o banco
+    // rejeita), nem menos (linha que o módulo não sabe ler).
+    describe("ramo Periodo (Story 7.3)", () => {
+      const MARCO = new Date(Date.UTC(2026, 0, 15, 8, 0));
+
+      test.each([
+        ["sem nenhum marco", { inicio: null, fim: null }],
+        ["só com o início", { inicio: MARCO, fim: null }],
+        ["só com o fim", { inicio: null, fim: MARCO }],
+        [
+          "com fim anterior ao início",
+          { inicio: MARCO, fim: new Date(Date.UTC(2026, 0, 15, 7, 0)) },
+        ],
+        ["com fim igual ao início", { inicio: MARCO, fim: MARCO }],
+      ])("Periodo %s é recusado", async (_rotulo, marcos) => {
+        const cenario = await criarEmissaoCompleta();
+        await expect(
+          inserirServico({
+            emissaoId: cenario.emissao.id,
+            pessoaId: cenario.pessoa.id,
+            itemRevisionalId: cenario.item.id,
+            modo: "Periodo",
+            ...marcos,
+          }),
+        ).rejects.toThrow();
+        expect(await db.servicoEmissao.count()).toBe(0);
+      });
+
+      // AC: "o mesmo número nos três" — TETO_DE_MINUTOS, a cláusula do ramo
+      // Duracao e a do ramo Periodo. O intervalo exato passa, um minuto além é
+      // recusado; se a migration for reescrita com outro limite num dos ramos,
+      // este teste ou o irmão acima quebra.
+      test("o teto do ramo Periodo é o mesmo TETO_DE_MINUTOS", async () => {
+        const cenario = await criarEmissaoCompleta();
+        const base = {
+          emissaoId: cenario.emissao.id,
+          pessoaId: cenario.pessoa.id,
+          itemRevisionalId: cenario.item.id,
+          modo: "Periodo" as const,
+          inicio: MARCO,
+        };
+        const depoisDe = (minutos: number) => new Date(MARCO.getTime() + minutos * 60_000);
+
+        await inserirServico({ ...base, fim: depoisDe(TETO_DE_MINUTOS) });
+        expect(await db.servicoEmissao.count()).toBe(1);
+
+        await expect(
+          inserirServico({ ...base, fim: depoisDe(TETO_DE_MINUTOS + 1) }),
+        ).rejects.toThrow();
+        expect(await db.servicoEmissao.count()).toBe(1);
+      });
+    });
   });
 
   // O repositório é o que a 7.3 vai usar para gravar: os dois campos precisam
@@ -337,6 +396,107 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
       expect(relida?.servicos[0].duracaoMinutos).toBe(115);
     });
 
+    // I/O Matrix "Violação da CHECK" (Story 7.3): uma escrita incoerente que
+    // escape da validação vira DESFECHO CLASSIFICADO, nunca erro cru do Prisma
+    // subindo como 500. A linha abaixo passa pelo tipo (é o ramo legado, com
+    // marcos opcionais) e é o banco quem a recusa — exatamente o cenário de
+    // "validação e CHECK divergiram".
+    test("escrita incoerente vira motivo servico-incoerente, não exceção", async () => {
+      const cenario = await criarEmissaoCompleta();
+
+      const criada = await criarEmissao(cenario.conta.id, {
+        ativoId: cenario.ativo.id,
+        planoId: cenario.plano.id,
+        responsavelId: cenario.identidade.id,
+        dataEmissao: new Date(Date.UTC(2026, 1, 6)),
+        setor: "Manutencao",
+        dataAgendamento: null,
+        dataInicio: null,
+        dataFim: null,
+        itens: [],
+        servicos: [],
+      });
+
+      const resultado = await atualizarEmissao(
+        cenario.conta.id,
+        criada.id,
+        criada.updatedAt,
+        {
+          ativoId: cenario.ativo.id,
+          planoId: cenario.plano.id,
+          responsavelId: cenario.identidade.id,
+          dataEmissao: new Date(Date.UTC(2026, 1, 6)),
+          setor: "Manutencao",
+          dataAgendamento: null,
+          dataInicio: null,
+          dataFim: null,
+          trocouPlano: false,
+          itens: [],
+          servicos: [
+            {
+              pessoaId: cenario.pessoa.id,
+              itemRevisionalId: cenario.item.id,
+              inicio: null,
+              fim: null,
+            },
+          ],
+        },
+      );
+
+      expect(resultado).toEqual({ ok: false, motivo: "servico-incoerente" });
+      // A transação abortou por inteiro — nada gravado pela metade (AD-9).
+      expect(await db.servicoEmissao.count()).toBe(0);
+    });
+
+    // O irmão do teste acima no caminho de CRIAÇÃO — que grava por nested
+    // create, não por createMany. A mensagem de erro do Prisma pode ter outra
+    // forma nos dois caminhos; se tiver, a criação cairia em ERRO_GENERICO e o
+    // modal nem trocaria de aba. Só um teste contra o banco real percebe.
+    test("criarEmissao com linha incoerente é classificado como violação da CHECK", async () => {
+      const cenario = await criarEmissaoCompleta();
+      const emissoesAntes = await db.emissao.count();
+
+      const criar = criarEmissao(cenario.conta.id, {
+        ativoId: cenario.ativo.id,
+        planoId: cenario.plano.id,
+        responsavelId: cenario.identidade.id,
+        dataEmissao: new Date(Date.UTC(2026, 1, 7)),
+        setor: "Manutencao",
+        dataAgendamento: null,
+        dataInicio: null,
+        dataFim: null,
+        itens: [],
+        servicos: [
+          // Ramo LEGADO: passa pelo tipo (marcos opcionais) e é o banco quem
+          // recusa — o cenário "validação e CHECK divergiram".
+          {
+            pessoaId: cenario.pessoa.id,
+            itemRevisionalId: cenario.item.id,
+            inicio: null,
+            fim: null,
+          },
+        ],
+      });
+
+      const lancado = await criar.then(
+        () => null,
+        (erro: unknown) => erro ?? new Error("rejeitou sem erro"),
+      );
+      expect(lancado).not.toBeNull();
+      expect(isViolacaoDeServicoIncoerente(lancado)).toBe(true);
+      // A transação abortou por inteiro: nem emissão, nem serviço (AD-9).
+      expect(await db.emissao.count()).toBe(emissoesAntes);
+      expect(await db.servicoEmissao.count()).toBe(0);
+    });
+
+    // O caso negativo: sem ele, um `isViolacaoDeServicoIncoerente` que
+    // devolvesse `true` para tudo passaria nos dois testes acima — e toda falha
+    // de escrita viraria "revise as horas lançadas".
+    test("um erro qualquer NÃO é classificado como violação da CHECK", () => {
+      expect(isViolacaoDeServicoIncoerente(new Error("falha de conexão"))).toBe(false);
+      expect(isViolacaoDeServicoIncoerente("servicos_emissao_modo_coerente")).toBe(false);
+    });
+
     // I/O Matrix "Escrita legada": o caminho atual (Server Action da 5.5, não
     // tocada nesta story) não informa os campos novos e continua gravando.
     test("escrita sem modo cai em Periodo", async () => {
@@ -356,8 +516,10 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
           {
             pessoaId: cenario.pessoa.id,
             itemRevisionalId: cenario.item.id,
-            inicio: null,
-            fim: null,
+            // Story 7.3: o caminho legado continua compilando sem os campos
+            // novos, mas os marcos deixaram de ser opcionais no banco.
+            inicio: new Date(Date.UTC(2026, 1, 4, 8, 0)),
+            fim: new Date(Date.UTC(2026, 1, 4, 10, 0)),
           },
         ],
       });

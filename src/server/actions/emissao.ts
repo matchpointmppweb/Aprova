@@ -11,6 +11,7 @@ import {
   atualizarStatusEmissao,
   buscarEmissao,
   criarEmissao,
+  isViolacaoDeServicoIncoerente,
   type DadosEditarEmissao,
   type DadosItemExecutadoExistente,
   type DadosItemExecutadoNovo,
@@ -24,6 +25,7 @@ import {
   ERRO_CONFLITO_EDICAO,
   ERRO_TRANSICAO_INVALIDA,
   isSetorValido,
+  lerServicos,
   parseDataHora,
   SETOR_PADRAO,
   validarCamposGerais,
@@ -39,6 +41,16 @@ const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.
 // eventual colisão de código sob concorrência que tenha esgotado as
 // tentativas de retry (I/O Matrix: "falha genérica após esgotar").
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
+
+// Story 7.3 — a CHECK do banco recusou uma linha de serviço que a validação
+// deixou passar (os dois lados divergiram). Vira erro de CAMPO da aba Serviço,
+// nunca um erro cru do Prisma nem um 500 (I/O Matrix: "Violação da CHECK"). O
+// `field` começa com "servico" de propósito: é o que traz o modal para a aba
+// certa (modal-emissao.tsx).
+const ERRO_SERVICO_INCOERENTE: ErroDeValidacao = {
+  field: "servico-lancamentos",
+  message: "Revise as horas lançadas na aba Serviço — um dos lançamentos é inválido.",
+};
 
 // Campo numérico opcional (usado só para os campos de medição
 // itemMedicaoDias/Km/Horas): string vazia/ausente -> null; valor inválido
@@ -100,45 +112,6 @@ function lerCamposGerais(formData: FormData) {
     dataInicio,
     dataFim,
   };
-}
-
-// Linhas da aba "Serviço" (Story 5.5). Convenção do Boundaries: contagem
-// explícita em `servicoCount` + campos indexados `servico-{i}-*` — NUNCA
-// getAll() posicional, que embaralharia as colunas quando um campo vem
-// vazio/desabilitado. Um índice cuja linha não tem NENHUM campo preenchido
-// é ignorado (linha fantasma), mas uma linha parcialmente preenchida cai na
-// validação de campo obrigatório de validarServicos.
-const MAX_LINHAS_SERVICO = 200;
-
-// Acima do teto a requisição é REJEITADA, nunca truncada: truncar salvaria
-// um subconjunto silencioso das linhas enviadas e ainda responderia ok.
-const ERRO_EXCESSO_SERVICOS = `Uma emissão aceita no máximo ${MAX_LINHAS_SERVICO} serviços.`;
-
-function lerServicos(
-  formData: FormData,
-): { ok: true; linhas: LinhaServicoBruta[] } | { ok: false; erro: string } {
-  const totalBruto = Number(String(formData.get("servicoCount") ?? "0").trim());
-  if (!Number.isFinite(totalBruto) || !Number.isInteger(totalBruto) || totalBruto <= 0) {
-    return { ok: true, linhas: [] };
-  }
-  if (totalBruto > MAX_LINHAS_SERVICO) {
-    return { ok: false, erro: ERRO_EXCESSO_SERVICOS };
-  }
-  const total = totalBruto;
-
-  const linhas: LinhaServicoBruta[] = [];
-  for (let indice = 0; indice < total; indice++) {
-    const pessoaId = String(formData.get(`servico-${indice}-pessoaId`) ?? "").trim();
-    const itemRevisionalId = String(
-      formData.get(`servico-${indice}-itemRevisionalId`) ?? "",
-    ).trim();
-    const inicio = String(formData.get(`servico-${indice}-inicio`) ?? "").trim();
-    const fim = String(formData.get(`servico-${indice}-fim`) ?? "").trim();
-
-    if (!pessoaId && !itemRevisionalId && !inicio && !fim) continue;
-    linhas.push({ indice, pessoaId, itemRevisionalId, inicio, fim });
-  }
-  return { ok: true, linhas };
 }
 
 // Estreita os campos da Story 5.5 já validados para a forma que o
@@ -349,7 +322,10 @@ export async function criarEmissaoAction(
       servicos,
       itens,
     });
-  } catch {
+  } catch (erro) {
+    if (isViolacaoDeServicoIncoerente(erro)) {
+      return { ok: false, error: [ERRO_SERVICO_INCOERENTE] };
+    }
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -460,10 +436,16 @@ export async function editarEmissaoAction(
       if (resultado.motivo === "conflito") {
         return { ok: false, error: ERRO_CONFLITO_EDICAO };
       }
+      if (resultado.motivo === "servico-incoerente") {
+        return { ok: false, error: [ERRO_SERVICO_INCOERENTE] };
+      }
       // Emissão não encontrada nesta conta (AD-1) — nunca expõe detalhe.
       return { ok: false, error: ERRO_GENERICO };
     }
-  } catch {
+  } catch (erro) {
+    if (isViolacaoDeServicoIncoerente(erro)) {
+      return { ok: false, error: [ERRO_SERVICO_INCOERENTE] };
+    }
     return { ok: false, error: ERRO_GENERICO };
   }
 

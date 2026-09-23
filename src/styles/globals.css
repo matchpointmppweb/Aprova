@@ -287,6 +287,10 @@ button{font-family:inherit;}
 
 table{width:100%;border-collapse:collapse;background:var(--white);}
 .table-wrap{border:1px solid var(--line);border-radius:var(--radius-m);overflow:hidden;}
+/* Irmã de .table-wrap para tabelas largas (a de serviços tem 7 colunas): em
+   tela estreita o `overflow:hidden` cortava a coluna Total e o botão de
+   remover, sem rolagem possível. Só quem pede a classe rola. */
+.table-wrap-rolavel{overflow-x:auto;}
 thead th{
   text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;
   color:var(--ink-soft);font-weight:500;padding:11px 16px;background:var(--paper-2);
@@ -403,15 +407,39 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .item-fields .f label{font-size:10.5px;}
 .item-obs{flex:1;min-width:180px;}
 
-/* Linhas da aba "Serviço" do modal de Emissão (Story 5.5) — portado de
-   Mockups/Mochup_atual.html:381-385. */
-.servico-row{
-  display:flex;gap:10px;align-items:flex-end;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;
+/* Modal em tela cheia, à direita do menu (Story 7.3) — portado de
+   Mockups/atual.html:387-396. O top/left espelham a altura da .topbar (58px) e
+   a largura da .sidebar (224px) definidas acima; mudá-las aqui sem mudar lá
+   descola o modal do chrome. */
+.modal-overlay.modal-full{
+  top:58px;left:224px;right:0;bottom:0;
+  padding:0;align-items:stretch;justify-content:stretch;background:rgba(10,18,14,0.28);
 }
-.servico-row:last-child{border-bottom:none;}
-.servico-row .f{flex:1;min-width:150px;}
-.servico-row .f label{font-size:10.5px;}
-.servico-remove{flex:none;}
+.modal-overlay.modal-full .modal{
+  width:100%;max-width:none;height:100%;max-height:none;border-radius:0;
+}
+.modal-overlay.modal-full .modal-body{padding:22px 28px;}
+.modal-overlay.modal-full .modal-grid{grid-template-columns:repeat(4,1fr);}
+
+/* Tabela da aba "Serviço" do modal de Emissão (Story 7.3, UX-DR16) — portada
+   de Mockups/atual.html:466-481. Substitui a lista de cartões .servico-row da
+   Story 5.5, aposentada nesta story. */
+.servicos-table{width:100%;border-collapse:collapse;background:var(--white);}
+.servicos-table th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
+  color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);
+  background:var(--paper-2);white-space:nowrap;
+}
+.servicos-table td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+.servicos-table tr:last-child td{border-bottom:none;}
+.servicos-table select,.servicos-table input{
+  width:100%;padding:7px 9px;border:1px solid var(--line-strong);border-radius:var(--radius-s);
+  font-size:12.5px;font-family:inherit;background:var(--white);color:var(--ink);
+}
+.servicos-table .col-total{white-space:nowrap;font-weight:600;text-align:right;}
+.servicos-table .col-acao-sv{width:44px;text-align:center;}
+.servicos-table tfoot td{background:var(--paper-2);font-weight:600;border-top:1px solid var(--line);}
+.servicos-empty{padding:18px;text-align:center;color:var(--ink-soft);font-size:13px;}
 
 /* ---------- MAP PICKER (polígono de local) ---------- */
 .map-field{margin-top:16px;}
@@ -437,4 +465,8 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
   .panel-grid{grid-template-columns:1fr;}
   .palette-grid{grid-template-columns:repeat(2,1fr);}
   .modal-grid{grid-template-columns:1fr;}
+  /* Story 7.3, portado do mockup L497-498: sem o menu lateral à esquerda, o
+     modal cheio ocupa a largura toda. */
+  .modal-overlay.modal-full{left:0;}
+  .modal-overlay.modal-full .modal-grid{grid-template-columns:1fr 1fr;}
 }

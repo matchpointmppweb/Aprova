@@ -16,20 +16,18 @@
 // de três dias. Um teto de 24h só na duração tornaria o mesmo fato registrável
 // num modo e proibido no outro.
 //
-// ASSIMETRIA REGISTRADA: no BANCO o teto vale hoje só para o ramo `Duracao` da
-// CHECK. O ramo `Periodo` não impõe nada sobre `inicio`/`fim`, então um período
-// de dez anos é gravável por SQL cru, embora `duracaoDoPeriodo` o recuse — o
-// módulo é mais estrito que o banco nesse caminho. Não é descuido: a 7.1 deixou
-// o ramo `Periodo` frouxo de propósito (a UI de hoje ainda produz linha sem
-// datas), e apertá-lo exige primeiro a Story 7.3, que passa a exigir os dois
-// marcos e valida o intervalo ANTES de o banco precisar recusar. Enquanto isso,
-// nenhum caminho da aplicação grava período fora do teto, porque todos passam
-// por aqui.
+// ASSIMETRIA FECHADA (Story 7.3): o teto vale agora nos DOIS ramos da CHECK. A
+// 7.1 deixou o ramo `Periodo` frouxo de propósito — ele não dizia nada sobre
+// `inicio`/`fim`, e um período de dez anos era gravável por SQL cru embora
+// `duracaoDoPeriodo` o recusasse. A 7.3 apertou esse ramo: `Periodo` exige os
+// dois marcos, `fim` depois de `inicio`, e o intervalo dentro do mesmo teto.
+// Banco e módulo recusam hoje exatamente o mesmo conjunto de períodos.
 //
-// ESTE NÚMERO É A FONTE ÚNICA. A cláusula da CHECK
-// `servicos_emissao_modo_coerente` (migration 20260922150000) usa o mesmo
-// 44640; divergir recria em silêncio o problema que esta story fecha, e é o
-// teste `tests/servico-emissao.test.ts` que guarda a igualdade.
+// ESTE NÚMERO É A FONTE ÚNICA. A cláusula vigente da CHECK
+// `servicos_emissao_modo_coerente` (migration 20260923120000, que substituiu a
+// da 20260922150000) usa o mesmo 44640 nos dois ramos; divergir recria em
+// silêncio o problema que esta story fecha, e é o teste
+// `tests/servico-emissao.test.ts` que guarda a igualdade.
 export const TETO_DE_MINUTOS = 44_640;
 
 // Recusa DISCRIMINADA, no padrão de `ResolucaoDeVinculo` (Epic 6): o campo
