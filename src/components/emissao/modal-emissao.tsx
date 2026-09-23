@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { StatusBadge } from "@/src/components/shared/status-badge";
@@ -26,8 +26,8 @@ import {
   lancamentosDoItem,
   linhaDeServicoDaCaixa,
   mensagemDeErro,
-  minutosAcumuladosDeServico,
   minutosDaLinhaDeServico,
+  resumoDaEmissao,
   SETOR_PADRAO,
   SETORES,
   validarLancamentoDaCaixa,
@@ -976,14 +976,6 @@ export function ModalEmissao({
     return mapa;
   }, [estado.error, errosDeServicoObsoletos]);
 
-  // Horas acumuladas: derivadas na exibição, NUNCA gravadas nem enviadas
-  // (AD-29). A regra de quem entra na soma vive em emissao-estado.ts, junto da
-  // validação que usa a mesma aritmética.
-  const minutosAcumulados = useMemo(
-    () => minutosAcumuladosDeServico(linhasServico),
-    [linhasServico],
-  );
-
   const itensRevisionaisPorId = useMemo(
     () => new Map(itensRevisionais.map((item) => [item.id, item])),
     [itensRevisionais],
@@ -1096,6 +1088,33 @@ export function ModalEmissao({
       Object.fromEntries(linhas.map((linha) => [linha.itemRevisionalId, linha.executadoInicial])),
     );
   }
+
+  // A precedência do `executado` vive num lugar só (o comentário de
+  // emissao-estado.ts conta com isso): entrada ausente no mapa cai no
+  // `executadoInicial` da própria linha, nunca num `false` cego — `linhas` é um
+  // useMemo que pode ganhar um item sem que `origemDasLinhas` mude, e um
+  // `false` aqui gravaria "não executado" para um item que estava executado.
+  // Os três consumidores (checkbox, estado derivado e a faixa de resumo) leem
+  // este helper.
+  const executadoDaLinha = useCallback(
+    (linha: LinhaItem) => executados[linha.itemRevisionalId] ?? linha.executadoInicial,
+    [executados],
+  );
+
+  // Story 7.4 (parte 2) — a faixa de cinco indicadores da aba Geral (UX-DR18).
+  // Nenhum dos cinco é gravado, lido do banco ou enviado no FormData (AD-29):
+  // todos derivam do estado que o modal já mantém, e recalculam a cada marcação
+  // de item ou lançamento sem nenhum submit. A soma de minutos sai DAQUI e
+  // alimenta também o rodapé da aba Serviço — uma origem só, para os dois
+  // números da mesma tela nunca discordarem.
+  const resumo = useMemo(
+    () =>
+      resumoDaEmissao({
+        itens: linhas.map((linha) => ({ executado: executadoDaLinha(linha) })),
+        lancamentos: linhasServico,
+      }),
+    [linhas, executadoDaLinha, linhasServico],
+  );
 
   const marcarItem = (itemRevisionalId: string, marcado: boolean) => {
     setExecutados((atual) => ({ ...atual, [itemRevisionalId]: marcado }));
@@ -1269,47 +1288,87 @@ export function ModalEmissao({
                     ))}
                   </select>
                 </div>
-                <div className="f">
-                  <label htmlFor="emissao-data">Data de emissão</label>
-                  <input
-                    id="emissao-data"
-                    name="dataEmissao"
-                    type="date"
-                    required
-                    defaultValue={
-                      emissao ? emissao.dataEmissao.toISOString().slice(0, 10) : undefined
-                    }
-                  />
+                {/* Story 7.4 — as quatro datas agrupadas em `date-row`
+                    (mockup L1884). O agrupamento é só de LAYOUT: nenhum dos
+                    quatro campos muda de natureza — a data de emissão continua
+                    editável e enviada pelo formulário (torná-la somente leitura
+                    é a 7.5, AD-33). */}
+                <div className="date-row">
+                  <div className="f">
+                    <label htmlFor="emissao-data">Data de emissão</label>
+                    <input
+                      id="emissao-data"
+                      name="dataEmissao"
+                      type="date"
+                      required
+                      defaultValue={
+                        emissao ? emissao.dataEmissao.toISOString().slice(0, 10) : undefined
+                      }
+                    />
+                  </div>
+                  {/* Story 5.5: os três marcos são OPCIONAIS (sem `required`) —
+                      uma emissão continua salvável só com a data de emissão. */}
+                  <div className="f">
+                    <label htmlFor="emissao-data-agendamento">Data agendamento</label>
+                    <input
+                      id="emissao-data-agendamento"
+                      name="dataAgendamento"
+                      type="datetime-local"
+                      defaultValue={paraDatetimeLocal(emissao?.dataAgendamento ?? null)}
+                    />
+                  </div>
+                  <div className="f">
+                    <label htmlFor="emissao-data-inicio">Data início</label>
+                    <input
+                      id="emissao-data-inicio"
+                      name="dataInicio"
+                      type="datetime-local"
+                      defaultValue={paraDatetimeLocal(emissao?.dataInicio ?? null)}
+                    />
+                  </div>
+                  <div className="f">
+                    <label htmlFor="emissao-data-fim">Data fim</label>
+                    <input
+                      id="emissao-data-fim"
+                      name="dataFim"
+                      type="datetime-local"
+                      defaultValue={paraDatetimeLocal(emissao?.dataFim ?? null)}
+                    />
+                  </div>
                 </div>
-                {/* Story 5.5: os três marcos são OPCIONAIS (sem `required`) —
-                    uma emissão continua salvável só com a data de emissão. */}
-                <div className="f">
-                  <label htmlFor="emissao-data-agendamento">Data agendamento</label>
-                  <input
-                    id="emissao-data-agendamento"
-                    name="dataAgendamento"
-                    type="datetime-local"
-                    defaultValue={paraDatetimeLocal(emissao?.dataAgendamento ?? null)}
-                  />
-                </div>
-                <div className="f">
-                  <label htmlFor="emissao-data-inicio">Data início</label>
-                  <input
-                    id="emissao-data-inicio"
-                    name="dataInicio"
-                    type="datetime-local"
-                    defaultValue={paraDatetimeLocal(emissao?.dataInicio ?? null)}
-                  />
-                </div>
-                <div className="f">
-                  <label htmlFor="emissao-data-fim">Data fim</label>
-                  <input
-                    id="emissao-data-fim"
-                    name="dataFim"
-                    type="datetime-local"
-                    defaultValue={paraDatetimeLocal(emissao?.dataFim ?? null)}
-                  />
-                </div>
+                {/* UX-DR18 — os cinco indicadores DERIVADOS, DEPOIS do bloco de
+                    datas (mockup L1884-1896: `date-row` e em seguida
+                    `resumo-row`). Nenhum deles tem `name`: nada aqui viaja no
+                    FormData nem existe como coluna.
+
+                    <dl>/<dt>/<dd> em vez de divs nus: a ligação rótulo-valor
+                    deixa de ser só visual. As classes do mockup (AD-4) são
+                    mantidas. `aria-live="polite"` porque os valores mudam ao
+                    vivo, sem submit — é justamente o ponto da funcionalidade. */}
+                <dl className="resumo-row" aria-live="polite">
+                  <div className="resumo-card">
+                    <dt className="rl">Horas acumuladas de serviço</dt>
+                    <dd className="rv">{formatarMinutos(resumo.minutosAcumulados)}</dd>
+                  </div>
+                  <div className="resumo-card">
+                    <dt className="rl">Lançamentos de serviço</dt>
+                    <dd className="rv">{resumo.lancamentosDeServico}</dd>
+                  </div>
+                  <div className="resumo-card">
+                    <dt className="rl">Itens executados</dt>
+                    <dd className="rv">
+                      {resumo.itensExecutados} de {resumo.totalDeItens}
+                    </dd>
+                  </div>
+                  <div className="resumo-card">
+                    <dt className="rl">Itens não executados</dt>
+                    <dd className="rv">{resumo.itensPendentes}</dd>
+                  </div>
+                  <div className="resumo-card">
+                    <dt className="rl">% executado</dt>
+                    <dd className="rv">{resumo.percentualExecutado}%</dd>
+                  </div>
+                </dl>
               </div>
             </div>
 
@@ -1342,17 +1401,11 @@ export function ModalEmissao({
                         <LinhaItemEmissaoRow
                           key={`${planoId}-${linha.itemRevisionalId}`}
                           linha={linha}
-                          // Entrada ausente cai no `executadoInicial` da própria
-                          // linha, nunca num `false` cego: `linhas` é um useMemo
-                          // que pode ganhar um item sem que `origemDasLinhas`
-                          // mude, e um `false` aqui gravaria "não executado"
-                          // para um item que estava executado.
-                          marcado={executados[linha.itemRevisionalId] ?? linha.executadoInicial}
+                          marcado={executadoDaLinha(linha)}
                           onMarcar={(marcado) => marcarItem(linha.itemRevisionalId, marcado)}
                           estado={estadoDerivadoDoItem({
                             itemRevisionalId: linha.itemRevisionalId,
-                            executado:
-                              executados[linha.itemRevisionalId] ?? linha.executadoInicial,
+                            executado: executadoDaLinha(linha),
                             lancamentos: linhasServico,
                           })}
                           lancamentos={lancamentosDoItem(linhasServico, linha.itemRevisionalId)}
@@ -1418,7 +1471,10 @@ export function ModalEmissao({
                   <tfoot>
                     <tr>
                       <td colSpan={5}>Horas acumuladas de serviço</td>
-                      <td className="col-total">{formatarMinutos(minutosAcumulados)}</td>
+                      {/* MESMO valor do cartão de horas da aba Geral — uma
+                          origem só (`resumo.minutosAcumulados`), para os dois
+                          números nunca divergirem em silêncio. */}
+                      <td className="col-total">{formatarMinutos(resumo.minutosAcumulados)}</td>
                       <td />
                     </tr>
                   </tfoot>

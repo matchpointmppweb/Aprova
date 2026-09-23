@@ -9,6 +9,7 @@ import {
   linhaDeServicoDaCaixa,
   minutosAcumuladosDeServico,
   minutosDaLinhaDeServico,
+  resumoDaEmissao,
   validarLancamentoDaCaixa,
   validarServicos,
   type LinhaServicoBruta,
@@ -602,6 +603,149 @@ describe("linhaDeServicoDaCaixa", () => {
       tipo: "ok",
       minutos: 115,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.4 (parte 2) — a faixa de resumo da aba Geral (UX-DR18/AD-29)
+// ---------------------------------------------------------------------------
+// O que estes testes prendem, e que nada mais prende: que o denominador é o
+// total de itens DESTA emissão (o mockup usa `ITENS_CATALOG.length`, L2263),
+// que a emissão vazia nunca divide por zero, que o percentual é inteiro, e a
+// assimetria do Design Notes — a linha recusada CONTA em "Lançamentos" e NÃO
+// soma em "Horas".
+describe("resumoDaEmissao", () => {
+  function item(executado: boolean) {
+    return { executado };
+  }
+  function derivavel(overrides: Partial<LinhaServicoDerivavel> = {}): LinhaServicoDerivavel {
+    return { modo: "Duracao", horas: "", inicio: "", fim: "", ...overrides };
+  }
+
+  test("emissão em andamento: os cinco valores da matriz", () => {
+    const resumo = resumoDaEmissao({
+      itens: [true, true, true, false, false, false, false, false].map(item),
+      lancamentos: [
+        derivavel({ horas: "1:55" }),
+        derivavel({ modo: "Periodo", inicio: "2026-01-15T08:00", fim: "2026-01-15T09:00" }),
+      ],
+    });
+
+    expect(resumo).toEqual({
+      minutosAcumulados: 175,
+      lancamentosDeServico: 2,
+      itensExecutados: 3,
+      totalDeItens: 8,
+      itensPendentes: 5,
+      percentualExecutado: 38,
+    });
+  });
+
+  // Divisão por zero: sem o guarda, `0/0` é NaN e o cartão exibe "NaN%".
+  test("emissão vazia: zeros honestos, nunca NaN", () => {
+    expect(resumoDaEmissao({ itens: [], lancamentos: [] })).toEqual({
+      minutosAcumulados: 0,
+      lancamentosDeServico: 0,
+      itensExecutados: 0,
+      totalDeItens: 0,
+      itensPendentes: 0,
+      percentualExecutado: 0,
+    });
+  });
+
+  test("tudo executado fecha em 100% e zero pendentes", () => {
+    const resumo = resumoDaEmissao({ itens: [true, true, true, true].map(item), lancamentos: [] });
+    expect(resumo.itensExecutados).toBe(4);
+    expect(resumo.totalDeItens).toBe(4);
+    expect(resumo.itensPendentes).toBe(0);
+    expect(resumo.percentualExecutado).toBe(100);
+  });
+
+  test("nada executado fica em 0% com todos pendentes", () => {
+    const resumo = resumoDaEmissao({
+      itens: [false, false, false, false, false].map(item),
+      lancamentos: [],
+    });
+    expect(resumo.itensExecutados).toBe(0);
+    expect(resumo.totalDeItens).toBe(5);
+    expect(resumo.itensPendentes).toBe(5);
+    expect(resumo.percentualExecutado).toBe(0);
+  });
+
+  // Inteiro, nunca fração: 1/3 = 33.333… precisa virar 33, não 33.33333.
+  test("o percentual é arredondado para inteiro", () => {
+    const resumo = resumoDaEmissao({ itens: [true, false, false].map(item), lancamentos: [] });
+    expect(resumo.percentualExecutado).toBe(33);
+    expect(Number.isInteger(resumo.percentualExecutado)).toBe(true);
+  });
+
+  // Prende o arredondamento nos DOIS sentidos: com só 1/3 → 33 acima,
+  // `Math.floor` passaria igual. 2/3 = 66.67 só vira 67 arredondando para cima.
+  test("o percentual arredonda para cima quando a fração passa da metade", () => {
+    const resumo = resumoDaEmissao({ itens: [true, true, false].map(item), lancamentos: [] });
+    expect(resumo.percentualExecutado).toBe(67);
+  });
+
+  // NFR7 — os dois extremos onde o arredondamento MENTIRIA: "100%" com um item
+  // ainda pendente ao lado, e "0%" com um item já feito.
+  test("quase tudo executado não vira 100% enquanto sobrar pendente", () => {
+    const itens = Array.from({ length: 200 }, (_, indice) => item(indice > 0));
+    const resumo = resumoDaEmissao({ itens, lancamentos: [] });
+    expect(resumo.itensPendentes).toBe(1);
+    expect(resumo.percentualExecutado).toBe(99);
+  });
+
+  test("um único item executado não vira 0%", () => {
+    const itens = Array.from({ length: 500 }, (_, indice) => item(indice === 0));
+    const resumo = resumoDaEmissao({ itens, lancamentos: [] });
+    expect(resumo.itensExecutados).toBe(1);
+    expect(resumo.percentualExecutado).toBe(1);
+  });
+
+  // O denominador é o total de ITENS DESTA emissão — nunca um catálogo global
+  // nem o número de lançamentos: as duas contagens são independentes.
+  test("o denominador segue os itens da emissão, não os lançamentos", () => {
+    const resumo = resumoDaEmissao({
+      itens: [true, false].map(item),
+      lancamentos: [derivavel({ horas: "1:00" }), derivavel({ horas: "1:00" })],
+    });
+    // Dois lançamentos, mas o denominador continua sendo os dois ITENS — e o
+    // numerador, o único marcado.
+    expect(resumo.itensExecutados).toBe(1);
+    expect(resumo.totalDeItens).toBe(2);
+    expect(resumo.percentualExecutado).toBe(50);
+    expect(resumo.lancamentosDeServico).toBe(2);
+  });
+
+  // Design Notes: a assimetria proposital. Duas perguntas diferentes — quantas
+  // entradas existem na tela, e quanto tempo elas somam.
+  test("linha recusada conta em Lançamentos mas não soma em Horas", () => {
+    const resumo = resumoDaEmissao({
+      itens: [],
+      lancamentos: [derivavel({ horas: "1:55" }), derivavel({ horas: "abc" })],
+    });
+
+    expect(resumo.lancamentosDeServico).toBe(2);
+    expect(resumo.minutosAcumulados).toBe(115);
+  });
+
+  // Mudança ao vivo: os mesmos itens, só uma marcação a mais, mudam os cinco —
+  // é a derivação que responde, nunca um valor gravado.
+  test("marcar um item a mais muda os indicadores sem nenhum submit", () => {
+    const antes = resumoDaEmissao({ itens: [false, false].map(item), lancamentos: [] });
+    const depois = resumoDaEmissao({ itens: [true, false].map(item), lancamentos: [] });
+
+    expect([antes.percentualExecutado, depois.percentualExecutado]).toEqual([0, 50]);
+    expect([antes.itensPendentes, depois.itensPendentes]).toEqual([2, 1]);
+  });
+
+  // As horas da faixa são as MESMAS do rodapé da aba Serviço — divergir faria
+  // dois números da mesma tela discordarem. Em MINUTOS: a formatação é do JSX.
+  test("as horas da faixa são o acumulado da aba Serviço", () => {
+    const lancamentos = [derivavel({ horas: "1:55" }), derivavel({ horas: "abc" })];
+    expect(resumoDaEmissao({ itens: [], lancamentos }).minutosAcumulados).toBe(
+      minutosAcumuladosDeServico(lancamentos),
+    );
   });
 });
 

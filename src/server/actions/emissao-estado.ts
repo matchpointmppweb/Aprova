@@ -369,6 +369,72 @@ export function minutosAcumuladosDeServico(linhas: readonly LinhaServicoDerivave
 }
 
 // ---------------------------------------------------------------------------
+// Story 7.4 (parte 2) — a faixa de resumo da aba Geral (UX-DR18)
+// ---------------------------------------------------------------------------
+// Os cinco indicadores são DERIVADOS (AD-29): calculados na exibição a cada
+// render, nunca coluna, nunca campo, nunca no FormData. Vivem aqui, e não no
+// componente, pelo mesmo motivo das demais regras deste módulo — dentro de um
+// `.tsx` a aritmética seria intestável.
+//
+// Diverge do mockup (`atualizarResumoEmissao`, L2259) em dois pontos:
+//  - o mockup lê o DOM (`.item-exec:checked`, L2262); aqui a verdade é o
+//    estado do modal, e `executado` chega JÁ RESOLVIDO (a regra "entrada
+//    ausente vale o `executadoInicial`" é do componente, que conhece as
+//    linhas — repeti-la aqui a colocaria em dois lugares);
+//  - o mockup usa `ITENS_CATALOG.length` (L2263) como denominador, que é um
+//    catálogo global; o denominador correto é o total de itens DESTA emissão.
+export type ItemDoResumo = { executado: boolean };
+
+// Só NÚMEROS: a composição do texto ("3 de 8", "38%", formatarMinutos) é do
+// JSX, onde o resto do texto de tela já mora — devolver string pronta daqui
+// enfiaria interface pt-BR num módulo de server actions e obrigaria qualquer
+// consumidor futuro a fazer parse de volta.
+export type ResumoDaEmissao = {
+  /// MINUTOS — a mesma unidade do rodapé da aba Serviço; a tela formata.
+  minutosAcumulados: number;
+  /// Conta TODAS as linhas da tela, inclusive a que o módulo recusa (Design
+  /// Notes): ela não tem duração para somar, mas existe e o usuário a vê.
+  lancamentosDeServico: number;
+  itensExecutados: number;
+  /// O denominador de "X de Y" — o total de itens DESTA emissão.
+  totalDeItens: number;
+  itensPendentes: number;
+  /// Inteiro de 0 a 100, nunca fração.
+  percentualExecutado: number;
+};
+
+// O arredondamento não pode MENTIR nos extremos (NFR7): 199 de 200 viraria
+// "100%" ao lado de "Itens não executados: 1", e 1 de 500 viraria "0%" com um
+// item já feito. 100 só com zero pendentes, 0 só com zero executados; no meio,
+// o arredondamento fica preso na faixa 1..99.
+function percentualHonesto(executados: number, totalDeItens: number): number {
+  // Emissão sem nenhum item: 0% em vez de NaN (I/O Matrix: "nunca divisão por
+  // zero") — o guarda precede a divisão, não a maquia depois.
+  if (totalDeItens === 0) return 0;
+  if (executados === 0) return 0;
+  if (executados === totalDeItens) return 100;
+  const bruto = Math.round((executados / totalDeItens) * 100);
+  return Math.min(99, Math.max(1, bruto));
+}
+
+export function resumoDaEmissao(entrada: {
+  itens: readonly ItemDoResumo[];
+  lancamentos: readonly LinhaServicoDerivavel[];
+}): ResumoDaEmissao {
+  const totalDeItens = entrada.itens.length;
+  const executados = entrada.itens.filter((item) => item.executado).length;
+
+  return {
+    minutosAcumulados: minutosAcumuladosDeServico(entrada.lancamentos),
+    lancamentosDeServico: entrada.lancamentos.length,
+    itensExecutados: executados,
+    totalDeItens,
+    itensPendentes: totalDeItens - executados,
+    percentualExecutado: percentualHonesto(executados, totalDeItens),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Story 7.4 — estado DERIVADO de um item da aba Itens (AD-31)
 // ---------------------------------------------------------------------------
 // Três níveis computados na LEITURA, a partir de `executado` mais a existência
