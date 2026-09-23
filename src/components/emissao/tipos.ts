@@ -1,4 +1,5 @@
 import type {
+  ModoLancamentoServico,
   Setor,
   StatusAtivo,
   StatusEmissao,
@@ -36,6 +37,12 @@ export interface ServicoEmissaoListagem {
   itemRevisionalId: string;
   inicio: Date | null;
   fim: Date | null;
+  // Story 7.1: modo sempre preenchido (default no banco cobre as linhas
+  // criadas antes da migration); `duracaoMinutos` é minuto inteiro, só no
+  // modo `Duracao` — "1:55" é formato de tela (7.2), nunca de armazenamento.
+  // Nenhuma tela lê os dois campos ainda: a exibição é da 7.3/7.4.
+  modo: ModoLancamentoServico;
+  duracaoMinutos: number | null;
 }
 
 export interface EmissaoListagem {

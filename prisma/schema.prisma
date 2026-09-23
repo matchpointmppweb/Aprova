@@ -100,6 +100,18 @@ enum Setor {
   Administrativo
 }
 
+/// Modo de lançamento de uma linha de serviço (Story 7.1) — PERSISTIDO,
+/// nunca inferido da presença de `inicio`/`fim` (AD-28): "período ainda não
+/// preenchido" e "lançamento por horas" são situações distintas, com
+/// validação e exibição distintas. `Duracao` guarda minutos inteiros em
+/// `ServicoEmissao.duracaoMinutos` ("1:55" é entrada/exibição, jamais
+/// armazenamento); `Periodo` guarda `inicio`/`fim`. Default `Periodo` para a
+/// migration cobrir as linhas já existentes sem perder nada.
+enum ModoLancamentoServico {
+  Duracao
+  Periodo
+}
+
 /// Status de Local (Story 5.1) — mesmo padrão de StatusTipoAtivo: "excluir"
 /// nunca é DELETE físico (AD-10), é atualizarLocal(...,{status:"Inativo"})
 /// pela mesma função de repositório usada pela edição comum.
@@ -860,6 +872,19 @@ model ServicoEmissao {
 
   inicio DateTime?
   fim    DateTime?
+
+  /// Story 7.1 — modo do lançamento, sempre persistido (AD-28), nunca
+  /// inferido da presença de `inicio`/`fim`. `@default(Periodo)` é o próprio
+  /// backfill das linhas existentes.
+  modo ModoLancamentoServico @default(Periodo)
+
+  /// Story 7.1 — duração em MINUTOS INTEIROS (AD-28). "1:55" é formato de
+  /// entrada e de exibição (Story 7.2), jamais de armazenamento. Preenchido
+  /// só no modo `Duracao`; a CHECK `servicos_emissao_modo_coerente` da
+  /// migration garante a coerência entre modo, duração e datas nos dois (na
+  /// 7.3, três) pontos de escrita. O TOTAL nunca é coluna: é derivado
+  /// (AD-29).
+  duracaoMinutos Int?
 
   @@index([emissaoId])
   @@index([pessoaId])

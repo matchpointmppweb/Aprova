@@ -120,6 +120,116 @@ export async function criarAmbiente(
   return { conta, perfil, identidade, vinculo };
 }
 
+export async function criarTipoAtivo(contaId: string, opcoes: { nome?: string } = {}) {
+  return db.tipoAtivo.create({
+    data: { contaId, nome: opcoes.nome ?? `Tipo ${unico()}` },
+  });
+}
+
+export async function criarAtivo(
+  contaId: string,
+  tipoAtivoId: string,
+  opcoes: { nome?: string } = {},
+) {
+  const sufixo = unico();
+  return db.ativo.create({
+    data: {
+      contaId,
+      tipoAtivoId,
+      nome: opcoes.nome ?? `Ativo ${sufixo}`,
+      localizacao: "Pátio",
+      codigo: `AT-${sufixo}`,
+    },
+  });
+}
+
+export async function criarItemRevisional(contaId: string, opcoes: { nome?: string } = {}) {
+  return db.itemRevisional.create({
+    data: {
+      contaId,
+      nome: opcoes.nome ?? `Item ${unico()}`,
+      horasPadrao: 100,
+    },
+  });
+}
+
+export async function criarPlano(
+  contaId: string,
+  ativoId: string,
+  responsavelId: string,
+  opcoes: { nome?: string; itemRevisionalId?: string } = {},
+) {
+  return db.planoRevisional.create({
+    data: {
+      contaId,
+      ativoId,
+      responsavelId,
+      nome: opcoes.nome ?? `Plano ${unico()}`,
+      ...(opcoes.itemRevisionalId
+        ? { itens: { create: [{ itemRevisionalId: opcoes.itemRevisionalId }] } }
+        : {}),
+    },
+  });
+}
+
+export async function criarPessoa(contaId: string, opcoes: { nome?: string } = {}) {
+  const sufixo = unico();
+  const cargo = await db.cargo.create({
+    data: { contaId, descricao: `Cargo ${sufixo}` },
+  });
+  const funcao = await db.funcao.create({
+    data: { contaId, descricao: `Função ${sufixo}` },
+  });
+  return db.pessoa.create({
+    data: {
+      contaId,
+      cargoId: cargo.id,
+      funcaoId: funcao.id,
+      nome: opcoes.nome ?? `Pessoa ${sufixo}`,
+      cpf: `${sufixo}`.padEnd(14, "0").slice(0, 14),
+    },
+  });
+}
+
+/// Cadeia mínima de uma Emissão (Story 7.1) — tipo de ativo, ativo, item
+/// revisional, plano vinculado ao ativo, cargo/função/pessoa e a emissão em
+/// si, pronta para receber linhas de serviço. Devolve também
+/// ativo/plano/item/pessoa, que os testes usam para montar `ServicoEmissao`.
+/// Todos na MESMA conta: qualquer teste que precise de cross-tenant monta um
+/// segundo ambiente e usa os ids de lá.
+///
+/// Escreve pelo client próprio dos testes (`db`), nunca pelas funções de
+/// repositório sob teste — um defeito na escrita do código de produção não
+/// pode mascarar a si mesmo montando o cenário.
+export async function criarEmissaoCompleta(
+  opcoes: { nomeDaConta?: string } = {},
+) {
+  const ambiente = await criarAmbiente({ nomeDaConta: opcoes.nomeDaConta });
+  const tipoAtivo = await criarTipoAtivo(ambiente.conta.id);
+  const ativo = await criarAtivo(ambiente.conta.id, tipoAtivo.id);
+  const item = await criarItemRevisional(ambiente.conta.id);
+  const plano = await criarPlano(ambiente.conta.id, ativo.id, ambiente.identidade.id, {
+    itemRevisionalId: item.id,
+  });
+  const pessoa = await criarPessoa(ambiente.conta.id);
+
+  const ano = 2026;
+  const emissao = await db.emissao.create({
+    data: {
+      contaId: ambiente.conta.id,
+      ativoId: ativo.id,
+      planoId: plano.id,
+      responsavelId: ambiente.identidade.id,
+      dataEmissao: new Date(Date.UTC(ano, 0, 15)),
+      codigo: `EM-${ano}-${unico()}`,
+      ano,
+      seq: (await db.emissao.count({ where: { contaId: ambiente.conta.id, ano } })) + 1,
+    },
+  });
+
+  return { ...ambiente, tipoAtivo, ativo, item, plano, pessoa, emissao };
+}
+
 export async function criarSessao(usuarioId: string, contaAtivaId?: string) {
   return db.session.create({
     data: {

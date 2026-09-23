@@ -48,6 +48,11 @@ const INCLUDE_LISTAGEM = {
       itemRevisionalId: true,
       inicio: true,
       fim: true,
+      // Story 7.1: modo e duração acompanham as datas nas três leituras
+      // (listarEmissoes/buscarEmissao/retorno de criarEmissao) por viverem no
+      // mesmo `select`.
+      modo: true,
+      duracaoMinutos: true,
     },
     orderBy: ORDEM_SERVICOS,
   },
@@ -94,12 +99,44 @@ export type DadosItemExecutadoNovo = {
 // Uma linha da aba "Serviço" (Story 5.5) — sem id próprio: as linhas são
 // sempre substituídas em bloco, nunca casadas com uma linha já persistida
 // (Boundaries/AD-20).
-export type DadosServicoEmissao = {
+type IdentidadeDoServico = {
   pessoaId: string;
   itemRevisionalId: string;
-  inicio: Date | null;
-  fim: Date | null;
 };
+
+// Story 7.1 — UNIÃO DISCRIMINADA por `modo`, não três campos independentes:
+// o tipo torna INEXPRIMÍVEIS os estados que a CHECK
+// `servicos_emissao_modo_coerente` recusa (Duracao sem minutos, Duracao com
+// datas, Periodo com minutos). A CHECK continua sendo a garantia real — ela
+// cobre também o que vem de fora do TypeScript — mas o erro passa a aparecer
+// na compilação, e não só em runtime.
+export type DadosServicoEmissao =
+  // Caminho de escrita LEGADO (Server Action da 5.5, intocada nesta story):
+  // não conhece os campos novos e continua compilando e gravando como antes —
+  // `Periodo` com duração nula (I/O Matrix: "Escrita legada").
+  | (IdentidadeDoServico & {
+      inicio: Date | null;
+      fim: Date | null;
+      modo?: undefined;
+      duracaoMinutos?: undefined;
+    })
+  // Período explícito: as datas mandam, duração nunca é preenchida. As duas
+  // continuam podendo ser nulas — o aperto "período exige as duas datas" é da
+  // 7.3 (Design Notes).
+  | (IdentidadeDoServico & {
+      modo: "Periodo";
+      inicio: Date | null;
+      fim: Date | null;
+      duracaoMinutos?: null;
+    })
+  // Duração digitada: minutos INTEIROS obrigatórios (AD-28) e datas
+  // necessariamente ausentes.
+  | (IdentidadeDoServico & {
+      modo: "Duracao";
+      duracaoMinutos: number;
+      inicio?: null;
+      fim?: null;
+    });
 
 // Campos gerais compartilhados pela criação e pelos dois braços da edição
 // (Story 5.5 acrescentou setor + os 3 marcos opcionais de data/hora).
@@ -174,6 +211,8 @@ export async function criarEmissao(contaId: string, dados: DadosCriarEmissao) {
                 itemRevisionalId: servico.itemRevisionalId,
                 inicio: servico.inicio,
                 fim: servico.fim,
+                modo: servico.modo ?? "Periodo",
+                duracaoMinutos: servico.duracaoMinutos ?? null,
               })),
             },
             itens: {
@@ -283,6 +322,8 @@ export async function atualizarEmissao(
             itemRevisionalId: servico.itemRevisionalId,
             inicio: servico.inicio,
             fim: servico.fim,
+            modo: servico.modo ?? "Periodo",
+            duracaoMinutos: servico.duracaoMinutos ?? null,
           })),
         });
       }
