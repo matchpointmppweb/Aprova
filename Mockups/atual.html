@@ -384,6 +384,103 @@
   .servico-row .f label{font-size:10.5px;}
   .servico-remove{flex:none;}
 
+  /* ---------- MODAL EM TELA CHEIA (à direita do menu) ---------- */
+  .modal-overlay.modal-full{
+    top:58px;left:224px;right:0;bottom:0;
+    padding:0;align-items:stretch;justify-content:stretch;background:rgba(10,18,14,0.28);
+  }
+  .modal-overlay.modal-full .modal{
+    width:100%;max-width:none;height:100%;max-height:none;border-radius:0;
+  }
+  .modal-overlay.modal-full .modal-body{padding:22px 28px;}
+  .modal-overlay.modal-full .modal-grid{grid-template-columns:repeat(4,1fr);}
+
+  /* ---------- LINHA DE DATAS ---------- */
+  .date-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;grid-column:1 / -1;}
+  .f input[readonly]{background:var(--paper-2);color:var(--ink-soft);cursor:default;}
+
+  /* ---------- RESUMO (horas acumuladas) ---------- */
+  .resumo-row{grid-column:1 / -1;display:flex;gap:14px;flex-wrap:wrap;}
+  .resumo-card{
+    border:1px solid var(--line);border-radius:var(--radius-m);background:var(--paper-2);
+    padding:12px 16px;min-width:190px;
+  }
+  .resumo-card .rl{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
+  .resumo-card .rv{font-size:19px;font-weight:600;margin-top:3px;}
+
+  /* ---------- TABELA DE ITENS REVISIONAIS (emissão) ---------- */
+  .itens-table{width:100%;border-collapse:collapse;background:transparent;}
+  .itens-table th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
+    color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  .itens-table td{padding:10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:top;}
+  .itens-table .col-chk{width:34px;}
+  .itens-table .col-item{width:210px;font-weight:500;}
+  .itens-table .col-desc{color:var(--ink-soft);font-size:13px;}
+  .itens-table .col-acao{width:140px;text-align:right;}
+  .itens-table input[type=checkbox]{width:16px;height:16px;}
+  .medidores{display:flex;gap:8px;flex-wrap:wrap;}
+  .medidores .f{width:92px;}
+  .medidores .f label{font-size:10.5px;}
+  .item-servico-box{background:var(--paper-2);border-left:2px solid var(--pine);}
+  .servico-inline{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .servico-inline .f{width:160px;}
+  .servico-inline .f label{font-size:10.5px;}
+  .servico-total{
+    display:flex;justify-content:flex-end;gap:8px;align-items:baseline;
+    padding:14px 2px 0;font-size:13px;color:var(--ink-soft);border-top:1px solid var(--line);margin-top:10px;
+  }
+  .servico-total strong{font-size:16px;color:var(--ink);}
+  .servico-row .f.f-horas{max-width:130px;}
+
+  /* ---------- SEMÁFORO DE STATUS DOS ITENS ---------- */
+  .itens-table tr.st-pendente > td{background:#FDF1F1;}
+  .itens-table tr.st-parcial > td{background:#FEF8E7;}
+  .itens-table tr.st-concluido > td{background:#F1F8F2;}
+  .itens-table tr.item-servico-tr > td{background:var(--paper-2);}
+  .st-tag{
+    display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;
+    padding:3px 9px;border-radius:100px;border:1px solid transparent;margin-top:5px;
+  }
+  .st-tag .dot{width:7px;height:7px;border-radius:50%;}
+  .st-tag.st-pendente{background:#FBE4E4;border-color:#F2C9C9;color:#8C2F2F;}
+  .st-tag.st-pendente .dot{background:#C64B4B;}
+  .st-tag.st-parcial{background:#FCF1D6;border-color:#F0DFAE;color:#8A6416;}
+  .st-tag.st-parcial .dot{background:#D9A521;}
+  .st-tag.st-concluido{background:#E2F1E5;border-color:#C2E0C9;color:#2C6E4F;}
+  .st-tag.st-concluido .dot{background:#3C8F63;}
+
+  /* ---------- SERVIÇOS JÁ LANÇADOS NO ITEM ---------- */
+  .servico-existentes{margin-bottom:12px;}
+  .servico-existentes .sx-title{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin-bottom:6px;}
+  .sx-item{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--white);
+    border:1px solid var(--line);border-radius:var(--radius-s);padding:7px 10px;margin-bottom:6px;font-size:12.5px;
+  }
+  .sx-item .sx-pessoa{font-weight:500;}
+  .sx-item .sx-periodo{color:var(--ink-soft);}
+  .sx-item .sx-horas{margin-left:auto;font-weight:600;}
+
+  /* ---------- DATA TABLE DE SERVIÇOS ---------- */
+  .servicos-table{width:100%;border-collapse:collapse;background:var(--white);}
+  .servicos-table th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;
+    color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);
+    background:var(--paper-2);white-space:nowrap;
+  }
+  .servicos-table td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+  .servicos-table tr:last-child td{border-bottom:none;}
+  .servicos-table select,.servicos-table input{
+    width:100%;padding:7px 9px;border:1px solid var(--line-strong);border-radius:var(--radius-s);
+    font-size:12.5px;font-family:inherit;background:var(--white);color:var(--ink);
+  }
+  .servicos-table .col-total{white-space:nowrap;font-weight:600;text-align:right;}
+  .servicos-table .col-acao-sv{width:44px;text-align:center;}
+  .servicos-table tfoot td{background:var(--paper-2);font-weight:600;border-top:1px solid var(--line);}
+  .servicos-empty{padding:18px;text-align:center;color:var(--ink-soft);font-size:13px;}
+  .servico-calc{font-size:12px;color:var(--pine-dark);padding-bottom:9px;flex:none;white-space:nowrap;}
+
   .perm-table{width:100%;border-collapse:collapse;}
   .perm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);}
   .perm-table th.perm-check-col{text-align:center;}
@@ -397,6 +494,9 @@
     .panel-grid{grid-template-columns:1fr;}
     .palette-grid{grid-template-columns:repeat(2,1fr);}
     .modal-grid{grid-template-columns:1fr;}
+    .modal-overlay.modal-full{left:0;}
+    .modal-overlay.modal-full .modal-grid{grid-template-columns:1fr 1fr;}
+    .date-row{grid-template-columns:1fr 1fr;}
   }
 </style>
 </head>
@@ -1757,7 +1857,7 @@
   </div>
 
   <!-- ===== MODAL: EMISSÃO ===== -->
-  <div class="modal-overlay hidden" id="modal-emissao">
+  <div class="modal-overlay modal-full hidden" id="modal-emissao">
     <div class="modal">
       <div class="modal-header">
         <h2 id="modal-emissao-title">Nova emissão</h2>
@@ -1777,27 +1877,55 @@
             <div class="f"><label>Setor</label>
               <select id="emissao-setor"><option>Manutenção</option><option>Produção</option><option>Logística</option><option>Segurança do trabalho</option><option>Administrativo</option></select>
             </div>
-            <div class="f"><label>Plano revisional</label>
-              <select id="emissao-plano"><option>Manutenção trimestral</option><option>Inspeção semestral</option><option>Revisão mensal</option><option>Inspeção anual</option></select>
-            </div>
             <div class="f"><label>Responsável</label><input type="text" id="emissao-responsavel" placeholder="Nome do responsável"></div>
-            <div class="f"><label>Data de emissão</label><input type="date" id="emissao-data"></div>
             <div class="f"><label>Status</label>
               <select id="emissao-status"><option>Rascunho</option><option>Em análise</option><option>Emitido</option><option>Reprovado</option></select>
             </div>
-            <div class="f"><label>Data agendamento</label><input type="datetime-local" id="emissao-data-agendamento"></div>
-            <div class="f"><label>Data início</label><input type="datetime-local" id="emissao-data-inicio"></div>
-            <div class="f"><label>Data fim</label><input type="datetime-local" id="emissao-data-fim"></div>
+            <div class="date-row">
+              <div class="f"><label>Data criação</label><input type="datetime-local" id="emissao-data" readonly tabindex="-1"></div>
+              <div class="f"><label>Data agendamento</label><input type="datetime-local" id="emissao-data-agendamento"></div>
+              <div class="f"><label>Data início</label><input type="datetime-local" id="emissao-data-inicio"></div>
+              <div class="f"><label>Data fim</label><input type="datetime-local" id="emissao-data-fim"></div>
+            </div>
+            <div class="resumo-row">
+              <div class="resumo-card"><div class="rl">Horas acumuladas de serviço</div><div class="rv" id="emissao-horas-total">0:00</div></div>
+              <div class="resumo-card"><div class="rl">Lançamentos de serviço</div><div class="rv" id="emissao-servicos-count">0</div></div>
+              <div class="resumo-card"><div class="rl">Itens executados</div><div class="rv" id="emissao-itens-count">0</div></div>
+              <div class="resumo-card"><div class="rl">Itens não executados</div><div class="rv" id="emissao-itens-pendentes">0</div></div>
+              <div class="resumo-card"><div class="rl">% executado</div><div class="rv" id="emissao-itens-perc">0%</div></div>
+            </div>
           </div>
         </div>
         <div class="modal-tab-panel hidden" data-tab="itens">
-          <p class="muted" style="margin:0 0 12px;font-size:13px;">Marque os itens revisionais executados nesta emissão e registre a medição realizada.</p>
-          <div id="emissao-itens-list"></div>
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Marque os itens revisionais executados nesta emissão, registre a medição realizada e, se necessário, adicione o serviço executado no item.</p>
+          <div class="table-wrap">
+            <table class="itens-table">
+              <thead><tr>
+                <th class="col-chk"></th>
+                <th class="col-item">Item</th>
+                <th class="col-desc">Descrição</th>
+                <th>Medidores (dias, horas, km)</th>
+                <th>Observação</th>
+                <th class="col-acao">Serviço</th>
+              </tr></thead>
+              <tbody id="emissao-itens-list"></tbody>
+            </table>
+          </div>
         </div>
         <div class="modal-tab-panel hidden" data-tab="servico">
-          <p class="muted" style="margin:0 0 12px;font-size:13px;">Registre quem executou o serviço, o período trabalhado e o item revisional relacionado (aba Itens).</p>
-          <div id="emissao-servico-list"></div>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="addServicoRow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Adicionar serviço</button>
+          <p class="muted" style="margin:0 0 12px;font-size:13px;">Selecione o item revisional e informe as horas trabalhadas — lançando apenas a duração (ex.: 1:55) ou data/hora de início e fim para o sistema calcular.</p>
+          <div class="table-wrap">
+            <table class="servicos-table">
+              <thead><tr>
+                <th>Item revisional</th><th>Pessoa</th><th>Lançamento</th>
+                <th>Início / Horas</th><th>Fim</th><th class="col-total">Total</th><th class="col-acao-sv"></th>
+              </tr></thead>
+              <tbody id="emissao-servico-list"></tbody>
+              <tfoot><tr><td colspan="5">Horas acumuladas de serviço</td><td class="col-total" id="emissao-horas-total-tabela">0:00</td><td></td></tr></tfoot>
+            </table>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px;" onclick="addServicoRow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Adicionar serviço</button>
+          <div class="servico-total">Horas acumuladas de serviço <strong id="emissao-horas-total-servico">0:00</strong></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1953,6 +2081,11 @@
   }
 
   /* ---------- GENERIC MODAL / TAB ENGINE ---------- */
+  function nowLocalDateTime(){
+    const d = new Date();
+    const pad = function(n){ return String(n).padStart(2,'0'); };
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
   function showModal(id){ document.getElementById(id).classList.remove('hidden'); }
   function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
 
@@ -2004,11 +2137,11 @@
 
   /* ---------- CATALOG: ITENS REVISIONAIS ---------- */
   const ITENS_CATALOG = [
-    { id:1, nome:'Troca de óleo', controle:['dias','km'], dias:90, km:5000 },
-    { id:2, nome:'Verificação de nível de fluido', controle:['dias'], dias:30 },
-    { id:3, nome:'Inspeção de correias', controle:['horas'], horas:500 },
-    { id:4, nome:'Calibração de instrumento', controle:['dias'], dias:180 },
-    { id:5, nome:'Revisão geral do motor', controle:['km','horas'], km:20000, horas:2000 }
+    { id:1, nome:'Troca de óleo', descricao:'Substituição do óleo lubrificante e do filtro', controle:['dias','km'], dias:90, km:5000 },
+    { id:2, nome:'Verificação de nível de fluido', descricao:'Conferência dos níveis de fluidos operacionais', controle:['dias'], dias:30 },
+    { id:3, nome:'Inspeção de correias', descricao:'Inspeção visual de tensão e desgaste das correias', controle:['horas'], horas:500 },
+    { id:4, nome:'Calibração de instrumento', descricao:'Aferição e calibração de instrumentos de medição', controle:['dias'], dias:180 },
+    { id:5, nome:'Revisão geral do motor', descricao:'Revisão completa do conjunto motor e componentes', controle:['km','horas'], km:20000, horas:2000 }
   ];
   const CONTROLE_LABEL = { dias:'Dias', km:'Km', horas:'Horas' };
 
@@ -2088,31 +2221,125 @@
 
   let emissaoServicos = [];
 
+  /* ---------- HORAS: helpers ---------- */
+  function parseHorasTexto(txt){
+    if(!txt) return 0;
+    const t = String(txt).trim();
+    const m = t.match(/^(\d{1,4})\s*[:hH]\s*(\d{1,2})?$/) || t.match(/^(\d{1,4})$/);
+    if(!m) return 0;
+    const h = parseInt(m[1],10) || 0;
+    const min = parseInt(m[2]||'0',10) || 0;
+    return h*60 + min;
+  }
+  function minutosEntre(inicio, fim){
+    if(!inicio || !fim) return 0;
+    const a = new Date(inicio), b = new Date(fim);
+    if(isNaN(a) || isNaN(b)) return 0;
+    const diff = Math.round((b - a)/60000);
+    return diff > 0 ? diff : 0;
+  }
+  function minutosEntreHoras(hi, hf){
+    if(!hi || !hf) return 0;
+    const ai = hi.split(':').map(Number), af = hf.split(':').map(Number);
+    let diff = (af[0]*60+af[1]) - (ai[0]*60+ai[1]);
+    if(diff < 0) diff += 24*60; // virada de dia
+    return diff;
+  }
+  function formatarMinutos(min){
+    min = Math.max(0, Math.round(min||0));
+    return Math.floor(min/60) + ':' + String(min%60).padStart(2,'0');
+  }
+  function minutosServico(s){
+    if(s.modo === 'horas') return parseHorasTexto(s.horas);
+    return minutosEntre(s.inicio, s.fim);
+  }
+  function totalMinutosServicos(){
+    return emissaoServicos.reduce(function(acc,s){ return acc + minutosServico(s); }, 0);
+  }
+  function atualizarResumoEmissao(){
+    const total = formatarMinutos(totalMinutosServicos());
+    const totalItens = ITENS_CATALOG.length;
+    const executados = document.querySelectorAll('#emissao-itens-list .item-exec:checked').length;
+    const pendentes = totalItens - executados;
+    const perc = totalItens ? Math.round((executados/totalItens)*100) : 0;
+    const set = function(id, val){ const el = document.getElementById(id); if(el) el.textContent = val; };
+    set('emissao-horas-total', total);
+    set('emissao-horas-total-servico', total);
+    set('emissao-horas-total-tabela', total);
+    set('emissao-servicos-count', emissaoServicos.length);
+    set('emissao-itens-count', executados + ' de ' + totalItens);
+    set('emissao-itens-pendentes', pendentes);
+    set('emissao-itens-perc', perc + '%');
+  }
+
+  /* ---------- SEMÁFORO ---------- */
+  function servicosDoItem(nome){
+    return emissaoServicos.filter(function(s){ return s.item === nome; });
+  }
+  function statusItem(nome, executado){
+    if(executado) return 'concluido';
+    if(servicosDoItem(nome).length) return 'parcial';
+    return 'pendente';
+  }
+  const STATUS_LABEL = { pendente:'Pendente', parcial:'Serviço apontado', concluido:'Concluído' };
+  function aplicarStatusItens(){
+    ITENS_CATALOG.forEach(function(item){
+      const tr = document.querySelector('#emissao-itens-list tr[data-item-id="'+item.id+'"]');
+      if(!tr) return;
+      const chk = tr.querySelector('.item-exec');
+      const st = statusItem(item.nome, chk && chk.checked);
+      tr.classList.remove('st-pendente','st-parcial','st-concluido');
+      tr.classList.add('st-' + st);
+      const tag = tr.querySelector('.st-tag');
+      if(tag){
+        tag.className = 'st-tag st-' + st;
+        tag.innerHTML = '<span class="dot"></span>' + STATUS_LABEL[st];
+      }
+      const box = document.getElementById('servico-box-' + item.id);
+      if(box) box.classList.remove('st-pendente','st-parcial','st-concluido');
+    });
+  }
+
+  /* ---------- ABA SERVIÇO ---------- */
   function renderEmissaoServicos(){
     const container = document.getElementById('emissao-servico-list');
     container.innerHTML = '';
     if(!emissaoServicos.length){
-      container.innerHTML = '<p class="muted" style="font-size:13px;margin:0 0 10px;">Nenhum serviço adicionado ainda.</p>';
+      container.innerHTML = '<tr><td colspan="7" class="servicos-empty">Nenhum serviço adicionado ainda.</td></tr>';
+      atualizarResumoEmissao();
+      aplicarStatusItens();
+      renderServicosDoItemBoxes();
       return;
     }
     emissaoServicos.forEach(function(s, idx){
-      const row = document.createElement('div');
-      row.className = 'servico-row';
-      row.innerHTML =
-        '<div class="f"><label>Pessoa</label><select onchange="updateServicoRow('+idx+',\'pessoa\',this.value)">' +
-          PESSOAS_CATALOG.map(p=>'<option '+(p===s.pessoa?'selected':'')+'>'+p+'</option>').join('') +
-        '</select></div>' +
-        '<div class="f"><label>Data/hora início</label><input type="datetime-local" value="'+(s.inicio||'')+'" onchange="updateServicoRow('+idx+',\'inicio\',this.value)"></div>' +
-        '<div class="f"><label>Data/hora fim</label><input type="datetime-local" value="'+(s.fim||'')+'" onchange="updateServicoRow('+idx+',\'fim\',this.value)"></div>' +
-        '<div class="f"><label>Item trabalhado</label><select onchange="updateServicoRow('+idx+',\'item\',this.value)">' +
-          ITENS_CATALOG.map(it=>'<option '+(it.nome===s.item?'selected':'')+'>'+it.nome+'</option>').join('') +
-        '</select></div>' +
-        '<button type="button" class="icon-btn servico-remove" title="Remover serviço" onclick="removeServicoRow('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>';
-      container.appendChild(row);
+      const tr = document.createElement('tr');
+      const celInicio = s.modo === 'horas'
+        ? '<td><input type="text" placeholder="1:55" value="'+(s.horas||'')+'" onchange="updateServicoRow('+idx+',\'horas\',this.value)"></td><td class="muted">—</td>'
+        : '<td><input type="datetime-local" value="'+(s.inicio||'')+'" onchange="updateServicoRow('+idx+',\'inicio\',this.value)"></td>' +
+          '<td><input type="datetime-local" value="'+(s.fim||'')+'" onchange="updateServicoRow('+idx+',\'fim\',this.value)"></td>';
+      tr.innerHTML =
+        '<td><select onchange="updateServicoRow('+idx+',\'item\',this.value)">' +
+          ITENS_CATALOG.map(function(it){ return '<option '+(it.nome===s.item?'selected':'')+'>'+it.nome+'</option>'; }).join('') +
+        '</select></td>' +
+        '<td><select onchange="updateServicoRow('+idx+',\'pessoa\',this.value)">' +
+          PESSOAS_CATALOG.map(function(pp){ return '<option '+(pp===s.pessoa?'selected':'')+'>'+pp+'</option>'; }).join('') +
+        '</select></td>' +
+        '<td><select onchange="updateServicoRow('+idx+',\'modo\',this.value)">' +
+          '<option value="horas" '+(s.modo==='horas'?'selected':'')+'>Apenas horas</option>' +
+          '<option value="periodo" '+(s.modo!=='horas'?'selected':'')+'>Data/hora início e fim</option>' +
+        '</select></td>' +
+        celInicio +
+        '<td class="col-total">'+formatarMinutos(minutosServico(s))+'</td>' +
+        '<td class="col-acao-sv"><button type="button" class="icon-btn" title="Remover serviço" onclick="removeServicoRow('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button></td>';
+      container.appendChild(tr);
     });
+    atualizarResumoEmissao();
+    aplicarStatusItens();
+    renderServicosDoItemBoxes();
   }
+
   function addServicoRow(){
-    emissaoServicos.push({ pessoa:PESSOAS_CATALOG[0], inicio:'', fim:'', item:ITENS_CATALOG[0].nome });
+    emissaoServicos.push({ pessoa:PESSOAS_CATALOG[0], modo:'horas', horas:'', inicio:'', fim:'', item:ITENS_CATALOG[0].nome });
     renderEmissaoServicos();
   }
   function removeServicoRow(idx){
@@ -2120,29 +2347,124 @@
     renderEmissaoServicos();
   }
   function updateServicoRow(idx, key, val){
-    if(emissaoServicos[idx]) emissaoServicos[idx][key] = val;
+    if(!emissaoServicos[idx]) return;
+    emissaoServicos[idx][key] = val;
+    renderEmissaoServicos();
+  }
+
+  /* ---------- ABA ITENS ---------- */
+  function toggleItemTr(checkbox){
+    const tr = checkbox.closest('tr');
+    tr.querySelectorAll('.medidores input, .item-obs-input, .btn-add-servico').forEach(function(el){ el.disabled = !checkbox.checked; });
+    if(!checkbox.checked){
+      const box = document.getElementById('servico-box-' + tr.dataset.itemId);
+      if(box) box.classList.add('hidden');
+    }
+    atualizarResumoEmissao();
+    aplicarStatusItens();
+  }
+  function toggleServicoBox(itemId){
+    const box = document.getElementById('servico-box-' + itemId);
+    if(!box) return;
+    box.classList.toggle('hidden');
+    if(!box.classList.contains('hidden')){
+      const ini = box.querySelector('.sv-inicio');
+      const fim = box.querySelector('.sv-fim');
+      if(ini && !ini.value) ini.value = nowLocalDateTime();
+      if(fim && !fim.value) fim.value = nowLocalDateTime();
+      renderServicosDoItemBoxes();
+    }
+  }
+  function renderServicosDoItemBoxes(){
+    ITENS_CATALOG.forEach(function(item){
+      const alvo = document.getElementById('sx-list-' + item.id);
+      if(!alvo) return;
+      const lista = emissaoServicos
+        .map(function(s, idx){ return { s:s, idx:idx }; })
+        .filter(function(o){ return o.s.item === item.nome; });
+      if(!lista.length){
+        alvo.innerHTML = '<div class="sx-title">Serviços lançados neste item</div><p class="muted" style="font-size:12.5px;margin:0;">Nenhum serviço lançado ainda.</p>';
+        return;
+      }
+      alvo.innerHTML = '<div class="sx-title">Serviços lançados neste item (' + lista.length + ')</div>' +
+        lista.map(function(o){
+          const periodo = o.s.modo === 'horas'
+            ? 'Lançamento por horas'
+            : formatarDataHora(o.s.inicio) + ' → ' + formatarDataHora(o.s.fim);
+          return '<div class="sx-item">' +
+            '<span class="sx-pessoa">'+o.s.pessoa+'</span>' +
+            '<span class="sx-periodo">'+periodo+'</span>' +
+            '<span class="sx-horas">'+formatarMinutos(minutosServico(o.s))+'</span>' +
+            '<button type="button" class="icon-btn" title="Remover serviço" onclick="removeServicoRow('+o.idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>' +
+          '</div>';
+        }).join('');
+    });
+  }
+  function formatarDataHora(v){
+    if(!v) return '—';
+    const partes = v.split('T');
+    if(partes.length < 2) return v;
+    const d = partes[0].split('-');
+    return d[2]+'/'+d[1]+'/'+d[0]+' '+partes[1].slice(0,5);
+  }
+  function confirmarServicoItem(itemId){
+    const box = document.getElementById('servico-box-' + itemId);
+    const item = ITENS_CATALOG.find(function(i){ return i.id === itemId; });
+    const pessoa = box.querySelector('.sv-pessoa').value;
+    const hi = box.querySelector('.sv-inicio').value;
+    const hf = box.querySelector('.sv-fim').value;
+    if(!hi || !hf){ alert('Informe a data/hora de início e de fim.'); return; }
+    if(minutosEntre(hi, hf) <= 0){ alert('A data/hora de fim deve ser posterior à de início.'); return; }
+    emissaoServicos.push({ pessoa:pessoa, item:item.nome, modo:'periodo', inicio:hi, fim:hf, horas:'' });
+    box.querySelector('.sv-inicio').value = nowLocalDateTime();
+    box.querySelector('.sv-fim').value = nowLocalDateTime();
+    renderEmissaoServicos();
   }
 
   function renderEmissaoItens(selected){
     const container = document.getElementById('emissao-itens-list');
     container.innerHTML = '';
     ITENS_CATALOG.forEach(function(item){
-      const sel = selected.find(s=>s.id===item.id) || { executado:false };
-      let fieldsHtml = '';
-      item.controle.forEach(function(c){
+      const sel = selected.find(function(s){ return s.id === item.id; }) || { executado:false };
+      const dis = sel.executado ? '' : 'disabled';
+      let medidoresHtml = '';
+      ['dias','horas','km'].forEach(function(c){
+        if(item.controle.indexOf(c) === -1) return;
         const val = (sel[c] !== undefined && sel[c] !== '') ? sel[c] : '';
-        fieldsHtml += '<div class="f"><label>'+CONTROLE_LABEL[c]+' medido</label><input type="number" value="'+val+'" '+(sel.executado?'':'disabled')+'></div>';
+        medidoresHtml += '<div class="f"><label>'+CONTROLE_LABEL[c]+'</label><input type="number" value="'+val+'" '+dis+'></div>';
       });
-      const badges = item.controle.map(c=>'<span class="tag tag-neutral">'+CONTROLE_LABEL[c]+'</span>').join('');
-      const row = document.createElement('div');
-      row.className = 'item-row';
-      row.innerHTML =
-        '<label class="item-check"><input type="checkbox" '+(sel.executado?'checked':'')+' onchange="toggleItemRow(this)"><span>'+item.nome+'</span></label>' +
-        '<div class="item-badges">'+badges+'</div>' +
-        '<div class="item-fields">'+fieldsHtml+'</div>' +
-        '<div class="f item-obs"><label>Observação</label><input type="text" value="'+(sel.obs||'')+'" '+(sel.executado?'':'disabled')+'></div>';
-      container.appendChild(row);
+
+      const tr = document.createElement('tr');
+      tr.dataset.itemId = item.id;
+      tr.setAttribute('data-item-id', item.id);
+      tr.innerHTML =
+        '<td class="col-chk"><input type="checkbox" class="item-exec" '+(sel.executado?'checked':'')+' onchange="toggleItemTr(this)"></td>' +
+        '<td class="col-item">'+item.nome+'<div><span class="st-tag st-pendente"><span class="dot"></span>Pendente</span></div></td>' +
+        '<td class="col-desc">'+(item.descricao||'—')+'</td>' +
+        '<td><div class="medidores">'+medidoresHtml+'</div></td>' +
+        '<td><input type="text" class="item-obs-input" style="width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:var(--radius-s);font-size:13px;font-family:inherit;" value="'+(sel.obs||'')+'" '+dis+'></td>' +
+        '<td class="col-acao"><button type="button" class="btn btn-ghost btn-sm btn-add-servico" '+dis+' onclick="toggleServicoBox('+item.id+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Serviço</button></td>';
+      container.appendChild(tr);
+
+      const trS = document.createElement('tr');
+      trS.className = 'hidden item-servico-tr';
+      trS.id = 'servico-box-' + item.id;
+      trS.innerHTML =
+        '<td></td><td colspan="5" class="item-servico-box">' +
+          '<div class="servico-existentes" id="sx-list-'+item.id+'"></div>' +
+          '<div class="servico-inline">' +
+            '<div class="f"><label>Pessoa</label><select class="sv-pessoa">'+PESSOAS_CATALOG.map(function(pp){ return '<option>'+pp+'</option>'; }).join('')+'</select></div>' +
+            '<div class="f" style="width:200px;"><label>Data/hora início</label><input type="datetime-local" class="sv-inicio" value="'+nowLocalDateTime()+'"></div>' +
+            '<div class="f" style="width:200px;"><label>Data/hora fim</label><input type="datetime-local" class="sv-fim" value="'+nowLocalDateTime()+'"></div>' +
+            '<button type="button" class="btn btn-primary btn-sm" onclick="confirmarServicoItem('+item.id+')">Adicionar ao serviço</button>' +
+            '<button type="button" class="btn btn-ghost btn-sm" onclick="toggleServicoBox('+item.id+')">Fechar</button>' +
+          '</div>' +
+        '</td>';
+      container.appendChild(trS);
     });
+    atualizarResumoEmissao();
+    aplicarStatusItens();
+    renderServicosDoItemBoxes();
   }
 
   function openEmissaoModal(mode, index){
@@ -2151,15 +2473,19 @@
     document.getElementById('modal-emissao-title').textContent = isEdit ? 'Editar emissão · ' + e.codigo : 'Nova emissão';
     document.getElementById('emissao-ativo').value = e.ativo;
     document.getElementById('emissao-setor').value = e.setor || 'Manutenção';
-    document.getElementById('emissao-plano').value = e.plano;
     document.getElementById('emissao-responsavel').value = e.responsavel;
-    document.getElementById('emissao-data').value = e.data;
+    document.getElementById('emissao-data').value = e.data ? (e.data.length === 10 ? e.data + 'T08:00' : e.data) : nowLocalDateTime();
     document.getElementById('emissao-status').value = e.status;
     document.getElementById('emissao-data-agendamento').value = e.dataAgendamento || '';
     document.getElementById('emissao-data-inicio').value = e.dataInicio || '';
     document.getElementById('emissao-data-fim').value = e.dataFim || '';
     renderEmissaoItens(e.itens);
-    emissaoServicos = (e.servicos || []).map(s => Object.assign({}, s));
+    emissaoServicos = (e.servicos || []).map(function(s){
+      const c = Object.assign({}, s);
+      if(!c.modo) c.modo = (c.inicio && c.fim) ? 'periodo' : 'horas';
+      if(c.horas === undefined) c.horas = '';
+      return c;
+    });
     renderEmissaoServicos();
     switchModalTab('modal-emissao','geral');
     showModal('modal-emissao');
