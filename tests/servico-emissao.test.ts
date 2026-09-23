@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
 
+import { TETO_DE_MINUTOS } from "@/src/lib/duracao";
 import {
   atualizarEmissao,
   buscarEmissao,
@@ -203,6 +204,29 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         }),
       ).rejects.toThrow();
       expect(await db.servicoEmissao.count()).toBe(0);
+    });
+
+    // Story 7.2 — o teto. A CHECK não entra na checagem de deriva (o Prisma
+    // não modela constraints), então este teste é a ÚNICA coisa que garante
+    // que a cláusula do banco e `TETO_DE_MINUTOS` são o mesmo número: o teto
+    // exato passa, um minuto além é recusado. Se a migration for reescrita com
+    // outro limite, um dos dois lados quebra aqui.
+    test("o teto da CHECK é o mesmo TETO_DE_MINUTOS do módulo", async () => {
+      const cenario = await criarEmissaoCompleta();
+      const base = {
+        emissaoId: cenario.emissao.id,
+        pessoaId: cenario.pessoa.id,
+        itemRevisionalId: cenario.item.id,
+        modo: "Duracao" as const,
+      };
+
+      await inserirServico({ ...base, duracaoMinutos: TETO_DE_MINUTOS });
+      expect(await db.servicoEmissao.count()).toBe(1);
+
+      await expect(
+        inserirServico({ ...base, duracaoMinutos: TETO_DE_MINUTOS + 1 }),
+      ).rejects.toThrow();
+      expect(await db.servicoEmissao.count()).toBe(1);
     });
   });
 
