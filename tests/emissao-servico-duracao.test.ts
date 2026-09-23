@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import { TETO_DE_MINUTOS, formatarMinutos } from "@/src/lib/duracao";
 import {
+  derivarPlanoDoAtivo,
+  emissaoTemProgresso,
   estadoDerivadoDoItem,
   formatarDataHoraDigitada,
   lancamentosDoItem,
@@ -12,7 +14,9 @@ import {
   resumoDaEmissao,
   validarLancamentoDaCaixa,
   validarServicos,
+  type AtivoDerivavel,
   type LinhaServicoBruta,
+  type PlanoDerivavel,
   type LinhaServicoDerivavel,
 } from "@/src/server/actions/emissao-estado";
 
@@ -773,4 +777,145 @@ describe("formatarDataHoraDigitada", () => {
       expect(saida).not.toContain("undefined");
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.5 — a derivação do plano a partir do ativo (AD-32)
+// ---------------------------------------------------------------------------
+// É a regra que decide TUDO nesta story: a tela monta o checklist com ela e o
+// servidor grava com ela. Pura, então a matriz inteira roda sem banco — e é
+// justamente por ser uma função só que os dois lados não podem discordar.
+
+const ATIVO: AtivoDerivavel = { id: "ativo-1", tipoAtivoId: "tipo-1" };
+
+function plano(overrides: Partial<PlanoDerivavel> & { id: string }): PlanoDerivavel {
+  return {
+    nome: `Plano ${overrides.id}`,
+    status: "Ativo",
+    ativoId: null,
+    tipoAtivoId: null,
+    ...overrides,
+  };
+}
+
+describe("derivarPlanoDoAtivo (Story 7.5)", () => {
+  test("um plano que mira o ativo é o plano", () => {
+    const alvo = plano({ id: "p1", ativoId: ATIVO.id });
+    expect(derivarPlanoDoAtivo(ATIVO, [alvo])).toEqual({ tipo: "ok", plano: alvo });
+  });
+
+  test("sem plano próprio, vale o que mira o tipo do ativo", () => {
+    const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
+    expect(derivarPlanoDoAtivo(ATIVO, [porTipo])).toEqual({ tipo: "ok", plano: porTipo });
+  });
+
+  // A preferência é o coração da AD-32: um plano por ativo VENCE qualquer plano
+  // por tipo, e vencendo não há ambiguidade nenhuma. Sem a precedência, este
+  // caso viraria "ambiguo" e o usuário seria obrigado a escolher onde a regra
+  // já sabia a resposta.
+  test("o plano do ativo vence o do tipo, sem ambiguidade", () => {
+    const porAtivo = plano({ id: "p1", ativoId: ATIVO.id });
+    const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
+    expect(derivarPlanoDoAtivo(ATIVO, [porTipo, porAtivo])).toEqual({
+      tipo: "ok",
+      plano: porAtivo,
+    });
+  });
+
+  test("dois planos mirando o mesmo ativo são ambíguos, com os dois candidatos", () => {
+    const a = plano({ id: "p1", ativoId: ATIVO.id });
+    const b = plano({ id: "p2", ativoId: ATIVO.id });
+    const resultado = derivarPlanoDoAtivo(ATIVO, [a, b]);
+    expect(resultado.tipo).toBe("ambiguo");
+    expect(resultado.tipo === "ambiguo" ? resultado.candidatos : []).toEqual([a, b]);
+  });
+
+  // O irmão do caso acima no SEGUNDO nível de preferência. Sem ele, uma
+  // implementação que só checasse ambiguidade no nível do ativo elegeria um dos
+  // dois planos-por-tipo sozinha — exatamente o que o Boundaries proíbe.
+  test("dois planos mirando o tipo, nenhum o ativo, são ambíguos", () => {
+    const a = plano({ id: "p1", tipoAtivoId: ATIVO.tipoAtivoId });
+    const b = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
+    const resultado = derivarPlanoDoAtivo(ATIVO, [a, b]);
+    expect(resultado.tipo).toBe("ambiguo");
+    expect(resultado.tipo === "ambiguo" ? resultado.candidatos : []).toEqual([a, b]);
+  });
+
+  test("plano arquivado não é candidato — vira sem-plano", () => {
+    const arquivado = plano({ id: "p1", ativoId: ATIVO.id, status: "Arquivado" });
+    expect(derivarPlanoDoAtivo(ATIVO, [arquivado])).toEqual({ tipo: "sem-plano" });
+  });
+
+  // Um arquivado no nível do ativo não pode "consumir" a preferência e esconder
+  // o plano por tipo que de fato vale.
+  test("plano do ativo arquivado deixa o plano do tipo valer", () => {
+    const arquivado = plano({ id: "p1", ativoId: ATIVO.id, status: "Arquivado" });
+    const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
+    expect(derivarPlanoDoAtivo(ATIVO, [arquivado, porTipo])).toEqual({
+      tipo: "ok",
+      plano: porTipo,
+    });
+  });
+
+  // Dois arquivados no nível do ativo não podem virar "ambiguo".
+  test("dois planos arquivados do ativo não são ambíguos — são sem-plano", () => {
+    const a = plano({ id: "p1", ativoId: ATIVO.id, status: "Arquivado" });
+    const b = plano({ id: "p2", ativoId: ATIVO.id, status: "Arquivado" });
+    expect(derivarPlanoDoAtivo(ATIVO, [a, b])).toEqual({ tipo: "sem-plano" });
+  });
+
+  test("nenhum plano cobre o ativo", () => {
+    const deOutro = plano({ id: "p1", ativoId: "ativo-2" });
+    const deOutroTipo = plano({ id: "p2", tipoAtivoId: "tipo-2" });
+    expect(derivarPlanoDoAtivo(ATIVO, [deOutro, deOutroTipo])).toEqual({ tipo: "sem-plano" });
+    expect(derivarPlanoDoAtivo(ATIVO, [])).toEqual({ tipo: "sem-plano" });
+  });
+
+  // Na tela, "ainda não escolhi o ativo" é um estado real — e ele não pode
+  // eleger o primeiro plano da conta.
+  test("sem ativo não há derivação", () => {
+    expect(derivarPlanoDoAtivo(null, [plano({ id: "p1", ativoId: ATIVO.id })])).toEqual({
+      tipo: "sem-plano",
+    });
+  });
+});
+
+// A regra que decide se a edição pode trocar o plano (Boundaries): progresso é
+// o que está GRAVADO. Cada campo abaixo sozinho já é progresso — sem isso, um
+// deles esquecido faria a troca apagar em silêncio execução ou medição.
+describe("emissaoTemProgresso (Story 7.5)", () => {
+  const limpo = {
+    executado: false,
+    medicaoDias: null,
+    medicaoKm: null,
+    medicaoHoras: null,
+    observacao: null,
+  };
+
+  test("emissão sem nada registrado não tem progresso", () => {
+    expect(emissaoTemProgresso({ itens: [limpo, limpo], servicos: [] })).toBe(false);
+    expect(emissaoTemProgresso({ itens: [], servicos: [] })).toBe(false);
+  });
+
+  test.each([
+    ["item executado", { executado: true }],
+    ["medição de dias", { medicaoDias: 10 }],
+    ["medição de km", { medicaoKm: 0 }],
+    ["medição de horas", { medicaoHoras: 5 }],
+    ["observação", { observacao: "trocado" }],
+  ])("%s conta como progresso", (_rotulo, campo) => {
+    expect(emissaoTemProgresso({ itens: [{ ...limpo, ...campo }], servicos: [] })).toBe(true);
+  });
+
+  test("um lançamento de serviço conta como progresso mesmo sem item tocado", () => {
+    expect(emissaoTemProgresso({ itens: [limpo], servicos: [{}] })).toBe(true);
+  });
+
+  // Observação vazia/só espaços é campo não preenchido — tratá-la como
+  // progresso travaria a troca de ativo de uma emissão intocada.
+  test("observação em branco não é progresso", () => {
+    expect(emissaoTemProgresso({ itens: [{ ...limpo, observacao: "   " }], servicos: [] })).toBe(
+      false,
+    );
+  });
 });

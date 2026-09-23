@@ -18,6 +18,9 @@ import {
   reprovarEmissaoAction,
 } from "@/src/server/actions/emissao";
 import {
+  derivarPlanoDoAtivo,
+  ERRO_SEM_PLANO_PARA_O_ATIVO,
+  erroDePlanoAmbiguo,
   estadoDerivadoDoItem,
   estadoInicialAcaoEmissao,
   formatarDataHoraDigitada,
@@ -65,6 +68,25 @@ function paraDatetimeLocal(data: Date | null): string {
   return (
     `${data.getUTCFullYear()}-${doisDigitos(data.getUTCMonth() + 1)}-${doisDigitos(data.getUTCDate())}` +
     `T${doisDigitos(data.getUTCHours())}:${doisDigitos(data.getUTCMinutes())}`
+  );
+}
+
+// Exibição de um INSTANTE REAL (um ponto no tempo atribuído pelo servidor,
+// como `dataEmissao`) para leitura humana. Usa getters LOCAIS, ao contrário de
+// paraDatetimeLocal acima — as duas coexistem porque tratam valores de
+// natureza diferente:
+//   - paraDatetimeLocal: wall-clock DIGITADO pelo usuário (os três marcos
+//     agendamento/início/fim). Getters getUTC* fecham o round trip com
+//     parseDataHora, que interpreta a string como wall-clock UTC.
+//   - formatarInstante: instante real do relógio do servidor. Getters locais
+//     o traduzem para o fuso de quem está olhando; usar getUTC* aqui mostraria
+//     a hora 3h adiantada para o usuário pt-BR.
+function formatarInstante(data: Date | null): string {
+  if (!data) return "";
+  const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
+  return (
+    `${doisDigitos(data.getDate())}/${doisDigitos(data.getMonth() + 1)}/${data.getFullYear()} ` +
+    `${doisDigitos(data.getHours())}:${doisDigitos(data.getMinutes())}`
   );
 }
 
@@ -866,7 +888,10 @@ export function ModalEmissao({
   const [estado, formAction] = useActionState(acao, estadoInicialAcaoEmissao);
   const [aba, setAba] = useState<AbaModal>("geral");
   const [ativoId, setAtivoId] = useState(emissao?.ativoId ?? "");
-  const [planoId, setPlanoId] = useState(emissao?.planoId ?? "");
+  // Story 7.5: NÃO existe mais um "plano escolhido" no caso geral — o plano é
+  // derivado do ativo (AD-32). Este estado guarda SÓ o desempate de uma
+  // ambiguidade, que é a única escolha de plano que ainda é humana.
+  const [planoDesempate, setPlanoDesempate] = useState(emissao?.planoId ?? "");
   const [responsavelId, setResponsavelId] = useState(emissao?.responsavelId ?? "");
   const [setor, setSetor] = useState(emissao?.setor ?? SETOR_PADRAO);
 
@@ -981,21 +1006,65 @@ export function ModalEmissao({
     [itensRevisionais],
   );
 
-  // Só ativos/planos com status "Ativo" ficam selecionáveis para um vínculo
-  // novo — mesmo critério de opcoesVinculo em modal-plano.tsx. O vínculo
-  // atual da emissão em edição sempre aparece na lista mesmo que tenha sido
-  // desativado/arquivado depois (edição não pode perder silenciosamente o
-  // vínculo existente). Sem filtragem cruzada entre os dois dropdowns
-  // (Boundaries) — cada um lista independentemente.
+  // Só ativos com status "Ativo" ficam selecionáveis para um vínculo novo —
+  // mesmo critério de opcoesVinculo em modal-plano.tsx. O ativo atual da
+  // emissão em edição sempre aparece na lista mesmo que tenha sido desativado
+  // depois (edição não pode perder silenciosamente o vínculo existente).
+  // Story 7.5: não há mais uma lista de planos ao lado — o plano é derivado
+  // deste ativo, e quem filtra por status "Ativo" lá é a própria derivação.
   const opcoesAtivo = ativos.filter(
     (ativo) => ativo.status === "Ativo" || ativo.id === emissao?.ativoId,
   );
-  const opcoesPlano = planos.filter(
-    (plano) => plano.status === "Ativo" || plano.id === emissao?.planoId,
+  // Story 7.5 — a tela DERIVA, o servidor DECIDE. O que sai daqui é
+  // pré-visualização: serve para montar o checklist da aba Itens (sem plano no
+  // cliente, `linhas` vira `[]` e todos os campos `itemExecutado-*` somem do
+  // FormData) e para dizer ao usuário qual plano será usado. A Server Action
+  // re-deriva com esta MESMA função e é ela quem grava — exatamente o arranjo
+  // que o `valorEsperado` já usa neste componente.
+  const ativoSelecionado = ativos.find((ativo) => ativo.id === ativoId) ?? null;
+  const derivacao = useMemo(
+    () => derivarPlanoDoAtivo(ativoSelecionado, planos),
+    [ativoSelecionado, planos],
   );
+
+  // A escolha de desempate morre junto com o ativo que a motivou: mantê-la ao
+  // trocar de ativo faria a tela pré-visualizar um plano que o servidor não tem
+  // entre os candidatos novos. Ajuste DURANTE o render (mesmo padrão do
+  // reposicionamento de aba), nunca num efeito.
+  const [ativoTratado, setAtivoTratado] = useState(ativoId);
+  if (ativoId !== ativoTratado) {
+    setAtivoTratado(ativoId);
+    setPlanoDesempate(ativoId === emissao?.ativoId ? (emissao?.planoId ?? "") : "");
+  }
+
+  const planoDerivado =
+    derivacao.tipo === "ok"
+      ? derivacao.plano
+      : derivacao.tipo === "ambiguo"
+        ? (derivacao.candidatos.find((plano) => plano.id === planoDesempate) ?? null)
+        : null;
+
+  // Edição com o ativo INALTERADO: enquanto a derivação não resolve (ambiguidade
+  // ainda não desempatada, ou plano arquivado depois da criação), a tela segue
+  // mostrando o plano que a emissão já tem — nunca esvazia o checklist de uma
+  // emissão gravada. Só vale com o ativo inalterado: trocado o ativo, um plano
+  // indeciso é indeciso mesmo, e o usuário precisa ver isso.
+  const planoId =
+    planoDerivado?.id ?? (emissao !== null && ativoId === emissao.ativoId ? emissao.planoId : "");
 
   const planoOriginalId = emissao?.planoId ?? null;
   const trocouPlano = emissao !== null && planoId !== planoOriginalId;
+
+  // O texto da situação do plano na aba Geral — a MESMA redação do servidor
+  // (constantes de emissao-estado.ts), para a tela nunca prometer/negar em
+  // palavras diferentes das da recusa que chega depois.
+  const nomeDoPlano = planoDerivado?.nome ?? planos.find((p) => p.id === planoId)?.nome ?? null;
+  const avisoDoPlano =
+    derivacao.tipo === "sem-plano" && ativoId
+      ? ERRO_SEM_PLANO_PARA_O_ATIVO
+      : derivacao.tipo === "ambiguo" && !planoDerivado
+        ? erroDePlanoAmbiguo(derivacao.candidatos)
+        : null;
 
   const linhas: LinhaItem[] = useMemo(() => {
     if (emissao && !trocouPlano) {
@@ -1233,6 +1302,9 @@ export function ModalEmissao({
                       </option>
                     ))}
                   </select>
+                  {/* Story 7.5: a recusa da troca de plano com progresso
+                      gravado aponta para o ativo — é ele que o usuário mexeu. */}
+                  <ErroDeCampo mensagem={errosPorCampo.get("ativoId")} />
                 </div>
                 <div className="f">
                   <label htmlFor="emissao-setor">Setor</label>
@@ -1250,24 +1322,42 @@ export function ModalEmissao({
                     ))}
                   </select>
                 </div>
+                {/* Story 7.5 — o plano deixou de ser escolhido (AD-32). No
+                    caso normal é um campo somente leitura mostrando o que o
+                    ativo determina; o <select> só reaparece quando a derivação
+                    é AMBÍGUA, e então lista apenas os candidatos reais — nunca
+                    a lista inteira de planos da conta. */}
                 <div className="f">
                   <label htmlFor="emissao-plano">Plano revisional</label>
-                  <select
-                    id="emissao-plano"
-                    name="planoId"
-                    required
-                    value={planoId}
-                    onChange={(evento) => setPlanoId(evento.target.value)}
-                  >
-                    <option value="" disabled>
-                      Selecione o plano revisional
-                    </option>
-                    {opcoesPlano.map((plano) => (
-                      <option key={plano.id} value={plano.id}>
-                        {plano.nome}
+                  {derivacao.tipo === "ambiguo" ? (
+                    <select
+                      id="emissao-plano"
+                      name="planoId"
+                      required
+                      value={planoDerivado?.id ?? ""}
+                      onChange={(evento) => setPlanoDesempate(evento.target.value)}
+                    >
+                      <option value="" disabled>
+                        Escolha o plano revisional
                       </option>
-                    ))}
-                  </select>
+                      {derivacao.candidatos.map((plano) => (
+                        <option key={plano.id} value={plano.id}>
+                          {plano.nome}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    // Sem `name`: no caso não-ambíguo o cliente não envia plano
+                    // nenhum — o servidor deriva sozinho (Boundaries).
+                    <input
+                      id="emissao-plano"
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={nomeDoPlano ?? (ativoId ? "Nenhum plano aplicável" : "Selecione o ativo")}
+                    />
+                  )}
+                  <ErroDeCampo mensagem={errosPorCampo.get("planoId") ?? avisoDoPlano ?? undefined} />
                 </div>
                 <div className="f">
                   <label htmlFor="emissao-responsavel">Responsável</label>
@@ -1289,20 +1379,28 @@ export function ModalEmissao({
                   </select>
                 </div>
                 {/* Story 7.4 — as quatro datas agrupadas em `date-row`
-                    (mockup L1884). O agrupamento é só de LAYOUT: nenhum dos
-                    quatro campos muda de natureza — a data de emissão continua
-                    editável e enviada pelo formulário (torná-la somente leitura
-                    é a 7.5, AD-33). */}
+                    (mockup L1884). Story 7.5/AD-33: a primeira é a "Data
+                    criação", SOMENTE LEITURA e sem `name` — ela não viaja no
+                    FormData, é atribuída pelo servidor no momento da criação, e
+                    é dela que sai o ano do código. Numa emissão nova ainda não
+                    existe valor a mostrar: quem a define é o save — daí o
+                    input de TEXTO (e não datetime-local, que renderizaria
+                    "dd/mm/aaaa --:--" e pareceria um campo que o usuário
+                    esqueceu de preencher), com um texto dizendo que a data é
+                    atribuída no salvamento, no mesmo espírito do "Selecione o
+                    ativo" logo acima. */}
                 <div className="date-row">
                   <div className="f">
-                    <label htmlFor="emissao-data">Data de emissão</label>
+                    <label htmlFor="emissao-data">Data criação</label>
                     <input
                       id="emissao-data"
-                      name="dataEmissao"
-                      type="date"
-                      required
-                      defaultValue={
-                        emissao ? emissao.dataEmissao.toISOString().slice(0, 10) : undefined
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={
+                        emissao?.dataEmissao
+                          ? formatarInstante(emissao.dataEmissao)
+                          : "Atribuída ao salvar"
                       }
                     />
                   </div>
@@ -1380,8 +1478,10 @@ export function ModalEmissao({
               {linhas.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13 }}>
                   {planoId
-                    ? "O plano selecionado não tem itens revisionais."
-                    : "Selecione um plano revisional na aba Geral."}
+                    ? "O plano revisional deste ativo não tem itens revisionais."
+                    : // Story 7.5: não há mais plano a selecionar — o que falta
+                      // é o ativo, ou um plano que o cubra sem ambiguidade.
+                      (avisoDoPlano ?? "Selecione o ativo na aba Geral.")}
                 </p>
               ) : (
                 <div className="table-wrap table-wrap-rolavel">

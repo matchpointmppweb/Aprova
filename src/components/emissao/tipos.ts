@@ -89,10 +89,16 @@ export interface AtivoOpcao {
   id: string;
   nome: string;
   status: StatusAtivo;
+  // Story 7.5: o tipo do ativo é o SEGUNDO nível de preferência de
+  // `derivarPlanoDoAtivo` (AD-32) — sem ele o cliente não deriva o plano e o
+  // checklist da aba Itens não tem de onde nascer. `listarAtivos` já traz o
+  // valor (findMany sem select); só o tipo o escondia.
+  tipoAtivoId: string;
 }
 
-// Item de PlanoItemRevisional do plano vigente — compatível com
-// listarPlanos()/buscarPlano() (server/repositories/plano.ts). Usado pelo
+// Item de PlanoItemRevisional do plano vigente — o formato que
+// `listarPlanos()` (server/repositories/plano.ts) traz em `itens` via
+// INCLUDE_LISTAGEM, e que chega ao modal dentro de `PlanoOpcao`. Usado pelo
 // modal para montar o checklist fixo de itens ao criar uma emissão ou ao
 // trocar o plano vinculado numa edição (Boundaries/Code Map).
 export interface PlanoItemVigente {
@@ -106,6 +112,11 @@ export interface PlanoOpcao {
   id: string;
   nome: string;
   status: StatusPlanoRevisional;
+  // Story 7.5: os dois lados do vínculo XOR do plano (AD-32) — é por eles que
+  // `derivarPlanoDoAtivo` decide. `listarPlanos` já os traz; só o tipo os
+  // escondia (mesmo caso da `descricao` na 7.4).
+  ativoId: string | null;
+  tipoAtivoId: string | null;
   itens: PlanoItemVigente[];
 }
 

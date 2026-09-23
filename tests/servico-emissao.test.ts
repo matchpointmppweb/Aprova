@@ -1,14 +1,47 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { TETO_DE_MINUTOS } from "@/src/lib/duracao";
 import {
+  anoNoFusoDeNegocio,
   atualizarEmissao,
   buscarEmissao,
   criarEmissao,
   isViolacaoDeServicoIncoerente,
 } from "@/src/server/repositories/emissao";
 
-import { criarEmissaoCompleta, db, limparBanco } from "./setup/fixtures";
+// Story 7.5 — as duas Server Actions de emissão entram na suíte. O único dublê
+// é a SESSÃO (que só existe dentro de uma requisição do Next); `can()`, Prisma,
+// repositórios e banco são reais — é justamente a autoridade do servidor que
+// estes testes existem para prender.
+const sessaoDeTeste: { usuario: { id: string; contaId: string; perfilAcessoId: string } | null } = {
+  usuario: null,
+};
+
+vi.mock("@/src/server/auth/sessao", () => ({
+  exigirUsuarioAutenticado: async () => {
+    if (!sessaoDeTeste.usuario) throw new Error("sessão de teste não configurada");
+    return sessaoDeTeste.usuario;
+  },
+}));
+
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+
+const { criarEmissaoAction, editarEmissaoAction } = await import("@/src/server/actions/emissao");
+
+import {
+  ERRO_TROCA_DE_PLANO_COM_PROGRESSO,
+  estadoInicialAcaoEmissao,
+  mensagemDeErro,
+} from "@/src/server/actions/emissao-estado";
+
+import {
+  criarAtivo,
+  criarEmissaoCompleta,
+  criarPlano,
+  criarTipoAtivo,
+  db,
+  limparBanco,
+} from "./setup/fixtures";
 
 beforeEach(limparBanco);
 
@@ -300,7 +333,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ativoId: cenario.ativo.id,
         planoId: cenario.plano.id,
         responsavelId: cenario.identidade.id,
-        dataEmissao: new Date(Date.UTC(2026, 1, 3)),
         setor: "Manutencao",
         dataAgendamento: null,
         dataInicio: null,
@@ -346,7 +378,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ativoId: cenario.ativo.id,
         planoId: cenario.plano.id,
         responsavelId: cenario.identidade.id,
-        dataEmissao: new Date(Date.UTC(2026, 1, 5)),
         setor: "Manutencao",
         dataAgendamento: null,
         dataInicio: null,
@@ -371,7 +402,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
           ativoId: cenario.ativo.id,
           planoId: cenario.plano.id,
           responsavelId: cenario.identidade.id,
-          dataEmissao: new Date(Date.UTC(2026, 1, 5)),
           setor: "Manutencao",
           dataAgendamento: null,
           dataInicio: null,
@@ -408,7 +438,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ativoId: cenario.ativo.id,
         planoId: cenario.plano.id,
         responsavelId: cenario.identidade.id,
-        dataEmissao: new Date(Date.UTC(2026, 1, 6)),
         setor: "Manutencao",
         dataAgendamento: null,
         dataInicio: null,
@@ -425,7 +454,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
           ativoId: cenario.ativo.id,
           planoId: cenario.plano.id,
           responsavelId: cenario.identidade.id,
-          dataEmissao: new Date(Date.UTC(2026, 1, 6)),
           setor: "Manutencao",
           dataAgendamento: null,
           dataInicio: null,
@@ -460,7 +488,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ativoId: cenario.ativo.id,
         planoId: cenario.plano.id,
         responsavelId: cenario.identidade.id,
-        dataEmissao: new Date(Date.UTC(2026, 1, 7)),
         setor: "Manutencao",
         dataAgendamento: null,
         dataInicio: null,
@@ -506,7 +533,6 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ativoId: cenario.ativo.id,
         planoId: cenario.plano.id,
         responsavelId: cenario.identidade.id,
-        dataEmissao: new Date(Date.UTC(2026, 1, 4)),
         setor: "Manutencao",
         dataAgendamento: null,
         dataInicio: null,
@@ -527,6 +553,432 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
       expect(criada.servicos).toHaveLength(1);
       expect(criada.servicos[0].modo).toBe("Periodo");
       expect(criada.servicos[0].duracaoMinutos).toBeNull();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 7.5 — plano derivado do ativo (AD-32) e data do servidor (AD-33)
+// ---------------------------------------------------------------------------
+// Contra banco REAL e pelas Server Actions, porque é exatamente aqui que a
+// autoridade do servidor vive: a regra pura já está coberta em
+// `emissao-servico-duracao.test.ts`, mas nada além destes testes garante que a
+// Server Action a CONSULTA, que ignora o `dataEmissao` do cliente, e que uma
+// emissão já gravada não é renumerada.
+
+async function cenarioComSessao(opcoes: { nomeDaConta?: string } = {}) {
+  const cenario = await criarEmissaoCompleta(opcoes);
+  sessaoDeTeste.usuario = {
+    id: cenario.identidade.id,
+    contaId: cenario.conta.id,
+    perfilAcessoId: cenario.perfil.id,
+  };
+  return cenario;
+}
+
+// O FormData que o modal de fato envia — sem `planoId` (o plano deixou de ser
+// campo) e sem `dataEmissao`, salvo quando um teste os FORJA de propósito.
+function formDeEmissao(campos: Record<string, string>) {
+  const formData = new FormData();
+  formData.set("setor", "Manutencao");
+  formData.set("servicoCount", "0");
+  for (const [nome, valor] of Object.entries(campos)) formData.set(nome, valor);
+  return formData;
+}
+
+async function emissoesNovas(contaId: string, exceto: string) {
+  return db.emissao.findMany({ where: { contaId, id: { not: exceto } } });
+}
+
+describe("Emissão: plano e data automáticos (Story 7.5)", () => {
+  test("a data é do servidor, o ano do código sai dela e um dataEmissao forjado é ignorado", async () => {
+    const cenario = await cenarioComSessao();
+    const antes = Date.now();
+
+    const estado = await criarEmissaoAction(
+      estadoInicialAcaoEmissao,
+      formDeEmissao({
+        ativoId: cenario.ativo.id,
+        responsavelId: cenario.identidade.id,
+        // I/O Matrix "Data forjada": outro ano, direto no FormData. Se a action
+        // voltasse a ler este campo, o código nasceria em 1999 — e uma emissão
+        // real ficaria renumerada num ano que não existe na conta.
+        dataEmissao: "1999-01-01",
+      }),
+    );
+    expect(estado.ok).toBe(true);
+
+    const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+    expect(criada.dataEmissao.getTime()).toBeGreaterThanOrEqual(antes - 5_000);
+    expect(criada.dataEmissao.getTime()).toBeLessThanOrEqual(Date.now() + 5_000);
+    expect(criada.ano).not.toBe(1999);
+    // O ano do código e a data gravada saem do MESMO instante (Design Notes).
+    expect(criada.ano).toBe(anoNoFusoDeNegocio(criada.dataEmissao));
+    expect(criada.codigo).toBe(`EM-${criada.ano}-${String(criada.seq).padStart(4, "0")}`);
+    // E o plano veio do ativo, sem ninguém escolher (AD-32).
+    expect(criada.planoId).toBe(cenario.plano.id);
+  });
+
+  test("sem plano aplicável, recusa sem gravar nada", async () => {
+    const cenario = await cenarioComSessao();
+    // Único candidato arquivado — não é candidato (Boundaries): recusa como
+    // "sem plano", nunca vincula a emissão a um plano fora de uso.
+    await db.planoRevisional.update({
+      where: { id: cenario.plano.id },
+      data: { status: "Arquivado" },
+    });
+
+    const estado = await criarEmissaoAction(
+      estadoInicialAcaoEmissao,
+      formDeEmissao({ ativoId: cenario.ativo.id, responsavelId: cenario.identidade.id }),
+    );
+
+    expect(estado.ok).toBe(false);
+    expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
+  });
+
+  describe("ambiguidade exige escolha humana", () => {
+    async function cenarioAmbiguo() {
+      const cenario = await cenarioComSessao();
+      const segundo = await criarPlano(
+        cenario.conta.id,
+        cenario.ativo.id,
+        cenario.identidade.id,
+        { itemRevisionalId: cenario.item.id },
+      );
+      return { ...cenario, segundoPlano: segundo };
+    }
+
+    test("dois planos para o mesmo ativo: recusa e nada é gravado", async () => {
+      const cenario = await cenarioAmbiguo();
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({ ativoId: cenario.ativo.id, responsavelId: cenario.identidade.id }),
+      );
+
+      expect(estado.ok).toBe(false);
+      // Os candidatos aparecem na mensagem — recusar sem dizer quais seria
+      // recusar sem dar ao usuário como resolver.
+      expect(mensagemDeErro(estado.error)).toContain(cenario.segundoPlano.nome);
+      expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
+    });
+
+    test("com escolha explícita entre os candidatos, grava o escolhido", async () => {
+      const cenario = await cenarioAmbiguo();
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          planoId: cenario.segundoPlano.id,
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      expect(criada.planoId).toBe(cenario.segundoPlano.id);
+    });
+
+    // O espelho do caso acima: SEM ambiguidade (um único candidato), um
+    // `planoId` forjado apontando para outro plano é simplesmente IGNORADO — a
+    // escolha do cliente só tem voz quando a derivação fica ambígua. Sem este
+    // teste, uma refatoração que passasse a "respeitar a escolha do cliente
+    // quando existir" ficaria toda verde.
+    test("sem ambiguidade, planoId do cliente é ignorado e vale o derivado", async () => {
+      const cenario = await cenarioComSessao();
+      const outroTipo = await criarTipoAtivo(cenario.conta.id);
+      const outroAtivo = await criarAtivo(cenario.conta.id, outroTipo.id);
+      const planoDeOutroAtivo = await criarPlano(
+        cenario.conta.id,
+        outroAtivo.id,
+        cenario.identidade.id,
+        { itemRevisionalId: cenario.item.id },
+      );
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          planoId: planoDeOutroAtivo.id,
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      expect(criada.planoId).toBe(cenario.plano.id);
+    });
+
+    // I/O Matrix "Escolha forjada": um plano REAL, da própria conta, `Ativo` —
+    // e que simplesmente não cobre este ativo. É o caso que um `buscarPlano`
+    // ingênuo aceitaria, porque o plano existe.
+    test("planoId de fora dos candidatos é recusado", async () => {
+      const cenario = await cenarioAmbiguo();
+      const outroTipo = await criarTipoAtivo(cenario.conta.id);
+      const outroAtivo = await criarAtivo(cenario.conta.id, outroTipo.id);
+      const planoDeOutroAtivo = await criarPlano(
+        cenario.conta.id,
+        outroAtivo.id,
+        cenario.identidade.id,
+        { itemRevisionalId: cenario.item.id },
+      );
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          planoId: planoDeOutroAtivo.id,
+        }),
+      );
+
+      expect(estado.ok).toBe(false);
+      expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
+    });
+  });
+
+  describe("edição", () => {
+    // Um segundo ativo, de outro tipo, com plano próprio — trocar o ativo da
+    // emissão para ele MUDA o plano derivado, que é o gatilho desta regra.
+    async function comSegundoAtivo(cenario: Awaited<ReturnType<typeof cenarioComSessao>>) {
+      const tipo = await criarTipoAtivo(cenario.conta.id);
+      const ativo = await criarAtivo(cenario.conta.id, tipo.id);
+      const plano = await criarPlano(cenario.conta.id, ativo.id, cenario.identidade.id, {
+        itemRevisionalId: cenario.item.id,
+      });
+      return { ativo, plano };
+    }
+
+    async function criarPelaAction(
+      cenario: Awaited<ReturnType<typeof cenarioComSessao>>,
+      extra: Record<string, string> = {},
+    ) {
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          ...extra,
+        }),
+      );
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      return criada;
+    }
+
+    test("sem progresso, trocar o ativo re-deriva o plano — e nada é renumerado", async () => {
+      const cenario = await cenarioComSessao();
+      const segundo = await comSegundoAtivo(cenario);
+      const criada = await criarPelaAction(cenario);
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: segundo.ativo.id,
+          responsavelId: cenario.identidade.id,
+          // I/O Matrix "Data na edição": mesmo forjada, não renumera nada.
+          dataEmissao: "1999-01-01",
+        }),
+      );
+      expect(estado.ok).toBe(true);
+
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(relida.planoId).toBe(segundo.plano.id);
+      // AC: código, ano, sequencial e data continuam EXATAMENTE os mesmos.
+      expect(relida.codigo).toBe(criada.codigo);
+      expect(relida.ano).toBe(criada.ano);
+      expect(relida.seq).toBe(criada.seq);
+      expect(relida.dataEmissao.toISOString()).toBe(criada.dataEmissao.toISOString());
+    });
+
+    test("com progresso gravado, trocar o ativo é recusado e o snapshot fica intacto", async () => {
+      const cenario = await cenarioComSessao();
+      const segundo = await comSegundoAtivo(cenario);
+      // O item nasce executado: é progresso GRAVADO já na criação.
+      const criada = await criarPelaAction(cenario, {
+        [`itemExecutado-${cenario.item.id}`]: "on",
+      });
+      const itensAntes = await db.itemExecutadoEmissao.findMany({
+        where: { emissaoId: criada.id },
+      });
+      expect(itensAntes.some((item) => item.executado)).toBe(true);
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: segundo.ativo.id,
+          responsavelId: cenario.identidade.id,
+          [`itemExecutado-${cenario.item.id}`]: "on",
+        }),
+      );
+
+      expect(estado.ok).toBe(false);
+      // O CAMPO importa tanto quanto a recusa: é por `ativoId` que a mensagem
+      // acha onde aparecer na tela. Trocar a chave deixaria o erro invisível.
+      expect(estado.error).toEqual([
+        { field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
+      ]);
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      // Nada mudou: nem o ativo, nem o plano, nem as linhas de item — a recusa
+      // precede a escrita (AD-9), nunca é um delete+recreate revertido pela
+      // metade.
+      expect(relida.ativoId).toBe(cenario.ativo.id);
+      expect(relida.planoId).toBe(cenario.plano.id);
+      const itensDepois = await db.itemExecutadoEmissao.findMany({
+        where: { emissaoId: criada.id },
+      });
+      expect(itensDepois.map((item) => item.id).sort()).toEqual(
+        itensAntes.map((item) => item.id).sort(),
+      );
+      expect(itensDepois.every((item) => item.executado)).toBe(true);
+    });
+
+    // O contraponto: com progresso, mas SEM troca de ativo, a edição salva
+    // normalmente. Sem este teste, uma guarda grosseira demais ("emissão com
+    // progresso não edita") passaria nos dois testes acima.
+    test("com progresso e sem trocar o ativo, salva normalmente", async () => {
+      const cenario = await cenarioComSessao();
+      const criada = await criarPelaAction(cenario, {
+        [`itemExecutado-${cenario.item.id}`]: "on",
+      });
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          setor: "Producao",
+          [`itemExecutado-${cenario.item.id}`]: "on",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(relida.setor).toBe("Producao");
+      expect(relida.planoId).toBe(cenario.plano.id);
+      expect(relida.dataEmissao.toISOString()).toBe(criada.dataEmissao.toISOString());
+    });
+
+    // O outro tipo de progresso: NENHUM item executado, só um lançamento de
+    // serviço. A recusa depende de `emissaoAtual.servicos` chegar carregado
+    // pelo include de `buscarEmissao` — um include que mudasse deixaria este
+    // caminho apagar os lançamentos em silêncio.
+    test("com progresso APENAS de serviço, trocar o ativo é recusado", async () => {
+      const cenario = await cenarioComSessao();
+      const segundo = await comSegundoAtivo(cenario);
+      const criada = await criarPelaAction(cenario, {
+        servicoCount: "1",
+        "servico-0-pessoaId": cenario.pessoa.id,
+        "servico-0-itemRevisionalId": cenario.item.id,
+        "servico-0-modo": "Duracao",
+        "servico-0-horas": "2:00",
+      });
+      expect(await db.servicoEmissao.count({ where: { emissaoId: criada.id } })).toBe(1);
+      expect(
+        await db.itemExecutadoEmissao.count({ where: { emissaoId: criada.id, executado: true } }),
+      ).toBe(0);
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: segundo.ativo.id,
+          responsavelId: cenario.identidade.id,
+          servicoCount: "1",
+          "servico-0-pessoaId": cenario.pessoa.id,
+          "servico-0-itemRevisionalId": cenario.item.id,
+          "servico-0-modo": "Duracao",
+          "servico-0-horas": "2:00",
+        }),
+      );
+
+      expect(estado.ok).toBe(false);
+      expect(estado.error).toEqual([
+        { field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
+      ]);
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(relida.ativoId).toBe(cenario.ativo.id);
+      expect(await db.servicoEmissao.count({ where: { emissaoId: criada.id } })).toBe(1);
+    });
+
+    // Os dois casos em que a DERIVAÇÃO deixaria de resolver depois da criação.
+    // Com o MESMO ativo ela nem é consultada: o plano gravado é preservado e a
+    // emissão continua editável. Se a derivação voltasse a rodar incondicional,
+    // a emissão ficaria PERMANENTEMENTE ineditável — nem setor, nem
+    // responsável, nem datas, nem itens, nem serviços.
+    test("plano arquivado depois da criação não impede editar com o mesmo ativo", async () => {
+      const cenario = await cenarioComSessao();
+      const criada = await criarPelaAction(cenario);
+      await db.planoRevisional.update({
+        where: { id: cenario.plano.id },
+        data: { status: "Arquivado" },
+      });
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          setor: "Producao",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(relida.setor).toBe("Producao");
+      expect(relida.planoId).toBe(cenario.plano.id);
+    });
+
+    test("segundo plano cobrindo o mesmo ativo não impede editar com o mesmo ativo", async () => {
+      const cenario = await cenarioComSessao();
+      const criada = await criarPelaAction(cenario);
+      // Ambiguidade criada DEPOIS: na criação havia um candidato só.
+      await criarPlano(cenario.conta.id, cenario.ativo.id, cenario.identidade.id, {
+        itemRevisionalId: cenario.item.id,
+      });
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          setor: "Producao",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(relida.setor).toBe("Producao");
+      expect(relida.planoId).toBe(cenario.plano.id);
+    });
+  });
+
+  // AD-33 — o ANO do código sai do fuso de NEGÓCIO (America/Sao_Paulo), não do
+  // fuso do processo (UTC na Vercel). 31/dez 21h em Brasília já é 1º/jan em
+  // UTC: `getFullYear()` no processo daria o ano seguinte, e nada renumera
+  // depois — o código é a identidade do documento.
+  describe("ano do código na virada do ano", () => {
+    test("um instante de 31/dez 21h BRT (já 1º/jan em UTC) rende o ano de Brasília", () => {
+      const virada = new Date("2026-01-01T00:30:00.000Z"); // 31/12/2025 21:30 BRT
+      expect(anoNoFusoDeNegocio(virada)).toBe(2025);
+      expect(virada.getUTCFullYear()).toBe(2026);
+    });
+
+    test("fora da virada, o ano é o mesmo dos dois lados", () => {
+      expect(anoNoFusoDeNegocio(new Date("2026-06-15T12:00:00.000Z"))).toBe(2026);
     });
   });
 });

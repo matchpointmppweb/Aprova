@@ -18,12 +18,17 @@ import {
 } from "@/src/server/repositories/emissao";
 import { listarItensRevisionais } from "@/src/server/repositories/item-revisional";
 import { listarPessoas } from "@/src/server/repositories/pessoa";
-import { buscarPlano } from "@/src/server/repositories/plano";
+import { planosCandidatosDoAtivo } from "@/src/server/repositories/plano";
 import { listarUsuarios } from "@/src/server/repositories/usuario";
 import {
   calcularValorEsperado,
+  derivarPlanoDoAtivo,
+  emissaoTemProgresso,
   ERRO_CONFLITO_EDICAO,
+  ERRO_SEM_PLANO_PARA_O_ATIVO,
   ERRO_TRANSICAO_INVALIDA,
+  ERRO_TROCA_DE_PLANO_COM_PROGRESSO,
+  erroDePlanoAmbiguo,
   isSetorValido,
   lerServicos,
   parseDataHora,
@@ -32,6 +37,7 @@ import {
   validarServicos,
   type ErroDeValidacao,
   type EstadoAcaoEmissao,
+  type ItemDoPlanoVigente,
   type ItemRevisionalReal,
   type LinhaServicoBruta,
 } from "./emissao-estado";
@@ -68,33 +74,19 @@ function lerCampoNumerico(formData: FormData, nome: string): number | null {
   return Number.isFinite(valor) && Number.isInteger(valor) && valor >= 0 ? valor : null;
 }
 
-// Input type="date" manda "YYYY-MM-DD" — fixa meia-noite local (evita o
-// shift de fuso horário que "YYYY-MM-DDT00:00:00Z" causaria em fusos
-// negativos, empurrando a data um dia para trás). `new Date(...)` sozinho
-// não rejeita um dia de calendário inexistente (ex. "2024-02-30" normaliza
-// silenciosamente para 1º de março) — confirma aqui que ano/mês/dia do
-// resultado batem com os componentes originais da string; se não bater,
-// trata como data ausente (mesmo erro de validação de "Informe a data de
-// emissão").
-function parseDataEmissao(bruto: string): Date | null {
-  if (!bruto) return null;
-  const data = new Date(`${bruto}T00:00:00`);
-  if (Number.isNaN(data.getTime())) return null;
-
-  const [anoStr, mesStr, diaStr] = bruto.split("-");
-  const bateComOriginal =
-    data.getFullYear() === Number(anoStr) &&
-    data.getMonth() + 1 === Number(mesStr) &&
-    data.getDate() === Number(diaStr);
-  return bateComOriginal ? data : null;
-}
-
+// Story 7.5 (AD-33) — `dataEmissao` NÃO é lida do FormData. A data é o instante
+// em que o servidor cria a emissão, atribuído no repositório; um `dataEmissao`
+// adulterado no FormData é simplesmente IGNORADO, nunca validado e nunca
+// gravado (I/O Matrix: "Data forjada"). Por isso o antigo `parseDataEmissao`
+// desapareceu em vez de continuar aqui sem chamador.
+//
+// `planoId` também deixou de ser um campo do formulário (AD-32): quando chega,
+// vale só como ESCOLHA DE DESEMPATE numa ambiguidade, e é revalidada contra os
+// candidatos reais em `derivarPlanoDaEmissao` — nunca aceita como o plano.
 function lerCamposGerais(formData: FormData) {
   const ativoId = String(formData.get("ativoId") ?? "").trim();
-  const planoId = String(formData.get("planoId") ?? "").trim();
+  const planoEscolhidoId = String(formData.get("planoId") ?? "").trim();
   const responsavelId = String(formData.get("responsavelId") ?? "").trim();
-  const dataEmissaoBruta = String(formData.get("dataEmissao") ?? "").trim();
-  const dataEmissao = parseDataEmissao(dataEmissaoBruta);
   // Story 5.5: setor (validado contra o enum em validarCamposGerais) + os
   // três marcos opcionais de data/hora, cada um podendo vir como null
   // (campo vazio) ou "invalido" (valor malformado -> erro de campo).
@@ -104,13 +96,55 @@ function lerCamposGerais(formData: FormData) {
   const dataFim = parseDataHora(String(formData.get("dataFim") ?? ""));
   return {
     ativoId,
-    planoId,
+    planoEscolhidoId,
     responsavelId,
-    dataEmissao,
     setor,
     dataAgendamento,
     dataInicio,
     dataFim,
+  };
+}
+
+// A AUTORIDADE sobre o plano (AD-32): o servidor re-deriva sempre, com a MESMA
+// `derivarPlanoDoAtivo` que a tela usa para pré-visualizar o checklist — e
+// nunca confia no `planoId` do cliente, exceto como desempate de ambiguidade,
+// revalidado contra os candidatos reais.
+//
+// Mesmo padrão do `valorEsperado`: a tela mostra, o servidor recalcula e grava.
+async function derivarPlanoDaEmissao(
+  contaId: string,
+  ativoId: string,
+  planoEscolhidoId: string,
+): Promise<
+  | { ok: true; plano: { id: string; itens: ItemDoPlanoVigente[] } }
+  | { ok: false; erros: ErroDeValidacao[] }
+> {
+  const candidatos = await planosCandidatosDoAtivo(contaId, ativoId);
+  if (!candidatos) {
+    // Ativo inexistente ou de outra conta (AD-1) — nunca revela qual dos dois.
+    return { ok: false, erros: [{ field: "ativoId", message: "Selecione um ativo válido." }] };
+  }
+
+  const derivacao = derivarPlanoDoAtivo(candidatos.ativo, candidatos.planos);
+  if (derivacao.tipo === "ok") {
+    return { ok: true, plano: derivacao.plano };
+  }
+  if (derivacao.tipo === "sem-plano") {
+    // Recusa dizendo o que falta, sem gravar nada (Boundaries).
+    return { ok: false, erros: [{ field: "planoId", message: ERRO_SEM_PLANO_PARA_O_ATIVO }] };
+  }
+
+  // Ambíguo: a escolha humana é aceita SÓ se for um dos candidatos reais. Um
+  // `planoId` forjado (de outro ativo, de outra conta, arquivado) não está
+  // entre eles e cai na mesma recusa de quem não escolheu — o servidor nunca
+  // vincula a emissão a um plano de fora (I/O Matrix: "Escolha forjada").
+  const escolhido = derivacao.candidatos.find((plano) => plano.id === planoEscolhidoId);
+  if (escolhido) {
+    return { ok: true, plano: escolhido };
+  }
+  return {
+    ok: false,
+    erros: [{ field: "planoId", message: erroDePlanoAmbiguo(derivacao.candidatos) }],
   };
 }
 
@@ -160,14 +194,17 @@ function lerIdentificacaoEmissao(formData: FormData) {
 // de outra conta é rejeitado como erro de campo ANTES de qualquer escrita —
 // nada é persistido (nem emissão, nem itens, nem serviços), e a mensagem
 // nunca revela se o registro existe em outra conta (I/O Matrix).
+//
+// Story 7.5: o PLANO saiu daqui — ele não vem mais do cliente, então não há id
+// de plano a conferir contra a conta; quem responde por ele é
+// `derivarPlanoDaEmissao`, que só enxerga os candidatos reais do ativo.
 async function referenciasValidas(
   contaId: string,
-  campos: { ativoId: string; planoId: string; responsavelId: string },
+  campos: { ativoId: string; responsavelId: string },
   servicos: LinhaServicoBruta[],
 ) {
-  const [ativos, plano, usuarios, itensReaisPorId, pessoas] = await Promise.all([
+  const [ativos, usuarios, itensReaisPorId, pessoas] = await Promise.all([
     listarAtivos(contaId),
-    buscarPlano(contaId, campos.planoId),
     listarUsuarios(contaId),
     buscarItensReaisPorId(contaId),
     servicos.length > 0 ? listarPessoas(contaId) : Promise.resolve([]),
@@ -176,9 +213,6 @@ async function referenciasValidas(
   const erros: { field: string; message: string }[] = [];
   if (campos.ativoId && !ativos.some((ativo) => ativo.id === campos.ativoId)) {
     erros.push({ field: "ativoId", message: "Selecione um ativo válido." });
-  }
-  if (campos.planoId && !plano) {
-    erros.push({ field: "planoId", message: "Selecione um plano revisional válido." });
   }
   if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
@@ -200,7 +234,7 @@ async function referenciasValidas(
     }
   }
 
-  return { erros, plano, itensReaisPorId };
+  return { erros, itensReaisPorId };
 }
 
 async function buscarItensReaisPorId(contaId: string) {
@@ -298,26 +332,36 @@ export async function criarEmissaoAction(
     return { ok: false, error: erros };
   }
 
-  const {
-    erros: errosDeReferencia,
-    plano,
-    itensReaisPorId,
-  } = await referenciasValidas(usuarioSessao.contaId, campos, linhasDeServico);
+  const { erros: errosDeReferencia, itensReaisPorId } = await referenciasValidas(
+    usuarioSessao.contaId,
+    campos,
+    linhasDeServico,
+  );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }
-  // plano nunca é null aqui: campos.planoId não é vazio (validarCamposGerais
-  // já barrou isso) e referenciasValidas já confirmou que existe na conta.
-  const planoAtual = plano!;
+
+  // O plano é DERIVADO do ativo aqui, no servidor (AD-32) — nada é gravado
+  // quando a derivação recusa (ambiguidade sem escolha, ou nenhum plano).
+  const derivacao = await derivarPlanoDaEmissao(
+    usuarioSessao.contaId,
+    campos.ativoId,
+    campos.planoEscolhidoId,
+  );
+  if (!derivacao.ok) {
+    return { ok: false, error: derivacao.erros };
+  }
+  const planoAtual = derivacao.plano;
 
   const itens = montarItensNovos(planoAtual.itens, itensReaisPorId, formData);
 
   try {
+    // Sem `dataEmissao` (AD-33): o repositório a atribui do relógio do
+    // servidor, e é dela que sai o ano do código.
     await criarEmissao(usuarioSessao.contaId, {
       ativoId: campos.ativoId,
-      planoId: campos.planoId,
+      planoId: planoAtual.id,
       responsavelId: campos.responsavelId,
-      dataEmissao: campos.dataEmissao as Date,
       ...camposDeSetorEDatas(campos),
       servicos,
       itens,
@@ -388,33 +432,68 @@ export async function editarEmissaoAction(
     return { ok: false, error: ERRO_TRANSICAO_INVALIDA };
   }
 
-  const {
-    erros: errosDeReferencia,
-    plano: planoSelecionado,
-    itensReaisPorId,
-  } = await referenciasValidas(usuarioSessao.contaId, campos, linhasDeServico);
+  const { erros: errosDeReferencia, itensReaisPorId } = await referenciasValidas(
+    usuarioSessao.contaId,
+    campos,
+    linhasDeServico,
+  );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }
-  const planoAtual = planoSelecionado!;
 
-  const trocouPlano = campos.planoId !== emissaoAtual.planoId;
+  // Re-deriva SOMENTE quando o ativo realmente mudou (AD-32) — trocar o ativo
+  // pode trocar o plano. Com o MESMO ativo, o plano gravado é preservado sem
+  // passar pela derivação: arquivar o plano depois da criação (ou surgir um
+  // segundo plano cobrindo o mesmo ativo) deixaria a derivação sem resposta e
+  // tornaria a emissão permanentemente ineditável — contra a I/O Matrix
+  // ("Edição sem troca: mesmo ativo, com progresso → salva normalmente").
+  const trocouAtivo = campos.ativoId !== emissaoAtual.ativoId;
 
+  let planoNovo: Awaited<ReturnType<typeof derivarPlanoDaEmissao>> | null = null;
+  if (trocouAtivo) {
+    planoNovo = await derivarPlanoDaEmissao(
+      usuarioSessao.contaId,
+      campos.ativoId,
+      campos.planoEscolhidoId,
+    );
+    if (!planoNovo.ok) {
+      return { ok: false, error: planoNovo.erros };
+    }
+  }
+  const planoDerivado = planoNovo?.ok ? planoNovo.plano : null;
+  const planoIdAtual = planoDerivado?.id ?? emissaoAtual.planoId;
+
+  const trocouPlano = planoIdAtual !== emissaoAtual.planoId;
+
+  // O plano mudaria e a emissão JÁ TEM progresso GRAVADO: recusa com mensagem,
+  // nunca apaga em silêncio (Boundaries/Design Notes). O ramo `trocouPlano` do
+  // repositório faz deleteMany+createMany dos itens — sem este guard, trocar o
+  // ativo levaria embora execução, medição, observação e o vínculo dos
+  // lançamentos de uma emissão em produção. A avaliação é sobre `emissaoAtual`
+  // (o que está no banco), nunca sobre o formulário.
+  if (trocouPlano && emissaoTemProgresso(emissaoAtual)) {
+    return {
+      ok: false,
+      error: [{ field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO }],
+    };
+  }
+
+  // Sem `dataEmissao` (AD-33): a edição nunca toca a data, o código, o ano nem
+  // o sequencial já gravados.
   const comuns = {
     ativoId: campos.ativoId,
-    planoId: campos.planoId,
+    planoId: planoIdAtual,
     responsavelId: campos.responsavelId,
-    dataEmissao: campos.dataEmissao as Date,
     ...camposDeSetorEDatas(campos),
     servicos,
   };
 
   let dados: DadosEditarEmissao;
-  if (trocouPlano) {
+  if (trocouPlano && planoDerivado) {
     dados = {
       trocouPlano: true,
       ...comuns,
-      itens: montarItensNovos(planoAtual.itens, itensReaisPorId, formData),
+      itens: montarItensNovos(planoDerivado.itens, itensReaisPorId, formData),
     };
   } else {
     dados = {

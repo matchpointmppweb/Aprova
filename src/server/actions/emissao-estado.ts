@@ -5,7 +5,7 @@
 // Fica fora de actions/emissao.ts porque um módulo "use server" só pode
 // exportar funções assíncronas — nenhuma constante ou tipo (mesmo motivo de
 // plano-estado.ts).
-import type { Setor } from "@prisma/client";
+import type { Setor, StatusPlanoRevisional } from "@prisma/client";
 
 import {
   duracaoDoPeriodo,
@@ -81,6 +81,113 @@ export function calcularValorEsperado(
     valorEsperadoHoras: itemDoPlano.horasOverride ?? itemReal?.horasPadrao ?? null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Story 7.5 — o plano revisional é DERIVADO do ativo (AD-32)
+// ---------------------------------------------------------------------------
+// UMA regra, UMA função, consumida pelos dois lados: a tela chama para montar o
+// checklist da aba Itens (pré-visualização), a Server Action chama para decidir
+// o que grava (autoridade). É o mesmo arranjo de `calcularValorEsperado` — e a
+// função ser única é o que impede as duas metades de discordarem.
+//
+// Nunca desempata sozinha: sobrando mais de um candidato no MESMO nível de
+// preferência, devolve `ambiguo` com os candidatos e deixa a escolha para quem
+// pode fazê-la. Há um critério determinístico à mão (`orderBy: nome`) e usá-lo
+// seria pior que não ter — a emissão sairia vinculada a um plano que ninguém
+// escolheu, e o erro só apareceria quando o checklist viesse errado.
+
+/// Forma mínima que a derivação precisa de um plano. Estruturalmente satisfeita
+/// tanto pelo `PlanoOpcao` do cliente quanto pelo retorno do repositório — e
+/// genérica na assinatura abaixo, para o chamador receber de volta o SEU tipo
+/// (com `itens`, que o cliente precisa para o checklist).
+export type PlanoDerivavel = {
+  id: string;
+  nome: string;
+  status: StatusPlanoRevisional;
+  /// XOR com `tipoAtivoId` (schema): exatamente um dos dois é não-nulo.
+  ativoId: string | null;
+  tipoAtivoId: string | null;
+};
+
+export type AtivoDerivavel = {
+  id: string;
+  tipoAtivoId: string;
+};
+
+export type DerivacaoDePlano<T> =
+  | { tipo: "ok"; plano: T }
+  /// Sempre 2 ou mais — um só nunca é ambíguo.
+  | { tipo: "ambiguo"; candidatos: T[] }
+  | { tipo: "sem-plano" };
+
+// Preferência (AD-32): entre os planos `Ativo` da conta, prefere o que mira
+// aquele `ativoId`; na ausência, o que mira o `tipoAtivoId` do ativo. Um plano
+// POR ATIVO vence qualquer plano por tipo — e vencendo, a existência de planos
+// por tipo não cria ambiguidade nenhuma.
+//
+// Um plano arquivado NÃO é candidato: some da derivação como se não existisse,
+// então um ativo cujo único plano foi arquivado cai em `sem-plano` (I/O Matrix)
+// — nunca é vinculado a um plano fora de uso.
+export function derivarPlanoDoAtivo<T extends PlanoDerivavel>(
+  ativo: AtivoDerivavel | null | undefined,
+  planos: readonly T[],
+): DerivacaoDePlano<T> {
+  if (!ativo) return { tipo: "sem-plano" };
+
+  const ativos = planos.filter((plano) => plano.status === "Ativo");
+
+  const porAtivo = ativos.filter((plano) => plano.ativoId === ativo.id);
+  const nivel = porAtivo.length > 0
+    ? porAtivo
+    : ativos.filter((plano) => plano.ativoId === null && plano.tipoAtivoId === ativo.tipoAtivoId);
+
+  if (nivel.length === 0) return { tipo: "sem-plano" };
+  if (nivel.length === 1) return { tipo: "ok", plano: nivel[0] };
+  return { tipo: "ambiguo", candidatos: nivel };
+}
+
+// Story 7.5 — "progresso registrado" é sobre o que está GRAVADO, nunca sobre o
+// formulário: trocar o ativo passa a poder trocar o plano sozinho, e o ramo
+// `trocouPlano` do repositório faz deleteMany+createMany dos itens. Com
+// progresso, isso apagaria execução, medição, observação e o vínculo dos
+// lançamentos — perda silenciosa num fluxo já em produção. Então a edição
+// RECUSA em vez de re-snapshotar; sem progresso não há o que perder.
+export type ItemGravadoDaEmissao = {
+  executado: boolean;
+  medicaoDias: number | null;
+  medicaoKm: number | null;
+  medicaoHoras: number | null;
+  observacao: string | null;
+};
+
+export function emissaoTemProgresso(emissao: {
+  itens: readonly ItemGravadoDaEmissao[];
+  servicos: readonly unknown[];
+}): boolean {
+  if (emissao.servicos.length > 0) return true;
+  return emissao.itens.some(
+    (item) =>
+      item.executado ||
+      item.medicaoDias !== null ||
+      item.medicaoKm !== null ||
+      item.medicaoHoras !== null ||
+      (item.observacao !== null && item.observacao.trim() !== ""),
+  );
+}
+
+// Mensagens da derivação (Story 7.5) — exportadas para a tela dizer a MESMA
+// coisa que o servidor diz, em vez de duas redações que divergem com o tempo.
+export const ERRO_SEM_PLANO_PARA_O_ATIVO =
+  "Nenhum plano revisional ativo cobre este ativo. Cadastre um plano para o ativo ou para o tipo dele.";
+
+export function erroDePlanoAmbiguo(candidatos: readonly { nome: string }[]): string {
+  return `Mais de um plano revisional cobre este ativo — escolha qual usar: ${candidatos
+    .map((plano) => plano.nome)
+    .join(", ")}.`;
+}
+
+export const ERRO_TROCA_DE_PLANO_COM_PROGRESSO =
+  "Este ativo usa outro plano revisional, e esta emissão já tem itens executados ou serviços lançados. Remova o progresso registrado antes de trocar o ativo.";
 
 // Setores válidos (Story 5.5) — espelha o enum `Setor` do schema. Fixo, sem
 // tela de gestão e FORA do enum `Modulo` (AD-15). O `satisfies` amarra a
@@ -246,7 +353,7 @@ export function parseDataHora(bruto: string): Date | null | "invalido" {
 }
 
 // Campos Gerais obrigatórios (I/O Matrix: "Criação feliz" exige
-// ativo+plano+responsável+data válidos). Vínculo cross-tenant de cada id é
+// ativo+responsável válidos). Vínculo cross-tenant de cada id é
 // checado à parte pela Server Action (contra os dados reais da conta),
 // mesmo padrão de vinculoEResponsavelValidos em actions/plano.ts.
 //
@@ -254,11 +361,14 @@ export function parseDataHora(bruto: string): Date | null | "invalido" {
 // banco tem default, mas um request adulterado com valor fora do enum é
 // rejeitado aqui, nunca chega ao Prisma) e os três marcos de data/hora são
 // OPCIONAIS — só um valor malformado vira erro de campo, ausência nunca vira.
+//
+// Story 7.5: `planoId` e `dataEmissao` SAÍRAM daqui. O plano deixou de ser um
+// campo do formulário (é derivado do ativo, AD-32) e a data deixou de vir do
+// cliente (é o instante do servidor na criação, AD-33) — exigir qualquer um dos
+// dois aqui rejeitaria um FormData que agora é o correto.
 export function validarCamposGerais(campos: {
   ativoId: string;
-  planoId: string;
   responsavelId: string;
-  dataEmissao: Date | null;
   setor: string;
   dataAgendamento: Date | null | "invalido";
   dataInicio: Date | null | "invalido";
@@ -268,14 +378,8 @@ export function validarCamposGerais(campos: {
   if (!campos.ativoId) {
     erros.push({ field: "ativoId", message: "Selecione um ativo." });
   }
-  if (!campos.planoId) {
-    erros.push({ field: "planoId", message: "Selecione um plano revisional." });
-  }
   if (!campos.responsavelId) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável." });
-  }
-  if (!campos.dataEmissao || Number.isNaN(campos.dataEmissao.getTime())) {
-    erros.push({ field: "dataEmissao", message: "Informe a data de emissão." });
   }
   if (!isSetorValido(campos.setor)) {
     erros.push({ field: "setor", message: "Selecione um setor válido." });

@@ -141,11 +141,14 @@ export type DadosServicoEmissao =
 
 // Campos gerais compartilhados pela criação e pelos dois braços da edição
 // (Story 5.5 acrescentou setor + os 3 marcos opcionais de data/hora).
+//
+// Story 7.5 (AD-33): `dataEmissao` SAIU daqui. Na criação ela é atribuída pelo
+// próprio repositório, do mesmo instante que dá o ano do código; na edição ela
+// não é tocada — nem código, nem ano, nem seq (nada é renumerado).
 type CamposGeraisEmissao = {
   ativoId: string;
   planoId: string;
   responsavelId: string;
-  dataEmissao: Date;
   setor: Setor;
   dataAgendamento: Date | null;
   dataInicio: Date | null;
@@ -159,6 +162,24 @@ export type DadosCriarEmissao = CamposGeraisEmissao & {
 
 function formatarCodigo(ano: number, seq: number) {
   return `EM-${ano}-${String(seq).padStart(4, "0")}`;
+}
+
+// Fuso de negócio do produto: single-timezone pt-BR (internacionalização é
+// non-goal explícito do SPEC).
+const FUSO_DE_NEGOCIO = "America/Sao_Paulo";
+
+// O ano do código sai do fuso de NEGÓCIO, nunca do fuso do processo
+// (`getFullYear()`), que é UTC na Vercel: uma emissão criada às 21h de 31/dez
+// em Brasília receberia `EM-{ano seguinte}`, e nada renumera depois — o código
+// é a identidade do documento. O instante gravado em `dataEmissao` continua
+// sendo o real; só o ANO do código muda de origem.
+export function anoNoFusoDeNegocio(instante: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: FUSO_DE_NEGOCIO,
+      year: "numeric",
+    }).format(instante),
+  );
 }
 
 function isErroDeColisaoDeCodigo(erro: unknown): boolean {
@@ -193,13 +214,20 @@ const MAX_TENTATIVAS_CODIGO = 5;
 // nunca deixa uma emissão parcial), e só desiste após
 // MAX_TENTATIVAS_CODIGO tentativas, devolvendo o erro genérico para a Server
 // Action decidir a mensagem (I/O Matrix: "Colisão de código").
+//
+// Story 7.5 (AD-33) — a data da emissão é ATRIBUÍDA AQUI, do relógio do
+// servidor, e nunca vem do cliente. `agora` é lido UMA vez por tentativa,
+// DENTRO da transação que conta o sequencial: o ano do código e o valor gravado
+// precisam sair do MESMO instante — lê-los em dois lugares abriria a janela de
+// virada de ano entre uma linha e outra, e o código sairia num ano diferente do
+// da data gravada.
 export async function criarEmissao(contaId: string, dados: DadosCriarEmissao) {
-  const ano = dados.dataEmissao.getFullYear();
-
   let ultimoErro: unknown;
   for (let tentativa = 0; tentativa < MAX_TENTATIVAS_CODIGO; tentativa++) {
     try {
       return await prisma.$transaction(async (tx) => {
+        const agora = new Date();
+        const ano = anoNoFusoDeNegocio(agora);
         const totalExistente = await tx.emissao.count({ where: { contaId, ano } });
         const seq = totalExistente + 1;
         const codigo = formatarCodigo(ano, seq);
@@ -210,7 +238,7 @@ export async function criarEmissao(contaId: string, dados: DadosCriarEmissao) {
             ativoId: dados.ativoId,
             planoId: dados.planoId,
             responsavelId: dados.responsavelId,
-            dataEmissao: dados.dataEmissao,
+            dataEmissao: agora,
             setor: dados.setor,
             dataAgendamento: dados.dataAgendamento,
             dataInicio: dados.dataInicio,
@@ -314,7 +342,8 @@ export async function atualizarEmissao(
           ativoId: dados.ativoId,
           planoId: dados.planoId,
           responsavelId: dados.responsavelId,
-          dataEmissao: dados.dataEmissao,
+          // `dataEmissao` NUNCA aparece aqui (AD-33): a data, e com ela o
+          // código/ano/seq que dela saíram, são da criação e permanecem.
           setor: dados.setor,
           dataAgendamento: dados.dataAgendamento,
           dataInicio: dados.dataInicio,

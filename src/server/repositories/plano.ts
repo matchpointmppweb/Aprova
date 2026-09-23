@@ -70,6 +70,50 @@ export async function buscarPlano(contaId: string, id: string) {
   return aplicarNomeDoVinculo(contaId, plano);
 }
 
+// Story 7.5 (AD-32) — a busca que faltava: planos A PARTIR de um ativo. É o
+// caminho inverso de `resolverAtivosDoPlano`, e não uma variante dele: ali a
+// pergunta é "que ativos este plano cobre", aqui é "que planos cobrem este
+// ativo". Traz os DOIS níveis de preferência (plano por ativo e plano pelo tipo
+// do ativo) sem escolher entre eles — a escolha é de `derivarPlanoDoAtivo`
+// (actions/emissao-estado.ts), a MESMA função que a tela usa.
+//
+// Escopado por contaId dos dois lados (AD-1): um ativo de outra conta devolve
+// `null`, nunca os planos dela. Só planos `Ativo` entram — um plano arquivado
+// não é candidato (Boundaries).
+export async function planosCandidatosDoAtivo(contaId: string, ativoId: string) {
+  const ativo = await prisma.ativo.findFirst({
+    where: { id: ativoId, contaId },
+    select: { id: true, tipoAtivoId: true },
+  });
+  if (!ativo) return null;
+
+  const planos = await prisma.planoRevisional.findMany({
+    where: {
+      contaId,
+      status: "Ativo",
+      OR: [{ ativoId: ativo.id }, { tipoAtivoId: ativo.tipoAtivoId }],
+    },
+    select: {
+      id: true,
+      nome: true,
+      status: true,
+      ativoId: true,
+      tipoAtivoId: true,
+      itens: {
+        select: {
+          itemRevisionalId: true,
+          diasOverride: true,
+          kmOverride: true,
+          horasOverride: true,
+        },
+      },
+    },
+    orderBy: { nome: "asc" },
+  });
+
+  return { ativo, planos };
+}
+
 // Cria PlanoRevisional + PlanoItemRevisional[] juntos numa única transação
 // (AD-9) — nunca chamadas sequenciais não-transacionais para a mesma
 // operação lógica (Boundaries).
