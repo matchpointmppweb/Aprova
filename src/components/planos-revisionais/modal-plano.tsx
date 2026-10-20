@@ -153,7 +153,11 @@ export function ModalPlano({
   }
 
   return (
-    <div className="modal-overlay" onClick={onFechar}>
+    // `modal-full` (padrão de tela de 20-10-2026): toda tela sobreposta é
+    // estendida. DIVERGE DO MOCKUP de propósito — lá este modal (L1819) é a
+    // janela reduzida de 760px; a decisão do produto passou a ser o modo
+    // estendido para TODAS as telas, não só a de Emissão.
+    <div className="modal-overlay modal-full" onClick={onFechar}>
       <div className="modal" onClick={(evento) => evento.stopPropagation()}>
         <div className="modal-header">
           <h2>{plano ? `Editar plano · ${plano.nome}` : "Novo plano revisional"}</h2>
