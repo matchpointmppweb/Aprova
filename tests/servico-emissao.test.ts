@@ -29,6 +29,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 const { criarEmissaoAction, editarEmissaoAction } = await import("@/src/server/actions/emissao");
 
 import {
+  ERRO_SEM_PLANO_PARA_O_ATIVO,
   ERRO_TROCA_DE_PLANO_COM_PROGRESSO,
   estadoInicialAcaoEmissao,
   mensagemDeErro,
@@ -634,6 +635,12 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
     );
 
     expect(estado.ok).toBe(false);
+    // Afere a MENSAGEM, não só o `ok` — a regra "arquivado não é candidato"
+    // é guardada em DOIS lugares (o `where status: "Ativo"` de
+    // `planosCandidatosDoAtivo` e o filtro de `derivarPlanoDoAtivo`), então
+    // só `ok === false` passaria mesmo com a derivação aceitando arquivado:
+    // a recusa viria de outro ponto, por outro motivo. Verificado por mutação.
+    expect(mensagemDeErro(estado.error)).toBe(ERRO_SEM_PLANO_PARA_O_ATIVO);
     expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
   });
 
