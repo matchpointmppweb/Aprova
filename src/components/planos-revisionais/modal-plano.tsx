@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { opcoesDeResponsavel } from "@/src/lib/responsavel";
 import { criarPlanoAction, editarPlanoAction } from "@/src/server/actions/plano";
 import { estadoInicialAcaoPlano, mensagemDeErro } from "@/src/server/actions/plano-estado";
 import type {
@@ -310,7 +311,12 @@ export function ModalPlano({
                     <option value="" disabled>
                       Selecione o responsável
                     </option>
-                    {usuarios.map((usuario) => (
+                    {/* Só quem está Ativo pode receber responsabilidade —
+                        MESMA regra do servidor (src/lib/responsavel.ts). O
+                        responsável já gravado continua na lista mesmo
+                        desativado depois, para o plano antigo não virar
+                        ineditável. */}
+                    {opcoesDeResponsavel(usuarios, plano?.responsavelId ?? null).map((usuario) => (
                       <option key={usuario.id} value={usuario.id}>
                         {usuario.nome}
                       </option>

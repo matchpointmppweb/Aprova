@@ -1,3 +1,4 @@
+import type { StatusUsuario } from "@prisma/client";
 import type {
   StatusAtivo,
   StatusItemRevisional,
@@ -71,6 +72,12 @@ export interface EmpresaOpcao {
 export interface UsuarioOpcao {
   id: string;
   nome: string;
+  /// Diferido da Story 6.3, fechado em 27-10-2026: só quem está Ativo pode
+  /// RECEBER responsabilidade, e o <select> precisa do status para montar a
+  /// lista pela mesma regra que o servidor aplica (src/lib/responsavel.ts).
+  /// `listarUsuarios` devolve os três status de propósito — a tela de
+  /// Usuários filtra e reativa — então o recorte é de quem OFERECE.
+  status: StatusUsuario;
 }
 
 // Forma mínima usada pela aba "Itens revisionais" do modal — compatível com

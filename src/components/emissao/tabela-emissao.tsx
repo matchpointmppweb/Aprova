@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { formatarInstante } from "@/src/lib/datas";
 import { StatusBadge } from "@/src/components/shared/status-badge";
 import { LABEL_POR_SETOR } from "@/src/server/actions/emissao-estado";
 import { ModalEmissao } from "./modal-emissao";
@@ -31,16 +32,16 @@ function obterIniciais(nome: string) {
   return (primeira + ultima).toUpperCase();
 }
 
-// Mesmo padrão de formatação de src/components/planos-revisionais/
-// tabela-planos.tsx (formatarData) — só data, sem hora.
-function formatarData(data: Date | string) {
-  const dataObj = typeof data === "string" ? new Date(data) : data;
-  return dataObj.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+// Diferido da Story 7.5, fechado em 27-10-2026: a coluna chamava-se "Data"
+// e mostrava só o dia, enquanto a AD-33 mudou a NATUREZA do campo — deixou
+// de ser data de negócio digitável e passou a ser o instante em que o
+// servidor criou a emissão, exibido no modal como "Data criação" com hora.
+// Rótulo e granularidade agora batem nos dois lugares; ler "12/10" na lista
+// e "12/10 14:37" no modal fazia parecer campos diferentes.
+//
+// Usa `formatarInstante` de src/lib/datas.ts — a mesma função do modal e da
+// OS impressa, com getters LOCAIS porque é instante real, não relógio de
+// parede digitado.
 
 // Tela Emissão (Story 4.1), portada de Mockup.html:945-979 (listagem) +
 // :1294-1331/1564-1585 (modal). can() já rodou no servidor (app/(dashboard)/
@@ -144,7 +145,7 @@ export function TabelaEmissao({
               <th>Ativo</th>
               <th>Setor</th>
               <th>Plano revisional</th>
-              <th>Data</th>
+              <th>Data criação</th>
               <th>Responsável</th>
               <th>Status</th>
               <th></th>
@@ -167,7 +168,7 @@ export function TabelaEmissao({
                   <td>{emissao.ativo.nome}</td>
                   <td className="muted">{LABEL_POR_SETOR[emissao.setor]}</td>
                   <td className="muted">{emissao.plano.nome}</td>
-                  <td>{formatarData(emissao.dataEmissao)}</td>
+                  <td>{formatarInstante(emissao.dataEmissao)}</td>
                   <td className="cell-user">
                     <div className="avatar-sm">{obterIniciais(emissao.responsavel.nome)}</div>
                     {emissao.responsavel.nome}

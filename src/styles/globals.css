@@ -546,6 +546,17 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
   .date-row{grid-template-columns:1fr 1fr;}
 }
 
+/* Aviso de pré-requisito de cadastro (diferido da 5.4, fechado em
+   27-10-2026): a criação está bloqueada porque falta cadastrar outra coisa,
+   e o aviso diz ONDE resolver. Tom de atenção, não de erro — nada deu
+   errado, só falta um passo anterior. */
+.aviso-pre-requisito{
+  margin:0 0 12px;padding:10px 14px;border-radius:var(--radius-m);
+  background:var(--amber-bg);border:1px solid var(--amber);
+  color:var(--ink);font-size:13px;
+}
+.aviso-pre-requisito a{color:var(--pine-dark);font-weight:600;}
+
 /* ---------- Relatórios (C3, 27-10-2026) ---------- */
 /* Não vem do mockup: `Mockups/atual.html` não tem tela de relatórios, então
    não há o que portar (AD-4 vale para o que existe lá). Reusa `.panel`,

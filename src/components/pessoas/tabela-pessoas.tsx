@@ -47,6 +47,18 @@ export function TabelaPessoas({
 
   const fecharLinha = () => setLinhaAberta(null);
 
+  // Diferido da Story 5.4, fechado em 27-10-2026. Pessoa é a primeira
+  // entidade do produto com FK OBRIGATÓRIA, então numa conta nova os dois
+  // <select required> nascem vazios: "Nova pessoa" abria a linha, o browser
+  // bloqueava o submit com a mensagem genérica dele, e nada dizia onde
+  // resolver. O recorte é por ATIVO, o mesmo que a linha de criação aplica
+  // (linha-criacao.tsx) — cargo arquivado não é oferecido, logo não conta.
+  const faltaCargo = !cargos.some((cargo) => cargo.status === "Ativo");
+  const faltaFuncao = !funcoes.some((funcao) => funcao.status === "Ativo");
+  const faltaPreRequisito = faltaCargo || faltaFuncao;
+
+  const oQueFalta = faltaCargo && faltaFuncao ? "um cargo e uma função" : faltaCargo ? "um cargo" : "uma função";
+
   const buscaNormalizada = busca.trim().toLowerCase();
   const pessoasFiltradas = pessoas.filter((pessoa) => {
     return (
@@ -66,7 +78,7 @@ export function TabelaPessoas({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={!podeCriar}
+          disabled={!podeCriar || faltaPreRequisito}
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -75,6 +87,16 @@ export function TabelaPessoas({
           Nova pessoa
         </button>
       </div>
+
+      {/* Só quando a criação está bloqueada POR FALTA DE CADASTRO — nunca
+          por falta de permissão, que não é problema que a pessoa resolva
+          clicando num link. */}
+      {podeCriar && faltaPreRequisito ? (
+        <p className="aviso-pre-requisito">
+          Para cadastrar uma pessoa é preciso ter {oQueFalta} em uso. Cadastre em{" "}
+          <a href="/cargos">Cargos</a> e <a href="/funcoes">Funções</a>.
+        </p>
+      ) : null}
 
       <div className="toolbar">
         <div className="search-box">

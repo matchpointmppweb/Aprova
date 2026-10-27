@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 
+import { validarResponsavel } from "@/src/lib/responsavel";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
@@ -137,6 +138,10 @@ async function vinculoEResponsavelValidos(
     empresaId: string | null;
     responsavelId: string;
   },
+  /// Quem o plano JÁ tem como responsável — `null` na criação. Ver
+  /// validarResponsavel: o responsável gravado continua aceito mesmo
+  /// desativado depois, para a edição do plano antigo não travar.
+  responsavelAtualId: string | null = null,
 ) {
   const [ativos, tipos, empresas, usuarios] = await Promise.all([
     listarAtivos(contaId),
@@ -155,9 +160,11 @@ async function vinculoEResponsavelValidos(
   if (campos.empresaId && !empresas.some((empresa) => empresa.id === campos.empresaId)) {
     erros.push({ field: "vinculo", message: "Selecione uma empresa válida." });
   }
-  if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
-    erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
-  }
+  // Responsável: pertencimento À CONTA e status, numa regra só
+  // (src/lib/responsavel.ts), a MESMA que o <select> do modal usa para
+  // montar as opções — divergir faria a tela oferecer o que o servidor
+  // recusa. `responsavelAtualId` preserva quem já estava gravado.
+  erros.push(...validarResponsavel(usuarios, campos.responsavelId, responsavelAtualId));
   return erros;
 }
 

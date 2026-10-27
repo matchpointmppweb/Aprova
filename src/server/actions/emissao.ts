@@ -3,6 +3,7 @@
 import type { StatusEmissao } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
+import { validarResponsavel } from "@/src/lib/responsavel";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
@@ -205,6 +206,11 @@ async function referenciasValidas(
   contaId: string,
   campos: { ativoId: string; responsavelId: string },
   servicos: LinhaServicoBruta[],
+  /// Quem a emissão JÁ tem como responsável — `null` na criação. Ver
+  /// validarResponsavel (src/lib/responsavel.ts): o responsável gravado
+  /// continua aceito mesmo desativado depois, para a emissão antiga não
+  /// virar ineditável.
+  responsavelAtualId: string | null = null,
 ) {
   const [ativos, usuarios, itensReaisPorId, pessoas] = await Promise.all([
     listarAtivos(contaId),
@@ -217,9 +223,10 @@ async function referenciasValidas(
   if (campos.ativoId && !ativos.some((ativo) => ativo.id === campos.ativoId)) {
     erros.push({ field: "ativoId", message: "Selecione um ativo válido." });
   }
-  if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
-    erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
-  }
+  // Pertencimento à conta E status, na mesma regra que monta as opções do
+  // <select> (src/lib/responsavel.ts) — divergir faria a tela oferecer o que
+  // o servidor recusa.
+  erros.push(...validarResponsavel(usuarios, campos.responsavelId, responsavelAtualId));
 
   const pessoasDaConta = new Set(pessoas.map((pessoa) => pessoa.id));
   for (const linha of servicos) {
@@ -489,6 +496,9 @@ export async function editarEmissaoAction(
     usuarioSessao.contaId,
     campos,
     linhasDeServico,
+    // Preserva o responsável JÁ gravado (ver validarResponsavel): desativar
+    // um usuário não pode tornar ineditáveis as emissões dele.
+    emissaoAtual.responsavelId,
   );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };

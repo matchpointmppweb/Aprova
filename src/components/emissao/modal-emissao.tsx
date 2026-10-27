@@ -9,6 +9,7 @@ import { StatusBadge } from "@/src/components/shared/status-badge";
 // a Server Action usa para validar e gravar. Nenhum parse próprio, nenhum
 // `padStart`, nenhum teto reescrito aqui.
 import { formatarInstante } from "@/src/lib/datas";
+import { opcoesDeResponsavel } from "@/src/lib/responsavel";
 import { DURACAO_INVALIDA, formatarMinutos } from "@/src/lib/duracao";
 import {
   aprovarEmissaoAction,
@@ -880,6 +881,11 @@ export function ModalEmissao({
   // ambiguidade, que é a única escolha de plano que ainda é humana.
   const [planoDesempate, setPlanoDesempate] = useState(emissao?.planoId ?? "");
   const [responsavelId, setResponsavelId] = useState(emissao?.responsavelId ?? "");
+  // Só quem está Ativo pode receber responsabilidade — MESMA regra do
+  // servidor (src/lib/responsavel.ts), nunca uma cópia. O responsável já
+  // gravado continua na lista mesmo desativado depois, senão desativar um
+  // usuário tornaria ineditáveis as emissões dele.
+  const opcoesResponsavel = opcoesDeResponsavel(usuarios, emissao?.responsavelId ?? null);
   const [setor, setSetor] = useState(emissao?.setor ?? SETOR_PADRAO);
 
   // Linhas da aba Serviço: agora TODO o valor é estado (Story 7.3/Design
@@ -1431,7 +1437,7 @@ export function ModalEmissao({
                     <option value="" disabled>
                       Selecione o responsável
                     </option>
-                    {usuarios.map((usuario) => (
+                    {opcoesResponsavel.map((usuario) => (
                       <option key={usuario.id} value={usuario.id}>
                         {usuario.nome}
                       </option>
