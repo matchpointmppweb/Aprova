@@ -6,6 +6,7 @@ import type { StatusAtivo } from "@prisma/client";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarAtivo, criarAtivo } from "@/src/server/repositories/ativo";
+import { listarEmpresas } from "@/src/server/repositories/empresa";
 import { listarTiposAtivo } from "@/src/server/repositories/tipo-ativo";
 import type { EstadoAcaoAtivo } from "./ativo-estado";
 
@@ -22,12 +23,16 @@ function lerCampos(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
   const tipoAtivoId = String(formData.get("tipoAtivoId") ?? "").trim();
   const localizacao = String(formData.get("localizacao") ?? "").trim();
+  const empresaIdBruto = String(formData.get("empresaId") ?? "").trim();
   const numeroSerieBruto = String(formData.get("numeroSerie") ?? "").trim();
   const statusBruto = String(formData.get("status") ?? "").trim();
   return {
     nome,
     tipoAtivoId,
     localizacao,
+    // Empresa proprietária é OPCIONAL (Frente A) — string vazia vira null,
+    // não erro: o ativo sem dona cadastrada continua válido.
+    empresaId: empresaIdBruto ? empresaIdBruto : null,
     numeroSerie: numeroSerieBruto ? numeroSerieBruto : null,
     status: statusBruto,
   };
@@ -61,6 +66,15 @@ async function tipoAtivoPertenceAConta(contaId: string, tipoAtivoId: string) {
   return tipos.some((tipo) => tipo.id === tipoAtivoId);
 }
 
+// Mesmo guard para a empresa proprietária (AD-1). `null` é válido — é a
+// ausência de dona, não um id a conferir; só um id REAL precisa existir na
+// própria conta.
+async function empresaPertenceAConta(contaId: string, empresaId: string | null) {
+  if (empresaId === null) return true;
+  const empresas = await listarEmpresas(contaId);
+  return empresas.some((empresa) => empresa.id === empresaId);
+}
+
 // Given usuário autenticado com can(criar,'ativos') e ao menos um Tipo já
 // cadastrado na conta, when cria um ativo com nome/tipo/localização/status
 // -> Ativo é gravado escopado pela própria conta (AD-1) com código
@@ -79,7 +93,8 @@ export async function criarAtivoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const { nome, tipoAtivoId, localizacao, numeroSerie, status } = lerCampos(formData);
+  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status } =
+    lerCampos(formData);
 
   const erros = validarCampos({ nome, tipoAtivoId, localizacao, status });
   if (erros.length > 0) {
@@ -93,11 +108,19 @@ export async function criarAtivoAction(
     };
   }
 
+  if (!(await empresaPertenceAConta(usuarioSessao.contaId, empresaId))) {
+    return {
+      ok: false,
+      error: [{ field: "empresaId", message: "Selecione uma empresa válida." }],
+    };
+  }
+
   try {
     await criarAtivo(usuarioSessao.contaId, {
       nome,
       tipoAtivoId,
       localizacao,
+      empresaId,
       numeroSerie,
       status: status as StatusAtivo,
     });
@@ -131,7 +154,8 @@ export async function editarAtivoAction(
   }
 
   const ativoId = String(formData.get("ativoId") ?? "").trim();
-  const { nome, tipoAtivoId, localizacao, numeroSerie, status } = lerCampos(formData);
+  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status } =
+    lerCampos(formData);
 
   const erros = validarCampos({ nome, tipoAtivoId, localizacao, status });
   if (!ativoId) erros.push({ field: "ativoId", message: "Ativo inválido." });
@@ -146,12 +170,20 @@ export async function editarAtivoAction(
     };
   }
 
+  if (!(await empresaPertenceAConta(usuarioSessao.contaId, empresaId))) {
+    return {
+      ok: false,
+      error: [{ field: "empresaId", message: "Selecione uma empresa válida." }],
+    };
+  }
+
   let atualizou: boolean;
   try {
     atualizou = await atualizarAtivo(usuarioSessao.contaId, ativoId, {
       nome,
       tipoAtivoId,
       localizacao,
+      empresaId,
       numeroSerie,
       status: status as StatusAtivo,
     });

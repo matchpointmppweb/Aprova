@@ -184,8 +184,8 @@ model Conta {
   /// Sessões que elegeram esta conta como conta ativa (Story 6.4).
   sessoes           Session[]
   /// Auditoria de troca de conta (Story 6.5) — os dois lados de cada troca.
-  trocasDeSaida     TrocaDeConta[] @relation("TrocaDeContaAnterior")
-  trocasDeEntrada   TrocaDeConta[] @relation("TrocaDeContaNova")
+  trocasDeSaida     TrocaDeConta[]    @relation("TrocaDeContaAnterior")
+  trocasDeEntrada   TrocaDeConta[]    @relation("TrocaDeContaNova")
   perfisAcesso      PerfilAcesso[]
   tiposDeAtivo      TipoAtivo[]
   ativos            Ativo[]
@@ -270,10 +270,10 @@ model Usuario {
 // ---------------------------------------------------------------------------
 
 model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      String  @id @default(cuid())
+  token   String  @unique
+  userId  String
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Conta ativa DESTA sessão (Story 6.4). Nullable de propósito: a sessão
   /// nasce sem ela (o Better Auth cria a linha antes de qualquer escolha) e
@@ -588,6 +588,13 @@ model Ativo {
   tipoAtivoId String
   tipoAtivo   TipoAtivo   @relation(fields: [tipoAtivoId], references: [id])
   localizacao String
+  /// Empresa PROPRIETÁRIA do ativo (Frente A, 26-10-2026). Opcional: os
+  /// ativos que já existiam nascem sem dona, e exigir a empresa quebraria a
+  /// migration sobre dado pré-existente. A emissão EXIBE esta empresa em vez
+  /// de pedir que se escolha uma — mesma decisão que tirou o plano e a data
+  /// do formulário na Story 7.5.
+  empresaId   String?
+  empresa     Empresa?    @relation(fields: [empresaId], references: [id])
   /// Opcional (Boundaries) — exibido no sub-text da coluna "Ativo" da
   /// listagem quando preenchido.
   numeroSerie String?
@@ -604,6 +611,7 @@ model Ativo {
 
   @@unique([contaId, codigo])
   @@index([tipoAtivoId])
+  @@index([empresaId])
   @@map("ativos")
 }
 
@@ -670,8 +678,11 @@ model PlanoRevisional {
 
   nome String
 
-  /// Vínculo XOR com tipoAtivoId: exatamente um dos dois é não-nulo, nunca
-  /// os dois, nunca nenhum — validado na Server Action (Boundaries).
+  /// Vínculo XOR entre TRÊS colunas (ativoId, tipoAtivoId, empresaId):
+  /// exatamente uma é não-nula, nunca duas, nunca nenhuma. Validado na
+  /// Server Action (Boundaries) E por CHECK no banco desde a migration
+  /// 20261026120000 — com três colunas o número de combinações inválidas
+  /// passou de 2 para 5, e a rede do banco deixou de ser opcional.
   ativoId String?
   ativo   Ativo?  @relation(fields: [ativoId], references: [id])
 
@@ -680,6 +691,12 @@ model PlanoRevisional {
   /// (AD-8), nunca persistido como uma linha por ativo.
   tipoAtivoId String?
   tipoAtivo   TipoAtivo? @relation(fields: [tipoAtivoId], references: [id])
+
+  /// Terceiro lado do XOR (Frente A, 26-10-2026): plano-por-empresa cobre
+  /// todos os Ativo cuja `empresaId` é esta. Mesma natureza do plano-por-tipo
+  /// — cobertura expandida na leitura, nunca uma linha por ativo.
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
 
   responsavelId String
   responsavel   Usuario @relation(fields: [responsavelId], references: [id])
@@ -695,6 +712,7 @@ model PlanoRevisional {
   @@unique([contaId, nome])
   @@index([ativoId])
   @@index([tipoAtivoId])
+  @@index([empresaId])
   @@index([responsavelId])
   @@map("planos_revisionais")
 }
@@ -948,6 +966,13 @@ model Empresa {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Ativos de que esta empresa é PROPRIETÁRIA (Frente A, 26-10-2026). Até
+  /// aqui Empresa era uma ilha: existia cadastro e nada apontava para ela.
+  ativos Ativo[]
+  /// Planos que cobrem TODOS os ativos desta empresa — o terceiro nível de
+  /// vínculo, ao lado de ativo e tipo de ativo.
+  planos PlanoRevisional[]
+
   @@unique([contaId, razaoSocial])
   @@map("empresas")
 }
@@ -1021,7 +1046,7 @@ model Pessoa {
   cpf  String
 
   cargoId String
-  cargo   Cargo @relation(fields: [cargoId], references: [id])
+  cargo   Cargo  @relation(fields: [cargoId], references: [id])
 
   funcaoId String
   funcao   Funcao @relation(fields: [funcaoId], references: [id])

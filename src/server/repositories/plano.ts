@@ -22,6 +22,9 @@ export type DadosPlano = {
   nome: string;
   ativoId: string | null;
   tipoAtivoId: string | null;
+  /// Terceiro lado do XOR (Frente A) — plano que cobre todos os ativos cuja
+  /// empresa proprietária é esta.
+  empresaId: string | null;
   responsavelId: string;
   itens: DadosItemDoPlano[];
 };
@@ -29,6 +32,7 @@ export type DadosPlano = {
 const INCLUDE_LISTAGEM = {
   ativo: { select: { id: true, nome: true } },
   tipoAtivo: { select: { id: true, nome: true } },
+  empresa: { select: { id: true, razaoSocial: true } },
   responsavel: { select: { id: true, nome: true } },
   itens: {
     select: {
@@ -125,6 +129,7 @@ export async function criarPlano(contaId: string, dados: DadosPlano) {
         nome: dados.nome,
         ativoId: dados.ativoId,
         tipoAtivoId: dados.tipoAtivoId,
+        empresaId: dados.empresaId,
         responsavelId: dados.responsavelId,
         itens: {
           create: dados.itens.map((item) => ({
@@ -170,6 +175,7 @@ export async function atualizarPlano(
           nome: dados.nome,
           ativoId: dados.ativoId,
           tipoAtivoId: dados.tipoAtivoId,
+          empresaId: dados.empresaId,
           responsavelId: dados.responsavelId,
         },
       });
@@ -319,7 +325,14 @@ export async function resolverAtivosDoPlano(
     .map((plano) => plano.tipoAtivoId)
     .filter((id): id is string => id !== null);
 
-  const [ativosDiretos, ativosPorTipo] = await Promise.all([
+  // Empresas vinculadas (planos por Empresa, Frente A) — expandem para todo
+  // Ativo cuja empresa PROPRIETÁRIA é aquela. Mesma natureza da expansão por
+  // tipo: cobertura calculada na leitura, nunca uma linha por ativo (AD-8).
+  const empresaIds = planos
+    .map((plano) => plano.empresaId)
+    .filter((id): id is string => id !== null);
+
+  const [ativosDiretos, ativosPorTipo, ativosPorEmpresa] = await Promise.all([
     ativoIdsDiretos.length > 0
       ? prisma.ativo.findMany({
           where: { contaId, id: { in: ativoIdsDiretos }, status: "Ativo" },
@@ -332,6 +345,12 @@ export async function resolverAtivosDoPlano(
           select: { id: true, tipoAtivoId: true, createdAt: true },
         })
       : Promise.resolve([]),
+    empresaIds.length > 0
+      ? prisma.ativo.findMany({
+          where: { contaId, empresaId: { in: empresaIds }, status: "Ativo" },
+          select: { id: true, tipoAtivoId: true, empresaId: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const ativoPorId = new Map(ativosDiretos.map((ativo) => [ativo.id, ativo]));
@@ -340,6 +359,16 @@ export async function resolverAtivosDoPlano(
     const lista = ativosPorTipoAtivoId.get(ativo.tipoAtivoId) ?? [];
     lista.push(ativo);
     ativosPorTipoAtivoId.set(ativo.tipoAtivoId, lista);
+  }
+
+  const ativosPorEmpresaId = new Map<string, typeof ativosPorEmpresa>();
+  for (const ativo of ativosPorEmpresa) {
+    // `empresaId` é não-nulo por construção (veio do `in: empresaIds`), mas
+    // o tipo não sabe disso — o guard evita uma chave "null" no Map.
+    if (!ativo.empresaId) continue;
+    const lista = ativosPorEmpresaId.get(ativo.empresaId) ?? [];
+    lista.push(ativo);
+    ativosPorEmpresaId.set(ativo.empresaId, lista);
   }
 
   const resultado: ResolucaoAtivoDoPlano[] = [];
@@ -352,7 +381,9 @@ export async function resolverAtivosDoPlano(
         })()
       : plano.tipoAtivoId
         ? (ativosPorTipoAtivoId.get(plano.tipoAtivoId) ?? [])
-        : [];
+        : plano.empresaId
+          ? (ativosPorEmpresaId.get(plano.empresaId) ?? [])
+          : [];
 
     for (const ativo of ativosResolvidos) {
       const proximaData = calcularProximaData(ativo.createdAt, plano.itens);

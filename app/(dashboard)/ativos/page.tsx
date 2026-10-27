@@ -4,6 +4,7 @@ import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { TabelaAtivos } from "@/src/components/ativos/tabela-ativos";
 import { listarAtivos } from "@/src/server/repositories/ativo";
+import { listarEmpresas } from "@/src/server/repositories/empresa";
 import { listarTiposAtivo } from "@/src/server/repositories/tipo-ativo";
 
 export const metadata: Metadata = {
@@ -21,9 +22,10 @@ export const metadata: Metadata = {
 export default async function AtivosPage() {
   const usuarioSessao = await exigirUsuarioAutenticado();
 
-  const [ativos, tiposAtivo, podeCriar, podeEditar, podeExcluir] = await Promise.all([
+  const [ativos, tiposAtivo, empresas, podeCriar, podeEditar, podeExcluir] = await Promise.all([
     listarAtivos(usuarioSessao.contaId),
     listarTiposAtivo(usuarioSessao.contaId),
+    listarEmpresas(usuarioSessao.contaId),
     can(usuarioSessao, "criar", "ativos"),
     can(usuarioSessao, "editar", "ativos"),
     can(usuarioSessao, "excluir", "ativos"),
@@ -38,6 +40,7 @@ export default async function AtivosPage() {
       <TabelaAtivos
         ativos={ativos}
         tiposAtivo={tiposAtivo}
+        empresas={empresas}
         podeCriar={podeCriar}
         podeEditar={podeEditar}
         podeExcluir={podeExcluir}

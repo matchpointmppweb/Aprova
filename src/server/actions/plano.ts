@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
+import { listarEmpresas } from "@/src/server/repositories/empresa";
 import { listarItensRevisionais } from "@/src/server/repositories/item-revisional";
 import {
   arquivarPlano,
@@ -50,15 +51,19 @@ function lerCamposGerais(formData: FormData) {
   const vinculo = String(formData.get("vinculo") ?? "").trim();
   const ativoIdBruto = String(formData.get("ativoId") ?? "").trim();
   const tipoAtivoIdBruto = String(formData.get("tipoAtivoId") ?? "").trim();
+  const empresaIdBruto = String(formData.get("empresaId") ?? "").trim();
   const responsavelId = String(formData.get("responsavelId") ?? "").trim();
 
   // Só considera o valor do vínculo cujo radio está de fato selecionado —
   // um <select> do lado "desligado" do radio pode continuar com valor
   // preenchido no DOM (Boundaries: XOR é sobre o que é de fato enviado).
+  // Com três lados isso deixa de ser zelo e vira necessidade: dois selects
+  // escondidos preenchidos fariam o XOR falhar por culpa do DOM, não do uso.
   const ativoId = vinculo === "ativo" && ativoIdBruto ? ativoIdBruto : null;
   const tipoAtivoId = vinculo === "tipo" && tipoAtivoIdBruto ? tipoAtivoIdBruto : null;
+  const empresaId = vinculo === "empresa" && empresaIdBruto ? empresaIdBruto : null;
 
-  return { nome, ativoId, tipoAtivoId, responsavelId };
+  return { nome, ativoId, tipoAtivoId, empresaId, responsavelId };
 }
 
 // Lê as linhas de item selecionadas no form — checkbox
@@ -106,6 +111,7 @@ function validarCamposGerais(campos: {
   nome: string;
   ativoId: string | null;
   tipoAtivoId: string | null;
+  empresaId: string | null;
   responsavelId: string;
 }) {
   const erros: { field: string; message: string }[] = [];
@@ -115,7 +121,7 @@ function validarCamposGerais(campos: {
   if (!campos.responsavelId) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável." });
   }
-  erros.push(...validarVinculoXor(campos.ativoId, campos.tipoAtivoId));
+  erros.push(...validarVinculoXor(campos.ativoId, campos.tipoAtivoId, campos.empresaId));
   return erros;
 }
 
@@ -125,11 +131,17 @@ function validarCamposGerais(campos: {
 // padrão de tipoAtivoPertenceAConta em src/server/actions/ativo.ts.
 async function vinculoEResponsavelValidos(
   contaId: string,
-  campos: { ativoId: string | null; tipoAtivoId: string | null; responsavelId: string },
+  campos: {
+    ativoId: string | null;
+    tipoAtivoId: string | null;
+    empresaId: string | null;
+    responsavelId: string;
+  },
 ) {
-  const [ativos, tipos, usuarios] = await Promise.all([
+  const [ativos, tipos, empresas, usuarios] = await Promise.all([
     listarAtivos(contaId),
     listarTiposAtivo(contaId),
+    listarEmpresas(contaId),
     listarUsuarios(contaId),
   ]);
 
@@ -139,6 +151,9 @@ async function vinculoEResponsavelValidos(
   }
   if (campos.tipoAtivoId && !tipos.some((tipo) => tipo.id === campos.tipoAtivoId)) {
     erros.push({ field: "vinculo", message: "Selecione um tipo de ativo válido." });
+  }
+  if (campos.empresaId && !empresas.some((empresa) => empresa.id === campos.empresaId)) {
+    erros.push({ field: "vinculo", message: "Selecione uma empresa válida." });
   }
   if (campos.responsavelId && !usuarios.some((usuario) => usuario.id === campos.responsavelId)) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável válido." });
@@ -217,6 +232,7 @@ export async function criarPlanoAction(
       nome: camposGerais.nome,
       ativoId: camposGerais.ativoId,
       tipoAtivoId: camposGerais.tipoAtivoId,
+      empresaId: camposGerais.empresaId,
       responsavelId: camposGerais.responsavelId,
       itens: paraDadosItens(itensSelecionados),
     });
@@ -291,6 +307,7 @@ export async function editarPlanoAction(
         nome: camposGerais.nome,
         ativoId: camposGerais.ativoId,
         tipoAtivoId: camposGerais.tipoAtivoId,
+        empresaId: camposGerais.empresaId,
         responsavelId: camposGerais.responsavelId,
         itens: paraDadosItens(itensSelecionados),
       },

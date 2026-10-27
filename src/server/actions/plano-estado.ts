@@ -30,22 +30,33 @@ export function mensagemDeErro(erro: EstadoAcaoPlano["error"]): string | undefin
   return erro.map((item) => item.message).join(" ");
 }
 
-// Vínculo é XOR: exatamente um entre ativoId/tipoAtivoId é não-nulo, nunca
-// os dois, nunca nenhum (Boundaries) — o banco não impõe XOR entre 2 colunas
-// sozinho, só a nulidade individual de cada FK. Função pura, testável
-// isoladamente, sem dependência de next/headers — mesmo motivo pelo qual
-// item-revisional-estado.ts extrai validarControlesDeItemRevisional daqui.
+// Vínculo é XOR entre TRÊS colunas (Frente A): exatamente uma entre
+// ativoId/tipoAtivoId/empresaId é não-nula. Com três lados as combinações
+// inválidas são 5 (as três duplas, a tripla e a vazia), e contar quantos
+// vieram preenchidos diz a regra melhor do que enumerá-las: acrescentar um
+// quarto vínculo amanhã é uma entrada a mais na lista, não uma condição nova.
+//
+// A migration 20261026120000 passou a impor a mesma regra por CHECK. Esta
+// função continua sendo o CAMINHO (recusa com erro de campo, NFR7/AD-30); a
+// CHECK é a rede para qualquer escrita que não passe por aqui.
+//
+// Função pura, testável isoladamente, sem dependência de next/headers —
+// mesmo motivo pelo qual item-revisional-estado.ts extrai
+// validarControlesDeItemRevisional daqui.
 export function validarVinculoXor(
   ativoId: string | null,
   tipoAtivoId: string | null,
+  empresaId: string | null,
 ): ErroDeValidacao[] {
-  const temAtivo = ativoId !== null;
-  const temTipo = tipoAtivoId !== null;
-  if (temAtivo === temTipo) {
+  const preenchidos = [ativoId, tipoAtivoId, empresaId].filter(
+    (valor) => valor !== null,
+  ).length;
+
+  if (preenchidos !== 1) {
     return [
       {
         field: "vinculo",
-        message: "Selecione um ativo específico OU um tipo de ativo.",
+        message: "Selecione um ativo específico, um tipo de ativo OU uma empresa.",
       },
     ];
   }

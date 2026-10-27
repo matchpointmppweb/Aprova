@@ -14,7 +14,10 @@ import { prisma } from "./db";
 export async function listarAtivos(contaId: string) {
   return prisma.ativo.findMany({
     where: { contaId },
-    include: { tipoAtivo: { select: { nome: true } } },
+    include: {
+      tipoAtivo: { select: { nome: true } },
+      empresa: { select: { razaoSocial: true } },
+    },
     orderBy: { nome: "asc" },
   });
 }
@@ -39,6 +42,9 @@ export async function criarAtivo(
     nome: string;
     tipoAtivoId: string;
     localizacao: string;
+    /// Empresa proprietária (Frente A) — opcional: nem todo ativo tem dona
+    /// cadastrada, e os que já existiam nasceram sem nenhuma.
+    empresaId: string | null;
     numeroSerie: string | null;
     status: StatusAtivo;
   },
@@ -53,6 +59,7 @@ export async function criarAtivo(
           nome: dados.nome,
           tipoAtivoId: dados.tipoAtivoId,
           localizacao: dados.localizacao,
+          empresaId: dados.empresaId,
           numeroSerie: dados.numeroSerie,
           codigo,
           status: dados.status,
@@ -74,6 +81,7 @@ export async function atualizarAtivo(
     nome: string;
     tipoAtivoId: string;
     localizacao: string;
+    empresaId: string | null;
     numeroSerie: string | null;
     status: StatusAtivo;
   }>,

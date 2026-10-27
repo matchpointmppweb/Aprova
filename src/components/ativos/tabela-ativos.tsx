@@ -9,7 +9,7 @@ import { excluirAtivoAction } from "@/src/server/actions/ativo";
 import { estadoInicialAcaoAtivo } from "@/src/server/actions/ativo-estado";
 import { LinhaCriacao } from "./linha-criacao";
 import { LinhaEdicao } from "./linha-edicao";
-import type { AtivoListagem, TipoAtivoOpcao } from "./tipos";
+import type { AtivoListagem, EmpresaOpcao, TipoAtivoOpcao } from "./tipos";
 
 const BADGE_POR_STATUS: Record<StatusAtivo, { tom: TomBadge; label: string }> = {
   Ativo: { tom: "ok", label: "Ativo" },
@@ -77,12 +77,14 @@ function BotaoExcluirSubmit() {
 export function TabelaAtivos({
   ativos,
   tiposAtivo,
+  empresas,
   podeCriar,
   podeEditar,
   podeExcluir,
 }: {
   ativos: AtivoListagem[];
   tiposAtivo: TipoAtivoOpcao[];
+  empresas: EmpresaOpcao[];
   podeCriar: boolean;
   podeEditar: boolean;
   podeExcluir: boolean;
@@ -193,6 +195,7 @@ export function TabelaAtivos({
             {linhaAberta === "create" && podeCriar && !semTipoCadastrado ? (
               <LinhaCriacao
                 tiposAtivo={tiposAtivo}
+                empresas={empresas}
                 onFechar={fecharLinha}
                 onSucesso={fecharLinha}
               />
@@ -216,6 +219,9 @@ export function TabelaAtivos({
                       <div className="primary-text">{ativo.nome}</div>
                       {ativo.numeroSerie ? (
                         <div className="sub-text">Nº série {ativo.numeroSerie}</div>
+                      ) : null}
+                      {ativo.empresa ? (
+                        <div className="sub-text">{ativo.empresa.razaoSocial}</div>
                       ) : null}
                     </td>
                     <td>{ativo.tipoAtivo.nome}</td>
@@ -249,6 +255,7 @@ export function TabelaAtivos({
                     <LinhaEdicao
                       ativo={ativo}
                       tiposAtivo={tiposAtivo}
+                      empresas={empresas}
                       onFechar={fecharLinha}
                       onSucesso={fecharLinha}
                     />

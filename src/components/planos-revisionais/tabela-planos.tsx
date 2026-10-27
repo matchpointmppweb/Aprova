@@ -9,6 +9,7 @@ import { estadoInicialAcaoPlano } from "@/src/server/actions/plano-estado";
 import { ModalPlano } from "./modal-plano";
 import type {
   AtivoOpcao,
+  EmpresaOpcao,
   ItemRevisionalOpcao,
   PlanoListagem,
   TipoAtivoOpcao,
@@ -39,6 +40,7 @@ function formatarData(data: Date | string | null) {
 function vinculadoA(plano: PlanoListagem) {
   if (plano.ativo) return plano.ativo.nome;
   if (plano.tipoAtivo) return `${plano.tipoAtivo.nome} (tipo)`;
+  if (plano.empresa) return `${plano.empresa.razaoSocial} (empresa)`;
   return "—";
 }
 
@@ -109,6 +111,7 @@ export function TabelaPlanos({
   planos,
   ativos,
   tiposAtivo,
+  empresas,
   usuarios,
   itensRevisionais,
   podeCriar,
@@ -118,6 +121,7 @@ export function TabelaPlanos({
   planos: PlanoListagem[];
   ativos: AtivoOpcao[];
   tiposAtivo: TipoAtivoOpcao[];
+  empresas: EmpresaOpcao[];
   usuarios: UsuarioOpcao[];
   itensRevisionais: ItemRevisionalOpcao[];
   podeCriar: boolean;
@@ -263,6 +267,7 @@ export function TabelaPlanos({
           plano={null}
           ativos={ativos}
           tiposAtivo={tiposAtivo}
+          empresas={empresas}
           usuarios={usuarios}
           itensRevisionais={itensRevisionais}
           onFechar={fecharModal}
@@ -274,6 +279,7 @@ export function TabelaPlanos({
           plano={planoEmEdicao}
           ativos={ativos}
           tiposAtivo={tiposAtivo}
+          empresas={empresas}
           usuarios={usuarios}
           itensRevisionais={itensRevisionais}
           onFechar={fecharModal}

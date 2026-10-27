@@ -126,10 +126,21 @@ export async function criarTipoAtivo(contaId: string, opcoes: { nome?: string } 
   });
 }
 
+export async function criarEmpresa(contaId: string, opcoes: { razaoSocial?: string } = {}) {
+  const sufixo = unico();
+  return db.empresa.create({
+    data: {
+      contaId,
+      razaoSocial: opcoes.razaoSocial ?? `Empresa ${sufixo}`,
+      nomeFantasia: `Fantasia ${sufixo}`,
+    },
+  });
+}
+
 export async function criarAtivo(
   contaId: string,
   tipoAtivoId: string,
-  opcoes: { nome?: string } = {},
+  opcoes: { nome?: string; empresaId?: string } = {},
 ) {
   const sufixo = unico();
   return db.ativo.create({
@@ -138,6 +149,7 @@ export async function criarAtivo(
       tipoAtivoId,
       nome: opcoes.nome ?? `Ativo ${sufixo}`,
       localizacao: "Pátio",
+      empresaId: opcoes.empresaId ?? null,
       codigo: `AT-${sufixo}`,
     },
   });

@@ -4,6 +4,7 @@ import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { TabelaPlanos } from "@/src/components/planos-revisionais/tabela-planos";
 import { listarAtivos } from "@/src/server/repositories/ativo";
+import { listarEmpresas } from "@/src/server/repositories/empresa";
 import { listarItensRevisionais } from "@/src/server/repositories/item-revisional";
 import {
   listarPlanos,
@@ -58,12 +59,13 @@ function agregarPorPlano(resolucoes: ResolucaoAtivoDoPlano[]) {
 export default async function PlanosRevisionaisPage() {
   const usuarioSessao = await exigirUsuarioAutenticado();
 
-  const [planosTodos, resolucoes, ativos, tiposAtivo, itensRevisionais, usuarios, podeCriar, podeEditar, podeExcluir] =
+  const [planosTodos, resolucoes, ativos, tiposAtivo, empresas, itensRevisionais, usuarios, podeCriar, podeEditar, podeExcluir] =
     await Promise.all([
       listarPlanos(usuarioSessao.contaId),
       resolverAtivosDoPlano(usuarioSessao.contaId),
       listarAtivos(usuarioSessao.contaId),
       listarTiposAtivo(usuarioSessao.contaId),
+      listarEmpresas(usuarioSessao.contaId),
       listarItensRevisionais(usuarioSessao.contaId),
       listarUsuarios(usuarioSessao.contaId),
       can(usuarioSessao, "criar", "planos"),
@@ -94,6 +96,7 @@ export default async function PlanosRevisionaisPage() {
         planos={planos}
         ativos={ativos}
         tiposAtivo={tiposAtivo}
+        empresas={empresas}
         usuarios={usuarios}
         itensRevisionais={itensRevisionais}
         podeCriar={podeCriar}

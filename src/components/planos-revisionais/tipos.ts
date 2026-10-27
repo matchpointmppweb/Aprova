@@ -27,6 +27,8 @@ export interface PlanoListagem {
   ativo: { id: string; nome: string } | null;
   tipoAtivoId: string | null;
   tipoAtivo: { id: string; nome: string } | null;
+  empresaId: string | null;
+  empresa: { id: string; razaoSocial: string } | null;
   responsavelId: string;
   responsavel: { id: string; nome: string };
   status: StatusPlanoRevisional;
@@ -55,6 +57,15 @@ export interface TipoAtivoOpcao {
   id: string;
   nome: string;
   status: StatusTipoAtivo;
+}
+
+// Empresa como terceiro vínculo (Frente A). Sem `status`: Empresa não tem
+// coluna de status (AD-17), então nenhuma empresa é filtrada do picker — o
+// que também significa que ela nunca precisa da exceção "mantém o vínculo
+// atual visível mesmo se desativado" que ativo e tipo exigem.
+export interface EmpresaOpcao {
+  id: string;
+  razaoSocial: string;
 }
 
 export interface UsuarioOpcao {

@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { criarAtivoAction } from "@/src/server/actions/ativo";
 import { estadoInicialAcaoAtivo, mensagemDeErro } from "@/src/server/actions/ativo-estado";
-import type { TipoAtivoOpcao } from "./tipos";
+import type { EmpresaOpcao, TipoAtivoOpcao } from "./tipos";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -38,10 +38,12 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
 // hardcoded do mockup (Boundaries).
 export function LinhaCriacao({
   tiposAtivo,
+  empresas,
   onFechar,
   onSucesso,
 }: {
   tiposAtivo: TipoAtivoOpcao[];
+  empresas: EmpresaOpcao[];
   onFechar: () => void;
   onSucesso: () => void;
 }) {
@@ -95,6 +97,17 @@ export function LinhaCriacao({
                 placeholder="Ex.: Planta 1 · Setor B"
                 required
               />
+            </div>
+            <div className="f">
+              <label htmlFor="ca-empresa">Proprietária</label>
+              <select id="ca-empresa" name="empresaId" defaultValue="">
+                <option value="">Sem proprietária</option>
+                {empresas.map((empresa) => (
+                  <option key={empresa.id} value={empresa.id}>
+                    {empresa.razaoSocial}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="f">
               <label htmlFor="ca-numeroSerie">Nº de série</label>

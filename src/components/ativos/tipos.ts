@@ -10,6 +10,10 @@ export interface AtivoListagem {
   tipoAtivoId: string;
   tipoAtivo: { nome: string };
   localizacao: string;
+  /// Empresa proprietária (Frente A) — `null` para o ativo sem dona
+  /// cadastrada, que continua sendo um ativo válido.
+  empresaId: string | null;
+  empresa: { razaoSocial: string } | null;
   numeroSerie: string | null;
   status: StatusAtivo;
 }
@@ -20,4 +24,13 @@ export interface AtivoListagem {
 export interface TipoAtivoOpcao {
   id: string;
   nome: string;
+}
+
+// Forma mínima da Empresa usada para popular o <select> de proprietária nos
+// formulários de criar/editar — compatível com listarEmpresas(contaId), que
+// traz vários campos não usados aqui. Sem `status`: Empresa não tem coluna
+// de status (AD-17), então toda empresa cadastrada é sempre selecionável.
+export interface EmpresaOpcao {
+  id: string;
+  razaoSocial: string;
 }

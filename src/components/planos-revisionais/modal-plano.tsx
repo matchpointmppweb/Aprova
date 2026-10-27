@@ -7,6 +7,7 @@ import { criarPlanoAction, editarPlanoAction } from "@/src/server/actions/plano"
 import { estadoInicialAcaoPlano, mensagemDeErro } from "@/src/server/actions/plano-estado";
 import type {
   AtivoOpcao,
+  EmpresaOpcao,
   ItemRevisionalOpcao,
   PlanoListagem,
   TipoAtivoOpcao,
@@ -14,7 +15,7 @@ import type {
 } from "./tipos";
 
 type AbaModal = "geral" | "itens";
-type Vinculo = "ativo" | "tipo";
+type Vinculo = "ativo" | "tipo" | "empresa";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — mesmo padrão de Acoes em
@@ -86,6 +87,7 @@ export function ModalPlano({
   plano,
   ativos,
   tiposAtivo,
+  empresas,
   usuarios,
   itensRevisionais,
   onFechar,
@@ -94,6 +96,7 @@ export function ModalPlano({
   plano: PlanoListagem | null;
   ativos: AtivoOpcao[];
   tiposAtivo: TipoAtivoOpcao[];
+  empresas: EmpresaOpcao[];
   usuarios: UsuarioOpcao[];
   itensRevisionais: ItemRevisionalOpcao[];
   onFechar: () => void;
@@ -102,13 +105,16 @@ export function ModalPlano({
   const acao = plano ? editarPlanoAction : criarPlanoAction;
   const [estado, formAction] = useActionState(acao, estadoInicialAcaoPlano);
   const [aba, setAba] = useState<AbaModal>("geral");
-  const [vinculo, setVinculo] = useState<Vinculo>(plano?.tipoAtivoId ? "tipo" : "ativo");
+  const [vinculo, setVinculo] = useState<Vinculo>(
+    plano?.tipoAtivoId ? "tipo" : plano?.empresaId ? "empresa" : "ativo",
+  );
   // Estado controlado por tipo de vínculo, independente do outro — alternar
   // o radio nunca descarta uma escolha já feita do lado que fica "escondido"
   // (achado de revisão: um <select> não-controlado com key={vinculo} perdia
   // silenciosamente a seleção ao trocar de radio e voltar).
   const [ativoIdSelecionado, setAtivoIdSelecionado] = useState(plano?.ativoId ?? "");
   const [tipoAtivoIdSelecionado, setTipoAtivoIdSelecionado] = useState(plano?.tipoAtivoId ?? "");
+  const [empresaIdSelecionado, setEmpresaIdSelecionado] = useState(plano?.empresaId ?? "");
 
   const selecaoInicial = useMemo(
     () => new Set((plano?.itens ?? []).map((item) => item.itemRevisionalId)),
@@ -137,11 +143,41 @@ export function ModalPlano({
   // (itensExibidos) neste mesmo arquivo. O vínculo atual do plano em edição
   // sempre aparece na lista mesmo que tenha sido desativado depois (edição
   // não pode perder silenciosamente o vínculo existente).
-  const opcoesVinculo = (vinculo === "ativo" ? ativos : tiposAtivo).filter(
-    (opcao) =>
-      opcao.status === "Ativo" ||
-      (vinculo === "ativo" ? opcao.id === plano?.ativoId : opcao.id === plano?.tipoAtivoId),
-  );
+  //
+  // Empresa é a exceção e não por esquecimento: ela não tem coluna de status
+  // (AD-17), então não há o que filtrar nem o que preservar.
+  //
+  // Os três vínculos viram UMA tabela em vez de um ternário aninhado: com
+  // dois lados o ternário ainda se lia, com três ele esconderia qual campo
+  // vai no `name` do <select> — e é justamente esse nome que a Server Action
+  // usa para decidir o XOR.
+  const configuracaoDoVinculo = {
+    ativo: {
+      campo: "ativoId",
+      rotulo: "Selecione o ativo",
+      valor: ativoIdSelecionado,
+      selecionar: setAtivoIdSelecionado,
+      opcoes: ativos
+        .filter((opcao) => opcao.status === "Ativo" || opcao.id === plano?.ativoId)
+        .map((opcao) => ({ id: opcao.id, rotulo: opcao.nome })),
+    },
+    tipo: {
+      campo: "tipoAtivoId",
+      rotulo: "Selecione o tipo de ativo",
+      valor: tipoAtivoIdSelecionado,
+      selecionar: setTipoAtivoIdSelecionado,
+      opcoes: tiposAtivo
+        .filter((opcao) => opcao.status === "Ativo" || opcao.id === plano?.tipoAtivoId)
+        .map((opcao) => ({ id: opcao.id, rotulo: opcao.nome })),
+    },
+    empresa: {
+      campo: "empresaId",
+      rotulo: "Selecione a empresa",
+      valor: empresaIdSelecionado,
+      selecionar: setEmpresaIdSelecionado,
+      opcoes: empresas.map((opcao) => ({ id: opcao.id, rotulo: opcao.razaoSocial })),
+    },
+  }[vinculo];
 
   function alternarItem(itemId: string, marcado: boolean) {
     setSelecionados((atual) => {
@@ -236,23 +272,29 @@ export function ModalPlano({
                       />
                       Tipo de ativo
                     </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="vinculo"
+                        value="empresa"
+                        checked={vinculo === "empresa"}
+                        onChange={() => setVinculo("empresa")}
+                      />
+                      Empresa
+                    </label>
                   </div>
                   <select
-                    name={vinculo === "ativo" ? "ativoId" : "tipoAtivoId"}
+                    name={configuracaoDoVinculo.campo}
                     required
-                    value={vinculo === "ativo" ? ativoIdSelecionado : tipoAtivoIdSelecionado}
-                    onChange={(evento) =>
-                      vinculo === "ativo"
-                        ? setAtivoIdSelecionado(evento.target.value)
-                        : setTipoAtivoIdSelecionado(evento.target.value)
-                    }
+                    value={configuracaoDoVinculo.valor}
+                    onChange={(evento) => configuracaoDoVinculo.selecionar(evento.target.value)}
                   >
                     <option value="" disabled>
-                      {vinculo === "ativo" ? "Selecione o ativo" : "Selecione o tipo de ativo"}
+                      {configuracaoDoVinculo.rotulo}
                     </option>
-                    {opcoesVinculo.map((opcao) => (
+                    {configuracaoDoVinculo.opcoes.map((opcao) => (
                       <option key={opcao.id} value={opcao.id}>
-                        {opcao.nome}
+                        {opcao.rotulo}
                       </option>
                     ))}
                   </select>

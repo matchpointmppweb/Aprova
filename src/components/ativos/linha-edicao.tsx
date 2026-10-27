@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { editarAtivoAction } from "@/src/server/actions/ativo";
 import { estadoInicialAcaoAtivo, mensagemDeErro } from "@/src/server/actions/ativo-estado";
-import type { AtivoListagem, TipoAtivoOpcao } from "./tipos";
+import type { AtivoListagem, EmpresaOpcao, TipoAtivoOpcao } from "./tipos";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -46,11 +46,13 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
 export function LinhaEdicao({
   ativo,
   tiposAtivo,
+  empresas,
   onFechar,
   onSucesso,
 }: {
   ativo: AtivoListagem;
   tiposAtivo: TipoAtivoOpcao[];
+  empresas: EmpresaOpcao[];
   onFechar: () => void;
   onSucesso: () => void;
 }) {
@@ -107,6 +109,21 @@ export function LinhaEdicao({
                 defaultValue={ativo.localizacao}
                 required
               />
+            </div>
+            <div className="f">
+              <label htmlFor={`ea-empresa-${ativo.id}`}>Proprietária</label>
+              <select
+                id={`ea-empresa-${ativo.id}`}
+                name="empresaId"
+                defaultValue={ativo.empresaId ?? ""}
+              >
+                <option value="">Sem proprietária</option>
+                {empresas.map((empresa) => (
+                  <option key={empresa.id} value={empresa.id}>
+                    {empresa.razaoSocial}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="f">
               <label htmlFor={`ea-numeroSerie-${ativo.id}`}>Nº de série</label>
