@@ -22,9 +22,12 @@ import { criarAmbiente, criarItemRevisional, db, limparBanco } from "./setup/fix
 
 beforeEach(limparBanco);
 
-// Organização do item revisional (26-10-2026) — categoria, grupo e as três
-// etapas. São o que dá forma à OS impressa: categoria vira seção, grupo vira
-// coluna, etapas viram as colunas do meio.
+// Organização do item revisional (26-10-2026) — categoria e grupo. São o que
+// dá forma à OS impressa: categoria vira seção, grupo vira a primeira coluna.
+//
+// As três `etapa` nasceram aqui junto com eles e SAÍRAM em 27-10-2026, a
+// pedido de Fulvi: vieram das prints de um TMS que serviram de modelo visual
+// e não são do fluxo dele.
 //
 // O que estes testes prendem é o CONTRATO DE NOMES do FormData e a
 // opcionalidade. É o mesmo buraco da Story 7.3: renomear um lado quebra a
@@ -50,10 +53,10 @@ function formDeItem(campos: Record<string, string>) {
   return formData;
 }
 
-const CAMPOS = ["categoria", "grupo", "etapa1", "etapa2", "etapa3"] as const;
+const CAMPOS = ["categoria", "grupo"] as const;
 
 describe("criação", () => {
-  test("os cinco campos gravam, cada um no seu lugar", async () => {
+  test("os dois campos gravam, cada um no seu lugar", async () => {
     const ambiente = await comSessao();
 
     // Valores DISTINTOS por campo, de propósito: com o mesmo valor em todos,
@@ -65,9 +68,6 @@ describe("criação", () => {
         nome: "Ar condicionado",
         categoria: "Elétrica",
         grupo: "Cabine",
-        etapa1: "Correto funcionamento",
-        etapa2: "Integridade dos componentes",
-        etapa3: "Lubrificar",
       }),
     );
 
@@ -77,9 +77,6 @@ describe("criação", () => {
     });
     expect(gravado.categoria).toBe("Elétrica");
     expect(gravado.grupo).toBe("Cabine");
-    expect(gravado.etapa1).toBe("Correto funcionamento");
-    expect(gravado.etapa2).toBe("Integridade dos componentes");
-    expect(gravado.etapa3).toBe("Lubrificar");
   });
 
   test("todos são opcionais — em branco viram null, não string vazia", async () => {
@@ -123,7 +120,7 @@ describe("criação", () => {
 });
 
 describe("edição", () => {
-  test("altera os cinco campos de um item existente", async () => {
+  test("altera os dois campos de um item existente", async () => {
     const ambiente = await comSessao();
     const item = await criarItemRevisional(ambiente.conta.id, { nome: "Filtro de ar" });
 
@@ -131,9 +128,6 @@ describe("edição", () => {
       nome: "Filtro de ar",
       categoria: "Mecânica",
       grupo: "Motor",
-      etapa1: "Inspecionar",
-      etapa2: "Substituir",
-      etapa3: "Anexar laudo",
     });
     formData.set("itemRevisionalId", item.id);
 
@@ -143,9 +137,6 @@ describe("edição", () => {
     const relido = await db.itemRevisional.findUniqueOrThrow({ where: { id: item.id } });
     expect(relido.categoria).toBe("Mecânica");
     expect(relido.grupo).toBe("Motor");
-    expect(relido.etapa1).toBe("Inspecionar");
-    expect(relido.etapa2).toBe("Substituir");
-    expect(relido.etapa3).toBe("Anexar laudo");
   });
 
   test("apagar o conteúdo de um campo o devolve a null", async () => {
@@ -153,10 +144,10 @@ describe("edição", () => {
     const item = await criarItemRevisional(ambiente.conta.id);
     await db.itemRevisional.update({
       where: { id: item.id },
-      data: { categoria: "Elétrica", etapa1: "Inspecionar" },
+      data: { categoria: "Elétrica", grupo: "Cabine" },
     });
 
-    const formData = formDeItem({ nome: item.nome, categoria: "", etapa1: "" });
+    const formData = formDeItem({ nome: item.nome, categoria: "", grupo: "" });
     formData.set("itemRevisionalId", item.id);
 
     const estado = await editarItemRevisionalAction({ ok: false }, formData);
@@ -164,6 +155,6 @@ describe("edição", () => {
     expect(estado.ok).toBe(true);
     const relido = await db.itemRevisional.findUniqueOrThrow({ where: { id: item.id } });
     expect(relido.categoria).toBeNull();
-    expect(relido.etapa1).toBeNull();
+    expect(relido.grupo).toBeNull();
   });
 });

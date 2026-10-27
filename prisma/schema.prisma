@@ -647,14 +647,6 @@ model ItemRevisional {
   categoria String?
   grupo     String?
 
-  /// Três etapas de verificação, com a instrução de cada uma (ex.: "Correto
-  /// funcionamento", "Integridade dos componentes", "Lubrificar"). Opcionais
-  /// e independentes entre si — um item pode ter só a primeira. Viram as
-  /// colunas do meio da OS impressa; vazias, a coluna não sai.
-  etapa1 String?
-  etapa2 String?
-  etapa3 String?
-
   /// "A cada N dias" — não-nulo significa que este controle está selecionado.
   diasPadrao  Int?
   /// "A cada N km" — não-nulo significa que este controle está selecionado.

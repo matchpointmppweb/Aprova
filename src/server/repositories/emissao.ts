@@ -88,7 +88,7 @@ export async function buscarEmissao(contaId: string, id: string) {
 // INCLUDE_LISTAGEM.
 //
 // Dois motivos para não reaproveitar: o papel precisa de campos que a
-// listagem não carrega (categoria/grupo/etapas do item revisional, empresa
+// listagem não carrega (categoria e grupo do item revisional, empresa
 // proprietária e tipo do ativo, nome da pessoa de cada apontamento), e
 // enfiá-los no INCLUDE_LISTAGEM faria a tela de Emissão passar tudo isso ao
 // cliente em TODA linha da listagem, à toa.
@@ -124,9 +124,6 @@ export async function buscarEmissaoParaImpressao(contaId: string, id: string) {
               nome: true,
               categoria: true,
               grupo: true,
-              etapa1: true,
-              etapa2: true,
-              etapa3: true,
             },
           },
         },

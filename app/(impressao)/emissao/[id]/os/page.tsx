@@ -50,9 +50,6 @@ export default async function OrdemDeServicoPage({
     nome: item.itemRevisional.nome,
     categoria: item.itemRevisional.categoria,
     grupo: item.itemRevisional.grupo,
-    etapa1: item.itemRevisional.etapa1,
-    etapa2: item.itemRevisional.etapa2,
-    etapa3: item.itemRevisional.etapa3,
     executado: item.executado,
     observacao: item.observacao,
   }));
@@ -122,17 +119,14 @@ export default async function OrdemDeServicoPage({
             <table className="os-tabela" key={secao.categoria}>
               <thead>
                 <tr>
-                  {/* Grupo + Item + etapas visíveis + Executado + Observação */}
-                  <th className="os-secao" colSpan={4 + secao.quantidadeDeEtapas}>
+                  {/* Grupo + Item + Executado + Observação */}
+                  <th className="os-secao" colSpan={4}>
                     {secao.categoria}
                   </th>
                 </tr>
                 <tr>
                   <th className="os-col-grupo">Grupo</th>
                   <th>Item</th>
-                  {secao.etapasVisiveis.etapa1 && <th>Etapa 1</th>}
-                  {secao.etapasVisiveis.etapa2 && <th>Etapa 2</th>}
-                  {secao.etapasVisiveis.etapa3 && <th>Etapa 3</th>}
                   <th className="os-col-executado">Executado</th>
                   <th>Observação</th>
                 </tr>
@@ -142,9 +136,6 @@ export default async function OrdemDeServicoPage({
                   <tr key={item.itemRevisionalId}>
                     <td>{rotuloDoGrupo(item.grupo)}</td>
                     <td>{item.nome}</td>
-                    {secao.etapasVisiveis.etapa1 && <td>{item.etapa1 ?? ""}</td>}
-                    {secao.etapasVisiveis.etapa2 && <td>{item.etapa2 ?? ""}</td>}
-                    {secao.etapasVisiveis.etapa3 && <td>{item.etapa3 ?? ""}</td>}
                     <td className="os-col-executado">{item.executado ? "Sim" : "Não"}</td>
                     <td>{item.observacao ?? ""}</td>
                   </tr>

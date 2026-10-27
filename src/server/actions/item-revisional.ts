@@ -53,15 +53,12 @@ function lerCampos(formData: FormData) {
   return {
     nome,
     descricao: descricaoBruta ? descricaoBruta : null,
-    // Organização e etapas: todos opcionais, string vazia vira null. Sem
+    // Categoria e grupo: opcionais, string vazia vira null. Sem
     // normalização de caixa — "Elétrica" e "ELÉTRICA" são agrupamentos
     // diferentes porque a pessoa os escreveu diferentes, e decidir por ela
     // qual é a "certa" mudaria o que ela vê impresso.
     categoria: lerTextoOpcional(formData, "categoria"),
     grupo: lerTextoOpcional(formData, "grupo"),
-    etapa1: lerTextoOpcional(formData, "etapa1"),
-    etapa2: lerTextoOpcional(formData, "etapa2"),
-    etapa3: lerTextoOpcional(formData, "etapa3"),
 
     diasPadrao: lerCampoNumerico(formData, "diasPadrao"),
     kmPadrao: lerCampoNumerico(formData, "kmPadrao"),

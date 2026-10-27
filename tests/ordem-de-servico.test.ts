@@ -32,9 +32,6 @@ function item(parcial: Partial<ItemDaOS> & { nome: string }): ItemDaOS {
     itemRevisionalId: parcial.nome,
     categoria: null,
     grupo: null,
-    etapa1: null,
-    etapa2: null,
-    etapa3: null,
     executado: false,
     observacao: null,
     ...parcial,
@@ -111,31 +108,6 @@ describe("secoesDaOS", () => {
       "Bomba",
       "Alavanca",
     ]);
-  });
-
-  test("a coluna de etapa só sai na seção em que ALGUM item a preenche", () => {
-    // Duas seções com perfis DIFERENTES de propósito: com uma só, uma
-    // implementação que decidisse as colunas olhando o relatório inteiro
-    // daria o mesmo resultado e o defeito passaria.
-    const secoes = secoesDaOS([
-      item({ nome: "Faróis", categoria: "Elétrica", etapa1: "Correto funcionamento" }),
-      item({ nome: "Bateria", categoria: "Elétrica", etapa3: "Lubrificar" }),
-      item({ nome: "Bomba", categoria: "Mecânica" }),
-    ]);
-
-    const eletrica = secoes[0];
-    expect(eletrica.categoria).toBe("Elétrica");
-    expect(eletrica.etapasVisiveis).toEqual({ etapa1: true, etapa2: false, etapa3: true });
-    expect(eletrica.quantidadeDeEtapas).toBe(2);
-
-    const mecanica = secoes[1];
-    expect(mecanica.etapasVisiveis).toEqual({ etapa1: false, etapa2: false, etapa3: false });
-    expect(mecanica.quantidadeDeEtapas).toBe(0);
-  });
-
-  test("etapa só com espaços não abre coluna", () => {
-    const [secao] = secoesDaOS([item({ nome: "Faróis", categoria: "Elétrica", etapa1: "   " })]);
-    expect(secao.etapasVisiveis.etapa1).toBe(false);
   });
 
   test("emissão sem itens não gera seção nenhuma", () => {
@@ -235,12 +207,7 @@ describe("buscarEmissaoParaImpressao", () => {
     });
     await db.itemRevisional.update({
       where: { id: cenario.item.id },
-      data: {
-        categoria: "Elétrica",
-        grupo: "Cabine",
-        etapa1: "Correto funcionamento",
-        etapa3: "Lubrificar",
-      },
+      data: { categoria: "Elétrica", grupo: "Cabine" },
     });
     await db.itemExecutadoEmissao.create({
       data: { emissaoId: cenario.emissao.id, itemRevisionalId: cenario.item.id, executado: true },
@@ -264,8 +231,6 @@ describe("buscarEmissaoParaImpressao", () => {
     expect(lida?.conta.nome).toBe(cenario.conta.nome);
     expect(lida?.itens[0].itemRevisional.categoria).toBe("Elétrica");
     expect(lida?.itens[0].itemRevisional.grupo).toBe("Cabine");
-    expect(lida?.itens[0].itemRevisional.etapa1).toBe("Correto funcionamento");
-    expect(lida?.itens[0].itemRevisional.etapa3).toBe("Lubrificar");
     expect(lida?.servicos[0].pessoa.nome).toBe(cenario.pessoa.nome);
     expect(lida?.servicos[0].itemRevisional.nome).toBe(cenario.item.nome);
   });

@@ -11,11 +11,13 @@ import { TETO_DE_MINUTOS, somarMinutos } from "./duracao";
 // branco para o mecânico anotar à mão. Decisão de Fulvi em 27-10-2026.
 //
 // O layout vem das imagens de OS de um TMS que Fulvi enviou como MODELO
-// VISUAL. Os campos de veículo daquele relatório (placa, chassi, km,
-// motorista) NÃO entram: não existem no modelo do Raiz e inventá-los seria
-// trazer o vocabulário de outro domínio. O que se aproveitou é a forma —
-// seções por categoria, grupo na primeira coluna, etapas de verificação no
-// meio.
+// VISUAL. Dali se aproveitou a FORMA — seções por categoria e grupo na
+// primeira coluna — e nada além disso. Os campos de veículo daquele
+// relatório (placa, chassi, km, motorista) nunca entraram: não existem no
+// modelo do Raiz. As três etapas de verificação chegaram a entrar, em
+// 26-10-2026, e SAÍRAM no dia seguinte a pedido de Fulvi — eram convenção
+// daquele outro sistema, não do fluxo dele. Não reintroduzir por conta
+// própria: se voltarem, é porque ele pediu.
 
 /// Rótulo das seções/células sem valor. A categoria e o grupo são opcionais
 /// (texto livre), e um item sem eles precisa aparecer no papel — some-lo
@@ -28,30 +30,14 @@ export type ItemDaOS = {
   nome: string;
   categoria: string | null;
   grupo: string | null;
-  etapa1: string | null;
-  etapa2: string | null;
-  etapa3: string | null;
   executado: boolean;
   observacao: string | null;
-};
-
-/// Quais das três colunas de etapa a seção imprime. Por SEÇÃO, não por
-/// relatório: uma OS pode ter uma categoria que usa as três etapas e outra
-/// que não usa nenhuma, e reservar as três colunas em todas desperdiçaria
-/// metade da largura do papel na segunda.
-export type EtapasVisiveis = {
-  etapa1: boolean;
-  etapa2: boolean;
-  etapa3: boolean;
 };
 
 export type SecaoDaOS = {
   /// Já resolvido: nunca null, nunca "" — é o que vai no cabeçalho da seção.
   categoria: string;
   itens: ItemDaOS[];
-  etapasVisiveis: EtapasVisiveis;
-  /// Quantas colunas de etapa saem — o `colSpan` do cabeçalho da seção.
-  quantidadeDeEtapas: number;
 };
 
 function preenchido(valor: string | null): boolean {
@@ -102,20 +88,7 @@ export function secoesDaOS(itens: readonly ItemDaOS[]): SecaoDaOS[] {
       return compararTexto(a.nome, b.nome);
     });
 
-    const etapasVisiveis: EtapasVisiveis = {
-      etapa1: itensDaSecao.some((item) => preenchido(item.etapa1)),
-      etapa2: itensDaSecao.some((item) => preenchido(item.etapa2)),
-      etapa3: itensDaSecao.some((item) => preenchido(item.etapa3)),
-    };
-
-    return {
-      categoria,
-      itens: itensDaSecao,
-      etapasVisiveis,
-      quantidadeDeEtapas: Number(etapasVisiveis.etapa1)
-        + Number(etapasVisiveis.etapa2)
-        + Number(etapasVisiveis.etapa3),
-    };
+    return { categoria, itens: itensDaSecao };
   });
 }
 
