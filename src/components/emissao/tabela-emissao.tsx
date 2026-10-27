@@ -177,6 +177,23 @@ export function TabelaEmissao({
                   </td>
                   <td>
                     <div className="row-actions">
+                      {/* Impressão da OS (C2) — <a> e não <button>: é
+                          navegação para outra rota, abre em aba nova para
+                          não perder a listagem filtrada, e funciona sem
+                          JavaScript. Sem gate de permissão porque não
+                          existe ação "ver" no enum; quem enxerga a linha
+                          pode imprimi-la. */}
+                      <a
+                        className="icon-btn"
+                        href={`/emissao/${emissao.id}/os`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Imprimir OS"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
+                        </svg>
+                      </a>
                       <button
                         className="icon-btn"
                         type="button"

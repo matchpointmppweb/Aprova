@@ -8,6 +8,7 @@ import { StatusBadge } from "@/src/components/shared/status-badge";
 // (Boundaries): o cliente interpreta, formata e soma com as mesmas funções que
 // a Server Action usa para validar e gravar. Nenhum parse próprio, nenhum
 // `padStart`, nenhum teto reescrito aqui.
+import { formatarInstante } from "@/src/lib/datas";
 import { DURACAO_INVALIDA, formatarMinutos } from "@/src/lib/duracao";
 import {
   aprovarEmissaoAction,
@@ -61,31 +62,18 @@ type AbaModal = "geral" | "itens" | "servico";
 // Decisão consciente e seu limite: o produto é single-timezone pt-BR
 // (internacionalização é non-goal explícito do SPEC); precisa ser revisto se
 // algum dia atender múltiplos fusos.
+//
+// A contraparte — `formatarInstante` de src/lib/datas.ts, com getters LOCAIS —
+// trata o valor de natureza OPOSTA: o instante real atribuído pelo servidor
+// (`dataEmissao`). Confundir as duas já custou um bug de 3h. Ela mora em
+// `lib/` porque a OS impressa (Server Component) usa a mesma formatação, e
+// uma segunda cópia divergiria.
 function paraDatetimeLocal(data: Date | null): string {
   if (!data) return "";
   const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
   return (
     `${data.getUTCFullYear()}-${doisDigitos(data.getUTCMonth() + 1)}-${doisDigitos(data.getUTCDate())}` +
     `T${doisDigitos(data.getUTCHours())}:${doisDigitos(data.getUTCMinutes())}`
-  );
-}
-
-// Exibição de um INSTANTE REAL (um ponto no tempo atribuído pelo servidor,
-// como `dataEmissao`) para leitura humana. Usa getters LOCAIS, ao contrário de
-// paraDatetimeLocal acima — as duas coexistem porque tratam valores de
-// natureza diferente:
-//   - paraDatetimeLocal: wall-clock DIGITADO pelo usuário (os três marcos
-//     agendamento/início/fim). Getters getUTC* fecham o round trip com
-//     parseDataHora, que interpreta a string como wall-clock UTC.
-//   - formatarInstante: instante real do relógio do servidor. Getters locais
-//     o traduzem para o fuso de quem está olhando; usar getUTC* aqui mostraria
-//     a hora 3h adiantada para o usuário pt-BR.
-function formatarInstante(data: Date | null): string {
-  if (!data) return "";
-  const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
-  return (
-    `${doisDigitos(data.getDate())}/${doisDigitos(data.getMonth() + 1)}/${data.getFullYear()} ` +
-    `${doisDigitos(data.getHours())}:${doisDigitos(data.getMinutes())}`
   );
 }
 

@@ -545,3 +545,94 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
   /* Mockup L499: as quatro datas quebram em duas colunas junto com a grade. */
   .date-row{grid-template-columns:1fr 1fr;}
 }
+
+/* ---------- Ordem de Serviço impressa (C2, 27-10-2026) ---------- */
+/* NÃO vem do mockup: `Mockups/atual.html` não tem tela de impressão, então
+   não há o que portar (AD-4 continua valendo para o que existe lá). As
+   regras abaixo seguem as variáveis e o peso tipográfico do resto do
+   projeto, sem introduzir cor nova.
+
+   O layout da folha veio das imagens de OS de um TMS que Fulvi enviou como
+   MODELO VISUAL — a forma (seções, grade de campos, assinaturas), nunca os
+   campos de veículo daquele domínio. */
+
+.os-folha{
+  max-width:210mm;              /* largura útil de uma A4 retrato */
+  margin:0 auto;
+  padding:24px 28px 40px;
+  background:var(--white);
+  color:var(--ink);
+}
+.os-controles{display:flex;justify-content:flex-end;gap:10px;margin-bottom:18px;}
+
+.os-cabecalho{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+  padding-bottom:12px;border-bottom:2px solid var(--forest);
+}
+.os-marca{font-family:var(--font-space-grotesk), sans-serif;font-size:19px;font-weight:700;color:var(--forest);}
+.os-identificacao{text-align:right;}
+.os-titulo{font-family:var(--font-space-grotesk), sans-serif;font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;}
+.os-codigo{font-family:var(--font-ibm-plex-mono), monospace;font-size:20px;font-weight:500;}
+.os-sub{font-size:11.5px;color:var(--ink-soft);}
+
+.os-bloco{margin-top:20px;}
+.os-bloco-titulo{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  margin:0 0 9px;font-size:12px;font-weight:600;text-transform:uppercase;
+  letter-spacing:0.05em;color:var(--ink-soft);
+  border-bottom:1px solid var(--line-strong);padding-bottom:5px;
+}
+.os-contador{font-size:11.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink);}
+
+.os-campos{display:grid;grid-template-columns:repeat(3,1fr);gap:9px 18px;margin:0;}
+.os-campo dt{font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
+.os-campo dd{margin:1px 0 0;font-size:13px;}
+
+.os-tabela{width:100%;border-collapse:collapse;margin-bottom:14px;}
+.os-tabela th,.os-tabela td{
+  border:1px solid var(--line-strong);padding:5px 7px;
+  font-size:11.5px;text-align:left;vertical-align:top;
+}
+.os-tabela thead th{background:var(--paper-2);font-weight:600;}
+.os-tabela th.os-secao{
+  background:var(--sage-pale);color:var(--forest);
+  font-size:12px;text-transform:uppercase;letter-spacing:0.05em;
+}
+.os-col-grupo{width:16%;}
+.os-col-executado{width:68px;text-align:center;}
+.os-tabela td.os-col-executado{text-align:center;font-weight:600;}
+.os-col-duracao{width:80px;text-align:right;}
+.os-tabela td.os-col-duracao{text-align:right;font-family:var(--font-ibm-plex-mono), monospace;}
+.os-vazio{font-size:12px;color:var(--ink-soft);margin:0 0 10px;}
+
+.os-assinaturas{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:46px;}
+.os-assinatura{font-size:11.5px;color:var(--ink-soft);text-align:center;}
+.os-linha-assinatura{display:block;border-top:1px solid var(--ink-soft);margin-bottom:5px;}
+.os-rodape{margin-top:22px;font-size:10.5px;color:var(--ink-soft);text-align:center;}
+
+@media (max-width:760px){
+  .os-campos{grid-template-columns:1fr 1fr;}
+}
+
+/* Margens da folha — o navegador imprime cabeçalho/rodapé próprios fora
+   delas; quem quiser removê-los faz na caixa de impressão. */
+@page{size:A4 portrait;margin:14mm;}
+
+@media print{
+  /* Fundo de papel e sombra só existem na tela; no papel custam tinta. */
+  body{background:var(--white);}
+  .no-print{display:none !important;}
+  .os-folha{max-width:none;padding:0;}
+  /* Uma seção de itens não deve começar no fim da folha e continuar sozinha
+     na seguinte — e o cabeçalho da tabela se repete em toda página quando a
+     seção de fato quebra. */
+  .os-tabela{break-inside:auto;}
+  .os-tabela thead{display:table-header-group;}
+  .os-tabela tr{break-inside:avoid;}
+  .os-assinaturas{break-inside:avoid;}
+  /* `print-color-adjust` preserva os fundos das faixas de seção: sem ele o
+     navegador descarta o fundo na impressão e a hierarquia da folha some. */
+  .os-tabela thead th,.os-tabela th.os-secao{
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+}

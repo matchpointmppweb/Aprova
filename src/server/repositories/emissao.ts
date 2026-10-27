@@ -84,6 +84,77 @@ export async function buscarEmissao(contaId: string, id: string) {
   return aplicarNomeDoVinculo(contaId, emissao);
 }
 
+// Leitura da ORDEM DE SERVIÇO IMPRESSA (C2) — um `include` PRÓPRIO, e não o
+// INCLUDE_LISTAGEM.
+//
+// Dois motivos para não reaproveitar: o papel precisa de campos que a
+// listagem não carrega (categoria/grupo/etapas do item revisional, empresa
+// proprietária e tipo do ativo, nome da pessoa de cada apontamento), e
+// enfiá-los no INCLUDE_LISTAGEM faria a tela de Emissão passar tudo isso ao
+// cliente em TODA linha da listagem, à toa.
+//
+// Escopado por {id, contaId} (AD-1) como qualquer leitura — um id de outra
+// conta nunca é encontrado, nem para impressão.
+export async function buscarEmissaoParaImpressao(contaId: string, id: string) {
+  const emissao = await prisma.emissao.findFirst({
+    where: { id, contaId },
+    include: {
+      ativo: {
+        select: {
+          id: true,
+          codigo: true,
+          nome: true,
+          localizacao: true,
+          numeroSerie: true,
+          tipoAtivo: { select: { nome: true } },
+          empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true, cpf: true } },
+        },
+      },
+      plano: { select: { id: true, nome: true } },
+      responsavel: { select: { id: true, nome: true } },
+      conta: { select: { nome: true, cnpj: true } },
+      itens: {
+        select: {
+          id: true,
+          itemRevisionalId: true,
+          executado: true,
+          observacao: true,
+          itemRevisional: {
+            select: {
+              nome: true,
+              categoria: true,
+              grupo: true,
+              etapa1: true,
+              etapa2: true,
+              etapa3: true,
+            },
+          },
+        },
+      },
+      servicos: {
+        select: {
+          id: true,
+          modo: true,
+          duracaoMinutos: true,
+          inicio: true,
+          fim: true,
+          pessoa: { select: { nome: true } },
+          itemRevisional: { select: { nome: true } },
+        },
+        orderBy: ORDEM_SERVICOS,
+      },
+    },
+  });
+  // Mesma resolução de nome por vínculo das outras leituras (Story 6.6): a
+  // relação com `Usuario` traz o nome da IDENTIDADE, que pode ter sido
+  // digitado por outra conta (NFR2) — e o nome do responsável vai IMPRESSO.
+  return aplicarNomeDoVinculo(contaId, emissao);
+}
+
+export type EmissaoParaImpressao = NonNullable<
+  Awaited<ReturnType<typeof buscarEmissaoParaImpressao>>
+>;
+
 export type DadosItemExecutadoNovo = {
   itemRevisionalId: string;
   executado: boolean;
