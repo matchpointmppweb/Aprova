@@ -107,6 +107,19 @@ export function Sidebar({
       </div>
 
       <div className="side-group">
+        <Link
+          href="/relatorios"
+          className={`side-item nav-item${ehRotaAtiva(pathname, "/relatorios") ? " active" : ""}`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 3v18h18" />
+            <path d="M7 15l4-5 3 3 5-7" />
+          </svg>
+          Relatórios
+        </Link>
+      </div>
+
+      <div className="side-group">
         <button
           type="button"
           className={`side-item group-toggle${configAberto ? " expanded" : ""}`}

@@ -546,6 +546,38 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
   .date-row{grid-template-columns:1fr 1fr;}
 }
 
+/* ---------- Relatórios (C3, 27-10-2026) ---------- */
+/* Não vem do mockup: `Mockups/atual.html` não tem tela de relatórios, então
+   não há o que portar (AD-4 vale para o que existe lá). Reusa `.panel`,
+   `.table-wrap`, `table` e `.f` do resto do projeto — nenhuma cor nova. */
+
+.rel-sub{margin:3px 0 0;font-size:12.5px;color:var(--ink-soft);}
+.rel-filtros{
+  display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;
+  padding:14px 18px;border-bottom:1px solid var(--line);background:var(--paper-2);
+}
+.rel-filtros .f{margin:0;}
+.rel-filtros select,.rel-filtros input{min-width:190px;}
+.rel-erro{padding:12px 18px 0;}
+.rel-aviso{
+  margin:0;padding:10px 18px;font-size:12px;color:var(--ink-soft);
+  border-bottom:1px solid var(--line);
+}
+.rel-vazio{padding:28px 18px;text-align:center;color:var(--ink-soft);font-size:13px;}
+.rel-num{text-align:right;}
+/* O rodapé de totais precisa se distinguir das linhas de dado — senão vira
+   só mais uma linha, e uma que soma coisas diferentes. */
+table tfoot td{
+  font-weight:600;background:var(--paper-2);
+  border-top:2px solid var(--line-strong);
+}
+table tfoot td.rel-num{font-family:var(--font-ibm-plex-mono), monospace;}
+
+@media (max-width:760px){
+  .rel-filtros{flex-direction:column;align-items:stretch;}
+  .rel-filtros select,.rel-filtros input{min-width:0;width:100%;}
+}
+
 /* ---------- Ordem de Serviço impressa (C2, 27-10-2026) ---------- */
 /* NÃO vem do mockup: `Mockups/atual.html` não tem tela de impressão, então
    não há o que portar (AD-4 continua valendo para o que existe lá). As
