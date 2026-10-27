@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useActionState, useEffect, useState } from "react";
+import { Fragment, useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { StatusBadge, type TomBadge } from "@/src/components/shared/status-badge";
@@ -104,6 +104,23 @@ export function TabelaItens({
   podeEditar: boolean;
   podeExcluir: boolean;
 }) {
+  // Valores já usados na conta, para o datalist dos formulários. Ordenados e
+  // sem repetição — é a lista de sugestões, não um cadastro.
+  const categoriasUsadas = useMemo(
+    () =>
+      [...new Set(itens.map((item) => item.categoria).filter((v): v is string => !!v))].sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
+    [itens],
+  );
+  const gruposUsados = useMemo(
+    () =>
+      [...new Set(itens.map((item) => item.grupo).filter((v): v is string => !!v))].sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
+    [itens],
+  );
+
   const [linhaAberta, setLinhaAberta] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"all" | StatusItemRevisional>("all");
@@ -122,6 +139,23 @@ export function TabelaItens({
 
   return (
     <>
+      {/* Sugere a grafia já usada na conta sem impedir uma nova — é o que
+          segura "Elétrica" e "ELETRICA" virarem duas seções diferentes no
+          relatório, sem o custo de uma tela de cadastro para um campo que o
+          relatório só agrupa. Fica AQUI, e não dentro das linhas de
+          criação/edição, porque um <datalist> precisa existir no DOM para
+          que o `list` de qualquer uma delas o alcance. */}
+      <datalist id="lista-categorias">
+        {categoriasUsadas.map((valor) => (
+          <option key={valor} value={valor} />
+        ))}
+      </datalist>
+      <datalist id="lista-grupos">
+        {gruposUsados.map((valor) => (
+          <option key={valor} value={valor} />
+        ))}
+      </datalist>
+
       <div className="page-head">
         <div>
           <h1>Itens revisionais</h1>

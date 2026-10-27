@@ -41,6 +41,11 @@ function lerCampoNumerico(formData: FormData, nome: string): number | null {
   return Number.isFinite(valor) && Number.isInteger(valor) ? valor : null;
 }
 
+function lerTextoOpcional(formData: FormData, nome: string): string | null {
+  const bruto = String(formData.get(nome) ?? "").trim();
+  return bruto ? bruto : null;
+}
+
 function lerCampos(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
   const descricaoBruta = String(formData.get("descricao") ?? "").trim();
@@ -48,6 +53,16 @@ function lerCampos(formData: FormData) {
   return {
     nome,
     descricao: descricaoBruta ? descricaoBruta : null,
+    // Organização e etapas: todos opcionais, string vazia vira null. Sem
+    // normalização de caixa — "Elétrica" e "ELÉTRICA" são agrupamentos
+    // diferentes porque a pessoa os escreveu diferentes, e decidir por ela
+    // qual é a "certa" mudaria o que ela vê impresso.
+    categoria: lerTextoOpcional(formData, "categoria"),
+    grupo: lerTextoOpcional(formData, "grupo"),
+    etapa1: lerTextoOpcional(formData, "etapa1"),
+    etapa2: lerTextoOpcional(formData, "etapa2"),
+    etapa3: lerTextoOpcional(formData, "etapa3"),
+
     diasPadrao: lerCampoNumerico(formData, "diasPadrao"),
     kmPadrao: lerCampoNumerico(formData, "kmPadrao"),
     horasPadrao: lerCampoNumerico(formData, "horasPadrao"),
@@ -91,21 +106,17 @@ export async function criarItemRevisionalAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const { nome, descricao, diasPadrao, kmPadrao, horasPadrao, status } = lerCampos(formData);
+  const campos = lerCampos(formData);
 
-  const erros = validarCampos({ nome, status, diasPadrao, kmPadrao, horasPadrao });
+  const erros = validarCampos(campos);
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
 
   try {
     await criarItemRevisional(usuarioSessao.contaId, {
-      nome,
-      descricao,
-      diasPadrao,
-      kmPadrao,
-      horasPadrao,
-      status: status as StatusItemRevisional,
+      ...campos,
+      status: campos.status as StatusItemRevisional,
     });
   } catch (erro) {
     if (isErroDeNomeDuplicado(erro)) {
@@ -139,9 +150,9 @@ export async function editarItemRevisionalAction(
   }
 
   const itemRevisionalId = String(formData.get("itemRevisionalId") ?? "").trim();
-  const { nome, descricao, diasPadrao, kmPadrao, horasPadrao, status } = lerCampos(formData);
+  const campos = lerCampos(formData);
 
-  const erros = validarCampos({ nome, status, diasPadrao, kmPadrao, horasPadrao });
+  const erros = validarCampos(campos);
   if (!itemRevisionalId) {
     erros.push({ field: "itemRevisionalId", message: "Item revisional inválido." });
   }
@@ -152,12 +163,8 @@ export async function editarItemRevisionalAction(
   let atualizou: boolean;
   try {
     atualizou = await atualizarItemRevisional(usuarioSessao.contaId, itemRevisionalId, {
-      nome,
-      descricao,
-      diasPadrao,
-      kmPadrao,
-      horasPadrao,
-      status: status as StatusItemRevisional,
+      ...campos,
+      status: campos.status as StatusItemRevisional,
     });
   } catch (erro) {
     if (isErroDeNomeDuplicado(erro)) {

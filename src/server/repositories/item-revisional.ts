@@ -21,6 +21,11 @@ export async function criarItemRevisional(
   dados: {
     nome: string;
     descricao: string | null;
+    categoria: string | null;
+    grupo: string | null;
+    etapa1: string | null;
+    etapa2: string | null;
+    etapa3: string | null;
     diasPadrao: number | null;
     kmPadrao: number | null;
     horasPadrao: number | null;
@@ -32,6 +37,11 @@ export async function criarItemRevisional(
       contaId,
       nome: dados.nome,
       descricao: dados.descricao,
+      categoria: dados.categoria,
+      grupo: dados.grupo,
+      etapa1: dados.etapa1,
+      etapa2: dados.etapa2,
+      etapa3: dados.etapa3,
       diasPadrao: dados.diasPadrao,
       kmPadrao: dados.kmPadrao,
       horasPadrao: dados.horasPadrao,
@@ -51,6 +61,11 @@ export async function atualizarItemRevisional(
   dados: Partial<{
     nome: string;
     descricao: string | null;
+    categoria: string | null;
+    grupo: string | null;
+    etapa1: string | null;
+    etapa2: string | null;
+    etapa3: string | null;
     diasPadrao: number | null;
     kmPadrao: number | null;
     horasPadrao: number | null;

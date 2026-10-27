@@ -632,8 +632,29 @@ model ItemRevisional {
   contaId String
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  nome        String
-  descricao   String?
+  nome      String
+  descricao String?
+
+  /// Organização do item para a OS impressa (26-10-2026). Os dois são TEXTO
+  /// LIVRE e opcionais, não enum nem cadastro próprio: o vocabulário é de
+  /// cada conta ("Elétrica"/"Mecânica" numa transportadora, outra coisa numa
+  /// indústria), e fixá-lo no schema imporia o vocabulário de um cliente a
+  /// todos. O formulário sugere os valores já usados na conta para que a
+  /// grafia não divirja — é o que mantém o agrupamento do relatório coerente
+  /// sem o custo de duas telas de cadastro.
+  ///
+  /// `categoria` vira a SEÇÃO do relatório; `grupo`, a primeira COLUNA.
+  categoria String?
+  grupo     String?
+
+  /// Três etapas de verificação, com a instrução de cada uma (ex.: "Correto
+  /// funcionamento", "Integridade dos componentes", "Lubrificar"). Opcionais
+  /// e independentes entre si — um item pode ter só a primeira. Viram as
+  /// colunas do meio da OS impressa; vazias, a coluna não sai.
+  etapa1 String?
+  etapa2 String?
+  etapa3 String?
+
   /// "A cada N dias" — não-nulo significa que este controle está selecionado.
   diasPadrao  Int?
   /// "A cada N km" — não-nulo significa que este controle está selecionado.

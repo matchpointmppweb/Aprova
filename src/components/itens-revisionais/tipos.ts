@@ -8,6 +8,11 @@ export interface ItemRevisionalListagem {
   id: string;
   nome: string;
   descricao: string | null;
+  categoria: string | null;
+  grupo: string | null;
+  etapa1: string | null;
+  etapa2: string | null;
+  etapa3: string | null;
   diasPadrao: number | null;
   kmPadrao: number | null;
   horasPadrao: number | null;

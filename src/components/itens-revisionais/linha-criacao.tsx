@@ -87,6 +87,53 @@ export function LinhaCriacao({
               />
             </div>
             <div className="f">
+              <label htmlFor={"ci-categoria"}>Categoria</label>
+              <input
+                id={"ci-categoria"}
+                name="categoria"
+                type="text"
+                list="lista-categorias"
+                placeholder="Ex.: Elétrica"
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={"ci-grupo"}>Grupo</label>
+              <input
+                id={"ci-grupo"}
+                name="grupo"
+                type="text"
+                list="lista-grupos"
+                placeholder="Ex.: Cabine"
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={"ci-etapa1"}>Etapa 1</label>
+              <input
+                id={"ci-etapa1"}
+                name="etapa1"
+                type="text"
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={"ci-etapa2"}>Etapa 2</label>
+              <input
+                id={"ci-etapa2"}
+                name="etapa2"
+                type="text"
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={"ci-etapa3"}>Etapa 3</label>
+              <input
+                id={"ci-etapa3"}
+                name="etapa3"
+                type="text"
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="f">
               <label htmlFor="ci-dias">A cada (dias)</label>
               <input id="ci-dias" name="diasPadrao" type="number" min={1} placeholder="Opcional" />
             </div>

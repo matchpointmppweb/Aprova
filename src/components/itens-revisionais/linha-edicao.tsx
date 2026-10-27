@@ -98,6 +98,58 @@ export function LinhaEdicao({
               />
             </div>
             <div className="f">
+              <label htmlFor={`ei-categoria-${item.id}`}>Categoria</label>
+              <input
+                id={`ei-categoria-${item.id}`}
+                name="categoria"
+                type="text"
+                list="lista-categorias"
+                placeholder="Ex.: Elétrica"
+                defaultValue={item.categoria ?? ""}
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={`ei-grupo-${item.id}`}>Grupo</label>
+              <input
+                id={`ei-grupo-${item.id}`}
+                name="grupo"
+                type="text"
+                list="lista-grupos"
+                placeholder="Ex.: Cabine"
+                defaultValue={item.grupo ?? ""}
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={`ei-etapa1-${item.id}`}>Etapa 1</label>
+              <input
+                id={`ei-etapa1-${item.id}`}
+                name="etapa1"
+                type="text"
+                placeholder="Opcional"
+                defaultValue={item.etapa1 ?? ""}
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={`ei-etapa2-${item.id}`}>Etapa 2</label>
+              <input
+                id={`ei-etapa2-${item.id}`}
+                name="etapa2"
+                type="text"
+                placeholder="Opcional"
+                defaultValue={item.etapa2 ?? ""}
+              />
+            </div>
+            <div className="f">
+              <label htmlFor={`ei-etapa3-${item.id}`}>Etapa 3</label>
+              <input
+                id={`ei-etapa3-${item.id}`}
+                name="etapa3"
+                type="text"
+                placeholder="Opcional"
+                defaultValue={item.etapa3 ?? ""}
+              />
+            </div>
+            <div className="f">
               <label htmlFor={`ei-dias-${item.id}`}>A cada (dias)</label>
               <input
                 id={`ei-dias-${item.id}`}
