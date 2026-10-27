@@ -39,6 +39,7 @@ import {
   criarAtivo,
   criarEmissaoCompleta,
   criarEmpresa,
+  criarItemRevisional,
   criarPlano,
   criarTipoAtivo,
   db,
@@ -410,6 +411,7 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
           dataFim: null,
           trocouPlano: false,
           itens: [],
+          itensNovos: [],
           servicos: [
             {
               pessoaId: cenario.pessoa.id,
@@ -462,6 +464,7 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
           dataFim: null,
           trocouPlano: false,
           itens: [],
+          itensNovos: [],
           servicos: [
             {
               pessoaId: cenario.pessoa.id,
@@ -679,6 +682,128 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
     expect(estado.ok).toBe(true);
     const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
     expect(criada.planoId).toBe(planoDaEmpresa.id);
+  });
+
+  // Frente A — itens AVULSOS na aba Itens. O botão "buscar itens do plano" e
+  // o seletor avulso enviam a MESMA coisa (`itemAvulso-{id}`), então os
+  // testes abaixo cobrem os dois de uma vez.
+  describe("itens avulsos", () => {
+    test("um item fora do plano entra na emissão, com o valor esperado do próprio item", async () => {
+      const cenario = await cenarioComSessao();
+      const avulso = await criarItemRevisional(cenario.conta.id, { nome: "Troca de pneu" });
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          [`itemAvulso-${avulso.id}`]: "1",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      const itens = await db.itemExecutadoEmissao.findMany({ where: { emissaoId: criada.id } });
+
+      // O item do plano E o avulso — o avulso ACRESCENTA, nunca substitui.
+      expect(itens.map((item) => item.itemRevisionalId).sort()).toEqual(
+        [cenario.item.id, avulso.id].sort(),
+      );
+      // Sem PlanoItemRevisional não há override: o snapshot vem do padrão do
+      // próprio item (100 horas, da fixture).
+      const gravado = itens.find((item) => item.itemRevisionalId === avulso.id)!;
+      expect(gravado.valorEsperadoHoras).toBe(100);
+    });
+
+    // A emissão tem @@unique([emissaoId, itemRevisionalId]): sem o filtro de
+    // duplicata a gravação estouraria, e o usuário veria um erro genérico por
+    // ter clicado duas vezes no botão.
+    test("avulso que repete um item do plano é ignorado, sem estourar", async () => {
+      const cenario = await cenarioComSessao();
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          [`itemAvulso-${cenario.item.id}`]: "1",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      const itens = await db.itemExecutadoEmissao.findMany({ where: { emissaoId: criada.id } });
+      expect(itens).toHaveLength(1);
+    });
+
+    test("avulso de OUTRA conta é ignorado e não entra (AD-1)", async () => {
+      const cenario = await cenarioComSessao();
+      const outra = await criarEmissaoCompleta({ nomeDaConta: "Outra conta" });
+      const itemAlheio = await criarItemRevisional(outra.conta.id);
+
+      const estado = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          [`itemAvulso-${itemAlheio.id}`]: "1",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+      const itens = await db.itemExecutadoEmissao.findMany({ where: { emissaoId: criada.id } });
+      expect(itens.map((item) => item.itemRevisionalId)).toEqual([cenario.item.id]);
+    });
+
+    // O caso que mais importa no dia a dia: acrescentar um item a uma emissão
+    // JÁ EM ANDAMENTO, sem trocar o plano. Este caminho é update-in-place, e
+    // o avulso tem de virar linha NOVA sem tocar no progresso das existentes.
+    test("avulso numa edição sem troca de plano cria a linha e preserva o progresso", async () => {
+      const cenario = await cenarioComSessao();
+      const avulso = await criarItemRevisional(cenario.conta.id, { nome: "Troca de pneu" });
+      const criacao = await criarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({ ativoId: cenario.ativo.id, responsavelId: cenario.identidade.id }),
+      );
+      expect(criacao.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+
+      const itemGravado = await db.itemExecutadoEmissao.findFirstOrThrow({
+        where: { emissaoId: criada.id },
+      });
+      await db.itemExecutadoEmissao.update({
+        where: { id: itemGravado.id },
+        data: { executado: true, observacao: "feito na segunda" },
+      });
+      const recarregada = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: recarregada.updatedAt.toISOString(),
+          ativoId: cenario.ativo.id,
+          responsavelId: cenario.identidade.id,
+          [`itemExecutado-${cenario.item.id}`]: "on",
+          [`itemObs-${cenario.item.id}`]: "feito na segunda",
+          [`itemAvulso-${avulso.id}`]: "1",
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const itens = await db.itemExecutadoEmissao.findMany({ where: { emissaoId: criada.id } });
+      expect(itens).toHaveLength(2);
+
+      // O item antigo manteve o progresso — nada de delete+recreate aqui.
+      const antigo = itens.find((item) => item.itemRevisionalId === cenario.item.id)!;
+      expect(antigo.executado).toBe(true);
+      expect(antigo.observacao).toBe("feito na segunda");
+      // E o novo nasceu limpo.
+      const novo = itens.find((item) => item.itemRevisionalId === avulso.id)!;
+      expect(novo.executado).toBe(false);
+      expect(novo.valorEsperadoHoras).toBe(100);
+    });
   });
 
   describe("escolha do plano entre os candidatos (Frente A)", () => {

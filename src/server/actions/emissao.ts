@@ -260,6 +260,51 @@ async function buscarItensReaisPorId(contaId: string) {
 // momento da criação") — uma linha por item do plano, nunca um subconjunto
 // escolhido no cliente (checklist fixo, Code Map). Usado na criação e na
 // troca de plano da edição (Boundaries).
+// Frente A — itens AVULSOS: itens revisionais que a pessoa acrescentou à
+// emissão fora do plano. O cliente envia um `itemAvulso-{id}` por item
+// adicionado (o botão "buscar itens do plano" e o seletor avulso produzem a
+// MESMA coisa: um id a mais nesta lista).
+//
+// Três filtros, nesta ordem, e cada um fecha um buraco diferente:
+//   1. o id tem de ser um ItemRevisional REAL da conta (AD-1) — `itensReais`
+//      já vem escopado por contaId;
+//   2. nunca duplica um item que o plano já traz — a emissão tem
+//      @@unique([emissaoId, itemRevisionalId]) e a gravação estouraria;
+//   3. nunca duplica dentro da própria lista de avulsos.
+//
+// Um id inválido é IGNORADO, não recusado: diferente do plano, aqui não há
+// escolha a honrar nem dado a perder — o item simplesmente não entra, e
+// recusar a emissão inteira por um id que o cliente mandou torto seria
+// desproporcional.
+function lerItensAvulsos(
+  formData: FormData,
+  itensReaisPorId: Map<string, ItemRevisionalReal>,
+  jaPresentes: ReadonlySet<string>,
+): { itemRevisionalId: string; diasOverride: null; kmOverride: null; horasOverride: null }[] {
+  const vistos = new Set<string>();
+  const avulsos: {
+    itemRevisionalId: string;
+    diasOverride: null;
+    kmOverride: null;
+    horasOverride: null;
+  }[] = [];
+
+  for (const chave of formData.keys()) {
+    if (!chave.startsWith("itemAvulso-")) continue;
+    const id = chave.slice("itemAvulso-".length);
+    if (!itensReaisPorId.has(id)) continue;
+    if (jaPresentes.has(id)) continue;
+    if (vistos.has(id)) continue;
+    vistos.add(id);
+    // Sem override: o avulso não veio de um PlanoItemRevisional, então o
+    // valor esperado é o padrão do próprio item (calcularValorEsperado já
+    // resolve isso com os overrides nulos).
+    avulsos.push({ itemRevisionalId: id, diasOverride: null, kmOverride: null, horasOverride: null });
+  }
+
+  return avulsos;
+}
+
 function montarItensNovos(
   itensDoPlano: { itemRevisionalId: string; diasOverride: number | null; kmOverride: number | null; horasOverride: number | null }[],
   itensReaisPorId: Map<string, ItemRevisionalReal>,
@@ -356,7 +401,12 @@ export async function criarEmissaoAction(
   }
   const planoAtual = derivacao.plano;
 
-  const itens = montarItensNovos(planoAtual.itens, itensReaisPorId, formData);
+  const avulsos = lerItensAvulsos(
+    formData,
+    itensReaisPorId,
+    new Set(planoAtual.itens.map((item) => item.itemRevisionalId)),
+  );
+  const itens = montarItensNovos([...planoAtual.itens, ...avulsos], itensReaisPorId, formData);
 
   try {
     // Sem `dataEmissao` (AD-33): o repositório a atribui do relógio do
@@ -505,16 +555,35 @@ export async function editarEmissaoAction(
 
   let dados: DadosEditarEmissao;
   if (trocouPlano && planoDerivado) {
+    const avulsos = lerItensAvulsos(
+      formData,
+      itensReaisPorId,
+      new Set(planoDerivado.itens.map((item) => item.itemRevisionalId)),
+    );
     dados = {
       trocouPlano: true,
       ...comuns,
-      itens: montarItensNovos(planoDerivado.itens, itensReaisPorId, formData),
+      itens: montarItensNovos([...planoDerivado.itens, ...avulsos], itensReaisPorId, formData),
     };
   } else {
     dados = {
       trocouPlano: false,
       ...comuns,
       itens: montarItensExistentes(emissaoAtual.itens, formData),
+      // Avulsos numa edição SEM troca de plano são linhas NOVAS ao lado das
+      // existentes — nunca um delete+recreate, que é o que levaria embora o
+      // progresso já registrado. Por isso viajam num campo próprio, e não
+      // misturados em `itens`: o repositório precisa saber quais criar e
+      // quais só atualizar.
+      itensNovos: montarItensNovos(
+        lerItensAvulsos(
+          formData,
+          itensReaisPorId,
+          new Set(emissaoAtual.itens.map((item) => item.itemRevisionalId)),
+        ),
+        itensReaisPorId,
+        formData,
+      ),
     };
   }
 

@@ -1000,6 +1000,12 @@ export function ModalEmissao({
     return mapa;
   }, [estado.error, errosDeServicoObsoletos]);
 
+  // Frente A — itens acrescentados à mão nesta edição/criação, FORA do que o
+  // plano traz. O botão "buscar itens do plano" e o seletor avulso alimentam
+  // a MESMA lista: os dois só acrescentam um id, e a diferença entre eles é
+  // quantos ids de uma vez.
+  const [adicionados, setAdicionados] = useState<string[]>([]);
+
   const itensRevisionaisPorId = useMemo(
     () => new Map(itensRevisionais.map((item) => [item.id, item])),
     [itensRevisionais],
@@ -1064,7 +1070,7 @@ export function ModalEmissao({
   const avisoDoPlano =
     derivacao.tipo === "sem-plano" && ativoId ? ERRO_SEM_PLANO_PARA_O_ATIVO : null;
 
-  const linhas: LinhaItem[] = useMemo(() => {
+  const linhasDaBase: LinhaItem[] = useMemo(() => {
     if (emissao && !trocouPlano) {
       // Plano não mudou (ou é a própria criação de uma emissão cujo plano
       // ainda não foi trocado de novo depois de já ter voltado ao
@@ -1133,6 +1139,63 @@ export function ModalEmissao({
       };
     });
   }, [emissao, trocouPlano, planoId, planos, itensRevisionaisPorId]);
+
+  // Os avulsos entram DEPOIS das linhas da base, na ordem em que foram
+  // acrescentados, e nunca duplicam o que já está lá — a emissão tem
+  // @@unique(emissaoId, itemRevisionalId), então duplicar aqui viraria erro
+  // de gravação em vez de linha repetida na tela.
+  const idsDaBase = useMemo(
+    () => new Set(linhasDaBase.map((linha) => linha.itemRevisionalId)),
+    [linhasDaBase],
+  );
+
+  const linhas: LinhaItem[] = useMemo(() => {
+    const extras = adicionados
+      .filter((id) => !idsDaBase.has(id))
+      .map((id) => {
+        const itemReal = itensRevisionaisPorId.get(id);
+        return {
+          itemRevisionalId: id,
+          nome: itemReal?.nome ?? "Item revisional",
+          descricao: itemReal?.descricao ?? null,
+          // Sem override: avulso não vem de um PlanoItemRevisional, então o
+          // valor esperado é o padrão do próprio item — o mesmo que o
+          // servidor calcula ao gravar.
+          controles: controlesReais(itemReal).map((controle) => ({
+            key: controle.key,
+            label: controle.key === "dias" ? "Dias" : controle.key === "km" ? "Km" : "Horas",
+            valorEsperado: controle.padrao,
+            campoMedicao: CONTROLES.find((c) => c.key === controle.key)!.campoMedicao(id),
+          })),
+          executadoInicial: false,
+          medicaoInicial: { dias: null, km: null, horas: null },
+          observacaoInicial: "",
+        };
+      });
+
+    return [...linhasDaBase, ...extras];
+  }, [linhasDaBase, adicionados, idsDaBase, itensRevisionaisPorId]);
+
+  // O que o botão "buscar itens do plano" acrescentaria: os itens do plano
+  // escolhido que não estão na tela. Zero significa que não há o que buscar,
+  // e o botão fica desabilitado em vez de mentir que fez algo.
+  const itensDoPlanoAusentes = useMemo(() => {
+    const plano = planos.find((opcao) => opcao.id === planoId);
+    if (!plano) return [];
+    return plano.itens
+      .map((item) => item.itemRevisionalId)
+      .filter((id) => !idsDaBase.has(id) && !adicionados.includes(id));
+  }, [planos, planoId, idsDaBase, adicionados]);
+
+  // Só itens Ativos da conta, e só os que ainda não estão na emissão.
+  const avulsosDisponiveis = useMemo(
+    () =>
+      itensRevisionais.filter(
+        (item) =>
+          item.status === "Ativo" && !idsDaBase.has(item.id) && !adicionados.includes(item.id),
+      ),
+    [itensRevisionais, idsDaBase, adicionados],
+  );
 
   // Story 7.4 — `executado` SOBE para o modal (Design Notes): o estado derivado
   // de cada item o consome junto dos lançamentos, e a faixa de resumo da
@@ -1484,6 +1547,49 @@ export function ModalEmissao({
                 Marque os itens revisionais executados nesta emissão, registre a medição
                 realizada e, se necessário, adicione o serviço executado no item.
               </p>
+
+              {/* Frente A — os dois jeitos de acrescentar item, lado a lado:
+                  em bloco (os que faltam do plano) ou um a um (avulso, fora
+                  do plano). Nenhum dos dois REMOVE nada: tirar um item que
+                  já tem progresso é exatamente a perda silenciosa que a
+                  trava de troca de plano existe para impedir. */}
+              <div className="inline-form" style={{ marginBottom: 12 }}>
+                <div className="f">
+                  <label htmlFor="emissao-item-avulso">Adicionar item avulso</label>
+                  <select
+                    id="emissao-item-avulso"
+                    value=""
+                    disabled={avulsosDisponiveis.length === 0}
+                    onChange={(evento) => {
+                      const id = evento.target.value;
+                      if (id) setAdicionados((atual) => [...atual, id]);
+                    }}
+                  >
+                    <option value="">
+                      {avulsosDisponiveis.length === 0
+                        ? "Todos os itens já estão na emissão"
+                        : "Selecione um item revisional"}
+                    </option>
+                    {avulsosDisponiveis.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="actions">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    type="button"
+                    disabled={itensDoPlanoAusentes.length === 0}
+                    onClick={() => setAdicionados((atual) => [...atual, ...itensDoPlanoAusentes])}
+                  >
+                    {itensDoPlanoAusentes.length === 0
+                      ? "Itens do plano já incluídos"
+                      : `Buscar itens do plano (${itensDoPlanoAusentes.length})`}
+                  </button>
+                </div>
+              </div>
               {linhas.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13 }}>
                   {planoId
@@ -1527,6 +1633,21 @@ export function ModalEmissao({
                   </table>
                 </div>
               )}
+
+              {/* O contrato com o servidor: um `itemAvulso-{id}` por item que
+                  está na tela mas não na base. Fora da <table> de propósito —
+                  input solto entre <tbody> e <tr> é HTML inválido e o
+                  navegador o move para fora, tirando-o do FormData. */}
+              {linhas
+                .filter((linha) => !idsDaBase.has(linha.itemRevisionalId))
+                .map((linha) => (
+                  <input
+                    key={`avulso-${linha.itemRevisionalId}`}
+                    type="hidden"
+                    name={`itemAvulso-${linha.itemRevisionalId}`}
+                    value="1"
+                  />
+                ))}
             </div>
 
             {/* Visibilidade por classe ".hidden" (mesmo padrão dos outros

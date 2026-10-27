@@ -312,6 +312,11 @@ export type DadosEditarEmissao =
   | (CamposGeraisEmissao & {
       trocouPlano: false;
       itens: DadosItemExecutadoExistente[];
+      /// Itens AVULSOS acrescentados nesta edição (Frente A) — linhas que
+      /// ainda não existem na emissão. Separadas de `itens` de propósito:
+      /// aquelas são atualizadas in-place, estas são criadas. Nenhuma linha
+      /// é removida neste ramo, nunca.
+      itensNovos: DadosItemExecutadoNovo[];
     })
   | (CamposGeraisEmissao & {
       trocouPlano: true;
@@ -416,6 +421,26 @@ export async function atualizarEmissao(
               medicaoHoras: item.medicaoHoras,
               observacao: item.observacao,
             },
+          });
+        }
+
+        // Avulsos acrescentados nesta edição: criados ao lado, com snapshot
+        // próprio de valorEsperado. `createMany` dentro da MESMA transação —
+        // ou a edição inteira vale, ou nada vale (AD-9).
+        if (dados.itensNovos.length > 0) {
+          await tx.itemExecutadoEmissao.createMany({
+            data: dados.itensNovos.map((item) => ({
+              emissaoId: id,
+              itemRevisionalId: item.itemRevisionalId,
+              executado: item.executado,
+              valorEsperadoDias: item.valorEsperadoDias,
+              valorEsperadoKm: item.valorEsperadoKm,
+              valorEsperadoHoras: item.valorEsperadoHoras,
+              medicaoDias: item.medicaoDias,
+              medicaoKm: item.medicaoKm,
+              medicaoHoras: item.medicaoHoras,
+              observacao: item.observacao,
+            })),
           });
         }
       }
