@@ -780,13 +780,18 @@ describe("formatarDataHoraDigitada", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Story 7.5 — a derivação do plano a partir do ativo (AD-32)
+// Story 7.5 / Frente A — a derivação do plano a partir do ativo
 // ---------------------------------------------------------------------------
-// É a regra que decide TUDO nesta story: a tela monta o checklist com ela e o
-// servidor grava com ela. Pura, então a matriz inteira roda sem banco — e é
-// justamente por ser uma função só que os dois lados não podem discordar.
+// É a regra que decide TUDO aqui: a tela monta o checklist e o seletor com
+// ela, e o servidor grava com ela. Pura, então a matriz inteira roda sem banco.
+//
+// A Frente A mudou o contrato: a ambiguidade deixou de ser recusa e virou uma
+// lista ORDENADA de candidatos com uma sugestão. Então o que estes testes
+// prendem mudou de "quando recusar" para "em que ORDEM", que é o que agora
+// decide o que vem pré-marcado na tela.
 
-const ATIVO: AtivoDerivavel = { id: "ativo-1", tipoAtivoId: "tipo-1" };
+const EMPRESA = "empresa-1";
+const ATIVO: AtivoDerivavel = { id: "ativo-1", tipoAtivoId: "tipo-1", empresaId: EMPRESA };
 
 function plano(overrides: Partial<PlanoDerivavel> & { id: string }): PlanoDerivavel {
   return {
@@ -794,51 +799,81 @@ function plano(overrides: Partial<PlanoDerivavel> & { id: string }): PlanoDeriva
     status: "Ativo",
     ativoId: null,
     tipoAtivoId: null,
+    empresaId: null,
     ...overrides,
   };
 }
 
-describe("derivarPlanoDoAtivo (Story 7.5)", () => {
-  test("um plano que mira o ativo é o plano", () => {
+describe("derivarPlanoDoAtivo", () => {
+  test("um plano que mira o ativo é a sugestão, e o único candidato", () => {
     const alvo = plano({ id: "p1", ativoId: ATIVO.id });
-    expect(derivarPlanoDoAtivo(ATIVO, [alvo])).toEqual({ tipo: "ok", plano: alvo });
+    expect(derivarPlanoDoAtivo(ATIVO, [alvo])).toEqual({
+      tipo: "ok",
+      sugestao: alvo,
+      candidatos: [alvo],
+    });
   });
 
   test("sem plano próprio, vale o que mira o tipo do ativo", () => {
     const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
-    expect(derivarPlanoDoAtivo(ATIVO, [porTipo])).toEqual({ tipo: "ok", plano: porTipo });
-  });
-
-  // A preferência é o coração da AD-32: um plano por ativo VENCE qualquer plano
-  // por tipo, e vencendo não há ambiguidade nenhuma. Sem a precedência, este
-  // caso viraria "ambiguo" e o usuário seria obrigado a escolher onde a regra
-  // já sabia a resposta.
-  test("o plano do ativo vence o do tipo, sem ambiguidade", () => {
-    const porAtivo = plano({ id: "p1", ativoId: ATIVO.id });
-    const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
-    expect(derivarPlanoDoAtivo(ATIVO, [porTipo, porAtivo])).toEqual({
+    expect(derivarPlanoDoAtivo(ATIVO, [porTipo])).toEqual({
       tipo: "ok",
-      plano: porAtivo,
+      sugestao: porTipo,
+      candidatos: [porTipo],
     });
   });
 
-  test("dois planos mirando o mesmo ativo são ambíguos, com os dois candidatos", () => {
-    const a = plano({ id: "p1", ativoId: ATIVO.id });
-    const b = plano({ id: "p2", ativoId: ATIVO.id });
-    const resultado = derivarPlanoDoAtivo(ATIVO, [a, b]);
-    expect(resultado.tipo).toBe("ambiguo");
-    expect(resultado.tipo === "ambiguo" ? resultado.candidatos : []).toEqual([a, b]);
+  test("um plano da empresa proprietária cobre o ativo", () => {
+    const porEmpresa = plano({ id: "p3", empresaId: EMPRESA });
+    expect(derivarPlanoDoAtivo(ATIVO, [porEmpresa])).toEqual({
+      tipo: "ok",
+      sugestao: porEmpresa,
+      candidatos: [porEmpresa],
+    });
   });
 
-  // O irmão do caso acima no SEGUNDO nível de preferência. Sem ele, uma
-  // implementação que só checasse ambiguidade no nível do ativo elegeria um dos
-  // dois planos-por-tipo sozinha — exatamente o que o Boundaries proíbe.
-  test("dois planos mirando o tipo, nenhum o ativo, são ambíguos", () => {
-    const a = plano({ id: "p1", tipoAtivoId: ATIVO.tipoAtivoId });
-    const b = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
-    const resultado = derivarPlanoDoAtivo(ATIVO, [a, b]);
-    expect(resultado.tipo).toBe("ambiguo");
-    expect(resultado.tipo === "ambiguo" ? resultado.candidatos : []).toEqual([a, b]);
+  // A ORDEM é o coração da regra nova: ativo > empresa > tipo. Ela decide o
+  // que vem pré-marcado, e os três entram embaralhados de propósito — uma
+  // implementação que só preservasse a ordem de entrada passaria sem isso.
+  test("a ordem de preferência é ativo, depois empresa, depois tipo", () => {
+    const porAtivo = plano({ id: "p1", ativoId: ATIVO.id });
+    const porEmpresa = plano({ id: "p2", empresaId: EMPRESA });
+    const porTipo = plano({ id: "p3", tipoAtivoId: ATIVO.tipoAtivoId });
+
+    const resultado = derivarPlanoDoAtivo(ATIVO, [porTipo, porEmpresa, porAtivo]);
+    expect(resultado).toEqual({
+      tipo: "ok",
+      sugestao: porAtivo,
+      candidatos: [porAtivo, porEmpresa, porTipo],
+    });
+  });
+
+  // Nenhum candidato SOME por perder a preferência — perder posição é
+  // diferente de desaparecer, e some seria a regra antiga disfarçada.
+  test("o nível vencedor não esconde os demais candidatos", () => {
+    const porAtivo = plano({ id: "p1", ativoId: ATIVO.id });
+    const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
+    const resultado = derivarPlanoDoAtivo(ATIVO, [porAtivo, porTipo]);
+    expect(resultado.tipo === "ok" ? resultado.candidatos : []).toHaveLength(2);
+  });
+
+  // Dentro do mesmo nível a ordem é por NOME, e precisa ser total: sem esse
+  // desempate a sugestão poderia diferir entre a tela e o servidor, que
+  // recebem a lista em ordens diferentes do banco.
+  test("empatados no nível, desempata por nome — e a entrada não manda", () => {
+    const zebra = plano({ id: "p1", ativoId: ATIVO.id, nome: "Zebra" });
+    const alfa = plano({ id: "p2", ativoId: ATIVO.id, nome: "Alfa" });
+    expect(derivarPlanoDoAtivo(ATIVO, [zebra, alfa])).toEqual({
+      tipo: "ok",
+      sugestao: alfa,
+      candidatos: [alfa, zebra],
+    });
+    // Mesma entrada, ordem invertida: mesmo resultado.
+    expect(derivarPlanoDoAtivo(ATIVO, [alfa, zebra])).toEqual({
+      tipo: "ok",
+      sugestao: alfa,
+      candidatos: [alfa, zebra],
+    });
   });
 
   test("plano arquivado não é candidato — vira sem-plano", () => {
@@ -853,15 +888,32 @@ describe("derivarPlanoDoAtivo (Story 7.5)", () => {
     const porTipo = plano({ id: "p2", tipoAtivoId: ATIVO.tipoAtivoId });
     expect(derivarPlanoDoAtivo(ATIVO, [arquivado, porTipo])).toEqual({
       tipo: "ok",
-      plano: porTipo,
+      sugestao: porTipo,
+      candidatos: [porTipo],
     });
   });
 
-  // Dois arquivados no nível do ativo não podem virar "ambiguo".
-  test("dois planos arquivados do ativo não são ambíguos — são sem-plano", () => {
-    const a = plano({ id: "p1", ativoId: ATIVO.id, status: "Arquivado" });
-    const b = plano({ id: "p2", ativoId: ATIVO.id, status: "Arquivado" });
-    expect(derivarPlanoDoAtivo(ATIVO, [a, b])).toEqual({ tipo: "sem-plano" });
+  // Um ativo SEM dona não pode casar com plano-por-empresa nenhum. O risco é
+  // concreto: pelo XOR, todo plano por ativo/tipo tem `empresaId` nulo, então
+  // uma comparação `null === null` colocaria metade dos planos da conta no
+  // nível errado.
+  test("ativo sem empresa não casa com plano por empresa", () => {
+    const semDona: AtivoDerivavel = { id: "ativo-9", tipoAtivoId: "tipo-9", empresaId: null };
+    const porEmpresa = plano({ id: "p1", empresaId: EMPRESA });
+    expect(derivarPlanoDoAtivo(semDona, [porEmpresa])).toEqual({ tipo: "sem-plano" });
+
+    // O caso que REALMENTE testa o guard de nulo, e que a linha acima NÃO
+    // alcança: um plano que não é por empresa tem `empresaId` nulo pelo XOR,
+    // e o ativo sem dona também. Uma comparação `null === null` casaria os
+    // dois e colocaria um plano de OUTRO tipo entre os candidatos.
+    // Verificado por mutação: sem este caso o defeito passava verde.
+    const deOutroTipo = plano({ id: "p2", tipoAtivoId: "tipo-outro" });
+    expect(derivarPlanoDoAtivo(semDona, [deOutroTipo])).toEqual({ tipo: "sem-plano" });
+  });
+
+  test("plano de OUTRA empresa não cobre o ativo", () => {
+    const deOutraEmpresa = plano({ id: "p1", empresaId: "empresa-2" });
+    expect(derivarPlanoDoAtivo(ATIVO, [deOutraEmpresa])).toEqual({ tipo: "sem-plano" });
   });
 
   test("nenhum plano cobre o ativo", () => {
@@ -871,8 +923,6 @@ describe("derivarPlanoDoAtivo (Story 7.5)", () => {
     expect(derivarPlanoDoAtivo(ATIVO, [])).toEqual({ tipo: "sem-plano" });
   });
 
-  // Na tela, "ainda não escolhi o ativo" é um estado real — e ele não pode
-  // eleger o primeiro plano da conta.
   test("sem ativo não há derivação", () => {
     expect(derivarPlanoDoAtivo(null, [plano({ id: "p1", ativoId: ATIVO.id })])).toEqual({
       tipo: "sem-plano",

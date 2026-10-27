@@ -20,7 +20,6 @@ import {
 import {
   derivarPlanoDoAtivo,
   ERRO_SEM_PLANO_PARA_O_ATIVO,
-  erroDePlanoAmbiguo,
   estadoDerivadoDoItem,
   estadoInicialAcaoEmissao,
   formatarDataHoraDigitada,
@@ -1037,12 +1036,13 @@ export function ModalEmissao({
     setPlanoDesempate(ativoId === emissao?.ativoId ? (emissao?.planoId ?? "") : "");
   }
 
+  // A escolha da pessoa vence a sugestão, mas só se ainda for candidata — o
+  // mesmo critério do servidor, para a tela nunca pré-visualizar um plano que
+  // a gravação vai recusar.
   const planoDerivado =
     derivacao.tipo === "ok"
-      ? derivacao.plano
-      : derivacao.tipo === "ambiguo"
-        ? (derivacao.candidatos.find((plano) => plano.id === planoDesempate) ?? null)
-        : null;
+      ? (derivacao.candidatos.find((plano) => plano.id === planoDesempate) ?? derivacao.sugestao)
+      : null;
 
   // Edição com o ativo INALTERADO: enquanto a derivação não resolve (ambiguidade
   // ainda não desempatada, ou plano arquivado depois da criação), a tela segue
@@ -1059,12 +1059,10 @@ export function ModalEmissao({
   // (constantes de emissao-estado.ts), para a tela nunca prometer/negar em
   // palavras diferentes das da recusa que chega depois.
   const nomeDoPlano = planoDerivado?.nome ?? planos.find((p) => p.id === planoId)?.nome ?? null;
+  // Sobrou um aviso só: sem plano aplicável. A ambiguidade deixou de ser um
+  // problema a avisar e virou um seletor com mais de uma opção.
   const avisoDoPlano =
-    derivacao.tipo === "sem-plano" && ativoId
-      ? ERRO_SEM_PLANO_PARA_O_ATIVO
-      : derivacao.tipo === "ambiguo" && !planoDerivado
-        ? erroDePlanoAmbiguo(derivacao.candidatos)
-        : null;
+    derivacao.tipo === "sem-plano" && ativoId ? ERRO_SEM_PLANO_PARA_O_ATIVO : null;
 
   const linhas: LinhaItem[] = useMemo(() => {
     if (emissao && !trocouPlano) {
@@ -1302,9 +1300,24 @@ export function ModalEmissao({
                       </option>
                     ))}
                   </select>
-                  {/* Story 7.5: a recusa da troca de plano com progresso
-                      gravado aponta para o ativo — é ele que o usuário mexeu. */}
                   <ErroDeCampo mensagem={errosPorCampo.get("ativoId")} />
+                </div>
+                {/* Frente A — a empresa é a PROPRIETÁRIA do ativo, então ela
+                    é exibida, não escolhida: dois campos editáveis para o
+                    mesmo fato poderiam se contradizer. Mesma decisão que
+                    tirou o plano e a data do formulário na 7.5. */}
+                <div className="f">
+                  <label htmlFor="emissao-empresa">Empresa</label>
+                  <input
+                    id="emissao-empresa"
+                    type="text"
+                    readOnly
+                    tabIndex={-1}
+                    value={
+                      ativoSelecionado?.empresa?.razaoSocial ??
+                      (ativoId ? "Ativo sem proprietária" : "Selecione o ativo")
+                    }
+                  />
                 </div>
                 <div className="f">
                   <label htmlFor="emissao-setor">Setor</label>
@@ -1322,14 +1335,15 @@ export function ModalEmissao({
                     ))}
                   </select>
                 </div>
-                {/* Story 7.5 — o plano deixou de ser escolhido (AD-32). No
-                    caso normal é um campo somente leitura mostrando o que o
-                    ativo determina; o <select> só reaparece quando a derivação
-                    é AMBÍGUA, e então lista apenas os candidatos reais — nunca
-                    a lista inteira de planos da conta. */}
+                {/* Frente A — o plano voltou a ser escolhível, mas nunca do
+                    zero: o <select> lista SÓ os candidatos reais do ativo (um
+                    ou vários), com a sugestão da derivação já marcada. Nunca a
+                    lista inteira de planos da conta — escolher um plano que
+                    não cobre o ativo é o que o servidor recusa. Sem ativo, ou
+                    sem plano aplicável, não há o que escolher. */}
                 <div className="f">
                   <label htmlFor="emissao-plano">Plano revisional</label>
-                  {derivacao.tipo === "ambiguo" ? (
+                  {derivacao.tipo === "ok" ? (
                     <select
                       id="emissao-plano"
                       name="planoId"
@@ -1337,9 +1351,6 @@ export function ModalEmissao({
                       value={planoDerivado?.id ?? ""}
                       onChange={(evento) => setPlanoDesempate(evento.target.value)}
                     >
-                      <option value="" disabled>
-                        Escolha o plano revisional
-                      </option>
                       {derivacao.candidatos.map((plano) => (
                         <option key={plano.id} value={plano.id}>
                           {plano.nome}
@@ -1347,8 +1358,6 @@ export function ModalEmissao({
                       ))}
                     </select>
                   ) : (
-                    // Sem `name`: no caso não-ambíguo o cliente não envia plano
-                    // nenhum — o servidor deriva sozinho (Boundaries).
                     <input
                       id="emissao-plano"
                       type="text"

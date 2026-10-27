@@ -28,7 +28,7 @@ import {
   ERRO_SEM_PLANO_PARA_O_ATIVO,
   ERRO_TRANSICAO_INVALIDA,
   ERRO_TROCA_DE_PLANO_COM_PROGRESSO,
-  erroDePlanoAmbiguo,
+  ERRO_PLANO_FORA_DOS_CANDIDATOS,
   isSetorValido,
   lerServicos,
   parseDataHora,
@@ -107,8 +107,14 @@ function lerCamposGerais(formData: FormData) {
 
 // A AUTORIDADE sobre o plano (AD-32): o servidor re-deriva sempre, com a MESMA
 // `derivarPlanoDoAtivo` que a tela usa para pré-visualizar o checklist — e
-// nunca confia no `planoId` do cliente, exceto como desempate de ambiguidade,
-// revalidado contra os candidatos reais.
+// nunca confia no `planoId` do cliente como verdade, só como ESCOLHA, e ainda
+// assim revalidada contra os candidatos reais.
+//
+// Frente A: a escolha deixou de ser exceção (antes só desempatava ambiguidade)
+// e virou o caso normal. Sem escolha, vale a sugestão da derivação. Com escolha
+// que não está entre os candidatos, RECUSA — nunca cai no silêncio de usar a
+// sugestão no lugar do que a pessoa pediu, que esconderia tanto um id forjado
+// quanto uma tela desatualizada.
 //
 // Mesmo padrão do `valorEsperado`: a tela mostra, o servidor recalcula e grava.
 async function derivarPlanoDaEmissao(
@@ -126,26 +132,23 @@ async function derivarPlanoDaEmissao(
   }
 
   const derivacao = derivarPlanoDoAtivo(candidatos.ativo, candidatos.planos);
-  if (derivacao.tipo === "ok") {
-    return { ok: true, plano: derivacao.plano };
-  }
   if (derivacao.tipo === "sem-plano") {
     // Recusa dizendo o que falta, sem gravar nada (Boundaries).
     return { ok: false, erros: [{ field: "planoId", message: ERRO_SEM_PLANO_PARA_O_ATIVO }] };
   }
 
-  // Ambíguo: a escolha humana é aceita SÓ se for um dos candidatos reais. Um
-  // `planoId` forjado (de outro ativo, de outra conta, arquivado) não está
-  // entre eles e cai na mesma recusa de quem não escolheu — o servidor nunca
-  // vincula a emissão a um plano de fora (I/O Matrix: "Escolha forjada").
-  const escolhido = derivacao.candidatos.find((plano) => plano.id === planoEscolhidoId);
-  if (escolhido) {
-    return { ok: true, plano: escolhido };
+  if (!planoEscolhidoId) {
+    return { ok: true, plano: derivacao.sugestao };
   }
-  return {
-    ok: false,
-    erros: [{ field: "planoId", message: erroDePlanoAmbiguo(derivacao.candidatos) }],
-  };
+
+  const escolhido = derivacao.candidatos.find((plano) => plano.id === planoEscolhidoId);
+  if (!escolhido) {
+    return {
+      ok: false,
+      erros: [{ field: "planoId", message: ERRO_PLANO_FORA_DOS_CANDIDATOS }],
+    };
+  }
+  return { ok: true, plano: escolhido };
 }
 
 // Estreita os campos da Story 5.5 já validados para a forma que o
@@ -441,16 +444,23 @@ export async function editarEmissaoAction(
     return { ok: false, error: errosDeReferencia };
   }
 
-  // Re-deriva SOMENTE quando o ativo realmente mudou (AD-32) — trocar o ativo
-  // pode trocar o plano. Com o MESMO ativo, o plano gravado é preservado sem
-  // passar pela derivação: arquivar o plano depois da criação (ou surgir um
-  // segundo plano cobrindo o mesmo ativo) deixaria a derivação sem resposta e
-  // tornaria a emissão permanentemente ineditável — contra a I/O Matrix
-  // ("Edição sem troca: mesmo ativo, com progresso → salva normalmente").
+  // Re-deriva quando o ativo mudou (trocar o ativo pode trocar o plano) OU
+  // quando a pessoa pediu EXPLICITAMENTE outro plano — o caso novo da Frente
+  // A, em que o plano virou campo escolhível e passou a poder mudar sozinho,
+  // com o ativo parado.
+  //
+  // O que NÃO pode voltar a acontecer: re-derivar numa edição em que nada
+  // disso ocorreu. Com o mesmo ativo e sem escolha nova, o plano gravado é
+  // preservado SEM passar pela derivação — arquivar o plano depois da criação
+  // deixaria a derivação sem resposta e tornaria a emissão permanentemente
+  // ineditável. Foi o defeito da 7.5, pego só na terceira revisão, e os dois
+  // testes que o prendem continuam valendo contra este ramo.
   const trocouAtivo = campos.ativoId !== emissaoAtual.ativoId;
+  const pediuOutroPlano =
+    campos.planoEscolhidoId !== "" && campos.planoEscolhidoId !== emissaoAtual.planoId;
 
   let planoNovo: Awaited<ReturnType<typeof derivarPlanoDaEmissao>> | null = null;
-  if (trocouAtivo) {
+  if (trocouAtivo || pediuOutroPlano) {
     planoNovo = await derivarPlanoDaEmissao(
       usuarioSessao.contaId,
       campos.ativoId,
@@ -468,13 +478,18 @@ export async function editarEmissaoAction(
   // O plano mudaria e a emissão JÁ TEM progresso GRAVADO: recusa com mensagem,
   // nunca apaga em silêncio (Boundaries/Design Notes). O ramo `trocouPlano` do
   // repositório faz deleteMany+createMany dos itens — sem este guard, trocar o
-  // ativo levaria embora execução, medição, observação e o vínculo dos
+  // plano levaria embora execução, medição, observação e o vínculo dos
   // lançamentos de uma emissão em produção. A avaliação é sobre `emissaoAtual`
   // (o que está no banco), nunca sobre o formulário.
+  //
+  // Frente A: a trava vale para os DOIS caminhos de troca, porque é escrita
+  // sobre o `planoIdAtual` já resolvido e não sobre o que a causou. Trocar só
+  // o plano, com o ativo parado, é recusado exatamente como trocar o ativo —
+  // era o risco novo que a escolha manual abriu.
   if (trocouPlano && emissaoTemProgresso(emissaoAtual)) {
     return {
       ok: false,
-      error: [{ field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO }],
+      error: [{ field: "planoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO }],
     };
   }
 

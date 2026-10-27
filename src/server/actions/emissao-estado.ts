@@ -83,18 +83,24 @@ export function calcularValorEsperado(
 }
 
 // ---------------------------------------------------------------------------
-// Story 7.5 — o plano revisional é DERIVADO do ativo (AD-32)
+// Story 7.5 / Frente A — o plano revisional é DERIVADO do ativo, e ESCOLHÍVEL
 // ---------------------------------------------------------------------------
 // UMA regra, UMA função, consumida pelos dois lados: a tela chama para montar o
 // checklist da aba Itens (pré-visualização), a Server Action chama para decidir
 // o que grava (autoridade). É o mesmo arranjo de `calcularValorEsperado` — e a
 // função ser única é o que impede as duas metades de discordarem.
 //
-// Nunca desempata sozinha: sobrando mais de um candidato no MESMO nível de
-// preferência, devolve `ambiguo` com os candidatos e deixa a escolha para quem
-// pode fazê-la. Há um critério determinístico à mão (`orderBy: nome`) e usá-lo
-// seria pior que não ter — a emissão sairia vinculada a um plano que ninguém
-// escolheu, e o erro só apareceria quando o checklist viesse errado.
+// MUDANÇA DA FRENTE A (26-10-2026): a 7.5 RECUSAVA quando mais de um plano
+// cobria o ativo no mesmo nível, de propósito — desempatar sozinha vincularia
+// a emissão a um plano que ninguém escolheu. A decisão de produto passou a ser
+// outra: a pessoa escolhe. Então a ambiguidade deixou de ser erro e virou o
+// conteúdo de um seletor, e esta função passou a devolver SEMPRE a lista
+// ordenada de candidatos mais uma SUGESTÃO (o primeiro da ordem).
+//
+// O que NÃO mudou, e é o que ainda protege a emissão: `sem-plano` continua
+// sendo recusa (a emissão exige um plano), plano arquivado continua fora dos
+// candidatos, e a autoridade continua no servidor — a escolha do cliente só
+// vale se for um dos candidatos reais.
 
 /// Forma mínima que a derivação precisa de um plano. Estruturalmente satisfeita
 /// tanto pelo `PlanoOpcao` do cliente quanto pelo retorno do repositório — e
@@ -104,46 +110,62 @@ export type PlanoDerivavel = {
   id: string;
   nome: string;
   status: StatusPlanoRevisional;
-  /// XOR com `tipoAtivoId` (schema): exatamente um dos dois é não-nulo.
+  /// XOR de três lados (schema + CHECK): exatamente um destes é não-nulo.
   ativoId: string | null;
   tipoAtivoId: string | null;
+  empresaId: string | null;
 };
 
 export type AtivoDerivavel = {
   id: string;
   tipoAtivoId: string;
+  /// `null` no ativo sem empresa proprietária cadastrada — nesse caso nenhum
+  /// plano-por-empresa o alcança.
+  empresaId: string | null;
 };
 
 export type DerivacaoDePlano<T> =
-  | { tipo: "ok"; plano: T }
-  /// Sempre 2 ou mais — um só nunca é ambíguo.
-  | { tipo: "ambiguo"; candidatos: T[] }
+  /// `candidatos` nunca é vazio aqui, e `sugestao` é sempre `candidatos[0]`.
+  | { tipo: "ok"; sugestao: T; candidatos: T[] }
   | { tipo: "sem-plano" };
 
-// Preferência (AD-32): entre os planos `Ativo` da conta, prefere o que mira
-// aquele `ativoId`; na ausência, o que mira o `tipoAtivoId` do ativo. Um plano
-// POR ATIVO vence qualquer plano por tipo — e vencendo, a existência de planos
-// por tipo não cria ambiguidade nenhuma.
-//
+/// Quanto mais específico o vínculo, menor o número — é a ordem de preferência
+/// escolhida em 26-10-2026: o plano feito para AQUELE ativo vence; depois o
+/// acordo da empresa dona; por último o padrão do tipo.
+///
+/// O guard `empresaId !== null` não é redundante com a comparação: sem ele, um
+/// ativo SEM dona casaria com todo plano-por-empresa cujo `empresaId` também
+/// fosse nulo — e como o XOR garante que plano-por-tipo tem `empresaId` nulo,
+/// isso colocaria planos de tipo no nível errado.
+function nivelDePreferencia(plano: PlanoDerivavel, ativo: AtivoDerivavel): number | null {
+  if (plano.ativoId === ativo.id) return 0;
+  if (plano.empresaId !== null && plano.empresaId === ativo.empresaId) return 1;
+  if (plano.tipoAtivoId !== null && plano.tipoAtivoId === ativo.tipoAtivoId) return 2;
+  return null;
+}
+
 // Um plano arquivado NÃO é candidato: some da derivação como se não existisse,
 // então um ativo cujo único plano foi arquivado cai em `sem-plano` (I/O Matrix)
 // — nunca é vinculado a um plano fora de uso.
+//
+// A ordem é TOTAL e determinística (nível, depois nome): sem o desempate por
+// nome, dois planos do mesmo nível poderiam trocar de lugar entre a tela e o
+// servidor, e a sugestão mudaria sozinha de um lado para o outro.
 export function derivarPlanoDoAtivo<T extends PlanoDerivavel>(
   ativo: AtivoDerivavel | null | undefined,
   planos: readonly T[],
 ): DerivacaoDePlano<T> {
   if (!ativo) return { tipo: "sem-plano" };
 
-  const ativos = planos.filter((plano) => plano.status === "Ativo");
+  const candidatos = planos
+    .filter((plano) => plano.status === "Ativo")
+    .map((plano) => ({ plano, nivel: nivelDePreferencia(plano, ativo) }))
+    .filter((entrada): entrada is { plano: T; nivel: number } => entrada.nivel !== null)
+    .sort((a, b) => a.nivel - b.nivel || a.plano.nome.localeCompare(b.plano.nome, "pt-BR"))
+    .map((entrada) => entrada.plano);
 
-  const porAtivo = ativos.filter((plano) => plano.ativoId === ativo.id);
-  const nivel = porAtivo.length > 0
-    ? porAtivo
-    : ativos.filter((plano) => plano.ativoId === null && plano.tipoAtivoId === ativo.tipoAtivoId);
-
-  if (nivel.length === 0) return { tipo: "sem-plano" };
-  if (nivel.length === 1) return { tipo: "ok", plano: nivel[0] };
-  return { tipo: "ambiguo", candidatos: nivel };
+  if (candidatos.length === 0) return { tipo: "sem-plano" };
+  return { tipo: "ok", sugestao: candidatos[0], candidatos };
 }
 
 // Story 7.5 — "progresso registrado" é sobre o que está GRAVADO, nunca sobre o
@@ -180,14 +202,20 @@ export function emissaoTemProgresso(emissao: {
 export const ERRO_SEM_PLANO_PARA_O_ATIVO =
   "Nenhum plano revisional ativo cobre este ativo. Cadastre um plano para o ativo ou para o tipo dele.";
 
-export function erroDePlanoAmbiguo(candidatos: readonly { nome: string }[]): string {
-  return `Mais de um plano revisional cobre este ativo — escolha qual usar: ${candidatos
-    .map((plano) => plano.nome)
-    .join(", ")}.`;
-}
+/// Escolha de plano que não está entre os candidatos reais do ativo — id
+/// forjado, de outro ativo, de outra conta, ou arquivado entre a tela e o
+/// envio (I/O Matrix: "Escolha forjada"). Nunca grava: a autoridade é do
+/// servidor, e aceitar o id do cliente sem conferir era o buraco que a
+/// ambiguidade-como-erro escondia.
+export const ERRO_PLANO_FORA_DOS_CANDIDATOS =
+  "O plano escolhido não cobre este ativo. Recarregue e escolha de novo.";
 
+// Frente A: a redação deixou de falar em "trocar o ativo". O plano agora muda
+// por dois caminhos — trocando o ativo OU escolhendo outro plano direto — e a
+// mensagem antiga descrevia só o primeiro, mandando a pessoa desfazer algo que
+// ela talvez nem tivesse feito.
 export const ERRO_TROCA_DE_PLANO_COM_PROGRESSO =
-  "Este ativo usa outro plano revisional, e esta emissão já tem itens executados ou serviços lançados. Remova o progresso registrado antes de trocar o ativo.";
+  "Trocar o plano revisional apagaria o progresso já registrado nesta emissão. Remova os itens executados e os serviços lançados antes de trocar.";
 
 // Setores válidos (Story 5.5) — espelha o enum `Setor` do schema. Fixo, sem
 // tela de gestão e FORA do enum `Modulo` (AD-15). O `satisfies` amarra a

@@ -38,6 +38,7 @@ import {
 import {
   criarAtivo,
   criarEmissaoCompleta,
+  criarEmpresa,
   criarPlano,
   criarTipoAtivo,
   db,
@@ -644,7 +645,43 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
     expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
   });
 
-  describe("ambiguidade exige escolha humana", () => {
+  // Frente A: o terceiro nível de vínculo tem de chegar até a EMISSÃO, não só
+  // até o cadastro. Sem isso o plano por empresa existiria na listagem e seria
+  // invisível onde importa.
+  test("um plano da empresa proprietária é candidato na emissão", async () => {
+    const cenario = await cenarioComSessao();
+    const empresa = await criarEmpresa(cenario.conta.id);
+    await db.ativo.update({
+      where: { id: cenario.ativo.id },
+      data: { empresaId: empresa.id },
+    });
+    // Arquivar o plano-por-ativo deixa o da empresa como único candidato: se
+    // ele NÃO fosse enxergado, a emissão cairia em "sem plano aplicável".
+    await db.planoRevisional.update({
+      where: { id: cenario.plano.id },
+      data: { status: "Arquivado" },
+    });
+    const planoDaEmpresa = await db.planoRevisional.create({
+      data: {
+        contaId: cenario.conta.id,
+        nome: "Plano da empresa",
+        empresaId: empresa.id,
+        responsavelId: cenario.identidade.id,
+        itens: { create: [{ itemRevisionalId: cenario.item.id }] },
+      },
+    });
+
+    const estado = await criarEmissaoAction(
+      estadoInicialAcaoEmissao,
+      formDeEmissao({ ativoId: cenario.ativo.id, responsavelId: cenario.identidade.id }),
+    );
+
+    expect(estado.ok).toBe(true);
+    const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+    expect(criada.planoId).toBe(planoDaEmpresa.id);
+  });
+
+  describe("escolha do plano entre os candidatos (Frente A)", () => {
     async function cenarioAmbiguo() {
       const cenario = await cenarioComSessao();
       const segundo = await criarPlano(
@@ -656,7 +693,11 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
       return { ...cenario, segundoPlano: segundo };
     }
 
-    test("dois planos para o mesmo ativo: recusa e nada é gravado", async () => {
+    // Frente A inverteu esta regra: dois planos cobrindo o mesmo ativo eram
+    // RECUSA ("escolha qual usar"), e agora são uma lista com uma sugestão.
+    // Sem escolha no formulário, o servidor grava a sugestão — o primeiro na
+    // ordem (nível, depois nome) — em vez de barrar a emissão.
+    test("dois planos para o mesmo ativo: grava a sugestão, sem recusar", async () => {
       const cenario = await cenarioAmbiguo();
 
       const estado = await criarEmissaoAction(
@@ -664,11 +705,16 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
         formDeEmissao({ ativoId: cenario.ativo.id, responsavelId: cenario.identidade.id }),
       );
 
-      expect(estado.ok).toBe(false);
-      // Os candidatos aparecem na mensagem — recusar sem dizer quais seria
-      // recusar sem dar ao usuário como resolver.
-      expect(mensagemDeErro(estado.error)).toContain(cenario.segundoPlano.nome);
-      expect(await emissoesNovas(cenario.conta.id, cenario.emissao.id)).toHaveLength(0);
+      expect(estado.ok).toBe(true);
+      const [criada] = await emissoesNovas(cenario.conta.id, cenario.emissao.id);
+
+      // Os dois estão no MESMO nível (ambos miram o ativo), então quem decide
+      // é o nome — e o teste calcula o esperado em vez de fixar um id, para
+      // não depender da ordem em que as fixtures nasceram.
+      const esperado = [cenario.plano, cenario.segundoPlano].sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR"),
+      )[0];
+      expect(criada.planoId).toBe(esperado.id);
     });
 
     test("com escolha explícita entre os candidatos, grava o escolhido", async () => {
@@ -688,28 +734,20 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
       expect(criada.planoId).toBe(cenario.segundoPlano.id);
     });
 
-    // O espelho do caso acima: SEM ambiguidade (um único candidato), um
-    // `planoId` forjado apontando para outro plano é simplesmente IGNORADO — a
-    // escolha do cliente só tem voz quando a derivação fica ambígua. Sem este
-    // teste, uma refatoração que passasse a "respeitar a escolha do cliente
-    // quando existir" ficaria toda verde.
-    test("sem ambiguidade, planoId do cliente é ignorado e vale o derivado", async () => {
+    // O espelho do caso acima, e a regra que a Frente A INVERTEU: antes, com
+    // um único candidato, o `planoId` do cliente era ignorado — a escolha só
+    // tinha voz na ambiguidade. Agora ela sempre tem voz, desde que aponte
+    // para um candidato real. Um único candidato não muda isso: escolher o
+    // próprio candidato é válido e grava ele.
+    test("com um único candidato, escolher esse mesmo candidato grava normal", async () => {
       const cenario = await cenarioComSessao();
-      const outroTipo = await criarTipoAtivo(cenario.conta.id);
-      const outroAtivo = await criarAtivo(cenario.conta.id, outroTipo.id);
-      const planoDeOutroAtivo = await criarPlano(
-        cenario.conta.id,
-        outroAtivo.id,
-        cenario.identidade.id,
-        { itemRevisionalId: cenario.item.id },
-      );
 
       const estado = await criarEmissaoAction(
         estadoInicialAcaoEmissao,
         formDeEmissao({
           ativoId: cenario.ativo.id,
           responsavelId: cenario.identidade.id,
-          planoId: planoDeOutroAtivo.id,
+          planoId: cenario.plano.id,
         }),
       );
 
@@ -829,7 +867,7 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
       // O CAMPO importa tanto quanto a recusa: é por `ativoId` que a mensagem
       // acha onde aparecer na tela. Trocar a chave deixaria o erro invisível.
       expect(estado.error).toEqual([
-        { field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
+        { field: "planoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
       ]);
       const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
       // Nada mudou: nem o ativo, nem o plano, nem as linhas de item — a recusa
@@ -910,7 +948,7 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
 
       expect(estado.ok).toBe(false);
       expect(estado.error).toEqual([
-        { field: "ativoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
+        { field: "planoId", message: ERRO_TROCA_DE_PLANO_COM_PROGRESSO },
       ]);
       const relida = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
       expect(relida.ativoId).toBe(cenario.ativo.id);
@@ -922,6 +960,80 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
     // emissão continua editável. Se a derivação voltasse a rodar incondicional,
     // a emissão ficaria PERMANENTEMENTE ineditável — nem setor, nem
     // responsável, nem datas, nem itens, nem serviços.
+    // O RISCO NOVO da Frente A: antes, o plano só mudava se o ativo mudasse,
+    // e era isso que protegia o progresso. Com o plano escolhível direto,
+    // existe um segundo caminho de troca — e a trava precisa valer nele
+    // também, senão trocar só o plano apagaria em silêncio execução, medição,
+    // observação e o vínculo dos lançamentos.
+    test("trocar SÓ o plano, com progresso gravado, é recusado", async () => {
+      const cenario = await cenarioComSessao();
+      const segundoPlano = await criarPlano(
+        cenario.conta.id,
+        cenario.ativo.id,
+        cenario.identidade.id,
+        { nome: "Zebra (segundo plano)", itemRevisionalId: cenario.item.id },
+      );
+      const criada = await criarPelaAction(cenario);
+
+      // Progresso real: um item executado na emissão recém-criada.
+      const itemGravado = await db.itemExecutadoEmissao.findFirstOrThrow({
+        where: { emissaoId: criada.id },
+      });
+      await db.itemExecutadoEmissao.update({
+        where: { id: itemGravado.id },
+        data: { executado: true },
+      });
+      const recarregada = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: recarregada.updatedAt.toISOString(),
+          // MESMO ativo — só o plano muda.
+          ativoId: cenario.ativo.id,
+          planoId: segundoPlano.id,
+          responsavelId: cenario.identidade.id,
+        }),
+      );
+
+      expect(estado.ok).toBe(false);
+      expect(mensagemDeErro(estado.error)).toBe(ERRO_TROCA_DE_PLANO_COM_PROGRESSO);
+      // O plano gravado não se mexeu, e o progresso continua lá.
+      const depois = await db.emissao.findUniqueOrThrow({
+        where: { id: criada.id },
+        include: { itens: true },
+      });
+      expect(depois.planoId).toBe(criada.planoId);
+      expect(depois.itens.some((item) => item.executado)).toBe(true);
+    });
+
+    test("trocar só o plano, SEM progresso, troca o plano e re-snapshota os itens", async () => {
+      const cenario = await cenarioComSessao();
+      const segundoPlano = await criarPlano(
+        cenario.conta.id,
+        cenario.ativo.id,
+        cenario.identidade.id,
+        { nome: "Zebra (segundo plano)", itemRevisionalId: cenario.item.id },
+      );
+      const criada = await criarPelaAction(cenario);
+
+      const estado = await editarEmissaoAction(
+        estadoInicialAcaoEmissao,
+        formDeEmissao({
+          emissaoId: criada.id,
+          updatedAt: criada.updatedAt.toISOString(),
+          ativoId: cenario.ativo.id,
+          planoId: segundoPlano.id,
+          responsavelId: cenario.identidade.id,
+        }),
+      );
+
+      expect(estado.ok).toBe(true);
+      const depois = await db.emissao.findUniqueOrThrow({ where: { id: criada.id } });
+      expect(depois.planoId).toBe(segundoPlano.id);
+    });
+
     test("plano arquivado depois da criação não impede editar com o mesmo ativo", async () => {
       const cenario = await cenarioComSessao();
       const criada = await criarPelaAction(cenario);

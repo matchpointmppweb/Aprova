@@ -87,7 +87,7 @@ export async function buscarPlano(contaId: string, id: string) {
 export async function planosCandidatosDoAtivo(contaId: string, ativoId: string) {
   const ativo = await prisma.ativo.findFirst({
     where: { id: ativoId, contaId },
-    select: { id: true, tipoAtivoId: true },
+    select: { id: true, tipoAtivoId: true, empresaId: true },
   });
   if (!ativo) return null;
 
@@ -95,7 +95,14 @@ export async function planosCandidatosDoAtivo(contaId: string, ativoId: string) 
     where: {
       contaId,
       status: "Ativo",
-      OR: [{ ativoId: ativo.id }, { tipoAtivoId: ativo.tipoAtivoId }],
+      OR: [
+        { ativoId: ativo.id },
+        { tipoAtivoId: ativo.tipoAtivoId },
+        // Só quando o ativo TEM dona: `empresaId: null` casaria com todo
+        // plano-por-ativo e plano-por-tipo (que têm empresaId nulo pelo XOR)
+        // e traria candidato que não cobre coisa nenhuma.
+        ...(ativo.empresaId ? [{ empresaId: ativo.empresaId }] : []),
+      ],
     },
     select: {
       id: true,
@@ -103,6 +110,7 @@ export async function planosCandidatosDoAtivo(contaId: string, ativoId: string) 
       status: true,
       ativoId: true,
       tipoAtivoId: true,
+      empresaId: true,
       itens: {
         select: {
           itemRevisionalId: true,

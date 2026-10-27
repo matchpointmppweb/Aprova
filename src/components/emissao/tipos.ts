@@ -94,6 +94,10 @@ export interface AtivoOpcao {
   // checklist da aba Itens não tem de onde nascer. `listarAtivos` já traz o
   // valor (findMany sem select); só o tipo o escondia.
   tipoAtivoId: string;
+  // Frente A: o TERCEIRO nível de preferência é a empresa proprietária, e a
+  // aba Geral exibe o nome dela. `null` no ativo sem dona cadastrada.
+  empresaId: string | null;
+  empresa: { razaoSocial: string } | null;
 }
 
 // Item de PlanoItemRevisional do plano vigente — o formato que
@@ -112,11 +116,12 @@ export interface PlanoOpcao {
   id: string;
   nome: string;
   status: StatusPlanoRevisional;
-  // Story 7.5: os dois lados do vínculo XOR do plano (AD-32) — é por eles que
+  // Story 7.5 / Frente A: os TRÊS lados do vínculo XOR do plano — é por eles que
   // `derivarPlanoDoAtivo` decide. `listarPlanos` já os traz; só o tipo os
   // escondia (mesmo caso da `descricao` na 7.4).
   ativoId: string | null;
   tipoAtivoId: string | null;
+  empresaId: string | null;
   itens: PlanoItemVigente[];
 }
 
