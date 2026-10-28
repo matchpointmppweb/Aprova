@@ -716,12 +716,63 @@ export function formatarDataHoraDigitada(valor: string): string {
 // com erro nunca entra em `servicos`. Como a Server Action aborta inteira
 // quando `erros` não está vazio, nada é gravado pela metade (AD-30) — o
 // contrário do mockup, que devolve `0` em cada um desses casos.
+export const ERRO_SERVICO_SOBREPOSTO =
+  "Esta pessoa já tem outro lançamento nesta emissão no mesmo horário.";
+
+/// Um lançamento de período já validado, com o índice da linha preservado —
+/// `ServicoValidado` não o carrega, e sem ele o erro não teria onde pousar na
+/// tela.
+export type PeriodoLancado = {
+  indice: number;
+  pessoaId: string;
+  inicio: Date;
+  fim: Date;
+};
+
+/// Sobreposição de horário da MESMA pessoa dentro da emissão (decisão do
+/// Fulvi, 27-10-2026: sobreposição é ERRO, não suspeita). Ninguém executa dois
+/// serviços ao mesmo tempo, e sem esta regra um duplo clique soma a mesma hora
+/// duas vezes no total — que é derivado (AD-29) e portanto propaga o engano
+/// para o relatório de serviços por pessoa sem deixar rastro.
+///
+/// Só o modo `Periodo` entra. Uma linha `Duracao` guarda quanto tempo levou,
+/// nunca QUANDO (AD-28): não tem posição no relógio, então sobreposição é
+/// indecidível para ela — e recusar por suspeita seria barrar lançamento
+/// legítimo.
+///
+/// Encostar NÃO é sobrepor: fim 10:00 e início 10:00 é a jornada partida em
+/// dois itens, o caso normal. A comparação é estrita dos dois lados.
+///
+/// O erro vai para o `-inicio` da linha POSTERIOR: é a que a pessoa acabou de
+/// mexer, e culpar a primeira mandaria o foco para um lançamento que já estava
+/// certo.
+export function sobreposicoesDeServico(
+  periodos: readonly PeriodoLancado[],
+): ErroDeValidacao[] {
+  const erros: ErroDeValidacao[] = [];
+  for (let b = 0; b < periodos.length; b++) {
+    for (let a = 0; a < b; a++) {
+      const anterior = periodos[a];
+      const atual = periodos[b];
+      if (anterior.pessoaId !== atual.pessoaId) continue;
+      if (anterior.inicio < atual.fim && atual.inicio < anterior.fim) {
+        erros.push({ field: `servico-${atual.indice}-inicio`, message: ERRO_SERVICO_SOBREPOSTO });
+        // Uma linha é marcada UMA vez: três lançamentos encavalados devem
+        // apontar três linhas, não seis mensagens sobre as mesmas.
+        break;
+      }
+    }
+  }
+  return erros;
+}
+
 export function validarServicos(linhas: LinhaServicoBruta[]): {
   erros: ErroDeValidacao[];
   servicos: ServicoValidado[];
 } {
   const erros: ErroDeValidacao[] = [];
   const servicos: ServicoValidado[] = [];
+  const periodos: PeriodoLancado[] = [];
 
   for (const linha of linhas) {
     const prefixo = `servico-${linha.indice}`;
@@ -804,11 +855,17 @@ export function validarServicos(linhas: LinhaServicoBruta[]): {
           inicio,
           fim,
         });
+        periodos.push({ indice: linha.indice, pessoaId: linha.pessoaId, inicio, fim });
       }
     }
 
     erros.push(...errosDaLinha);
   }
+
+  // Depois do laço de propósito: sobreposição é relação ENTRE linhas, e só
+  // entram as que passaram sozinhas — acusar encavalamento com uma linha cujo
+  // horário é inválido seria opinar sobre o que não foi lido.
+  erros.push(...sobreposicoesDeServico(periodos));
 
   return { erros, servicos };
 }
