@@ -4,6 +4,7 @@ import type { StatusEmissao } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { validarResponsavel } from "@/src/lib/responsavel";
+import { validarEscolha } from "@/src/lib/selecionavel";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
@@ -202,33 +203,57 @@ function lerIdentificacaoEmissao(formData: FormData) {
 // Story 7.5: o PLANO saiu daqui — ele não vem mais do cliente, então não há id
 // de plano a conferir contra a conta; quem responde por ele é
 // `derivarPlanoDaEmissao`, que só enxerga os candidatos reais do ativo.
+/// O que a emissão JÁ referencia no banco — `null` na criação. Cada campo
+/// aqui é uma EXCEÇÃO às regras de status abaixo: o que está gravado continua
+/// aceito mesmo tendo saído de circulação depois, senão desativar um ativo ou
+/// arquivar um item tornaria ineditáveis todas as emissões que os usam (o
+/// defeito da Story 7.5, repetido).
+type ReferenciasJaGravadas = {
+  ativoId: string;
+  responsavelId: string;
+  /// Os itens que os lançamentos de serviço já apontam.
+  itensDeServico: readonly string[];
+};
+
 async function referenciasValidas(
   contaId: string,
   campos: { ativoId: string; responsavelId: string },
   servicos: LinhaServicoBruta[],
-  /// Quem a emissão JÁ tem como responsável — `null` na criação. Ver
-  /// validarResponsavel (src/lib/responsavel.ts): o responsável gravado
-  /// continua aceito mesmo desativado depois, para a emissão antiga não
-  /// virar ineditável.
-  responsavelAtualId: string | null = null,
+  jaGravadas: ReferenciasJaGravadas | null = null,
 ) {
-  const [ativos, usuarios, itensReaisPorId, pessoas] = await Promise.all([
+  // `itensRevisionais` é a lista COM status; `itensReaisPorId` é o mapa que o
+  // resto da action já usava. Vêm da mesma leitura de propósito: duas
+  // consultas poderiam divergir entre si dentro da mesma requisição.
+  const [ativos, usuarios, itensRevisionais, pessoas] = await Promise.all([
     listarAtivos(contaId),
     listarUsuarios(contaId),
-    buscarItensReaisPorId(contaId),
+    listarItensRevisionais(contaId),
     servicos.length > 0 ? listarPessoas(contaId) : Promise.resolve([]),
   ]);
+  const itensReaisPorId = mapearItensReais(itensRevisionais);
 
   const erros: { field: string; message: string }[] = [];
-  if (campos.ativoId && !ativos.some((ativo) => ativo.id === campos.ativoId)) {
-    erros.push({ field: "ativoId", message: "Selecione um ativo válido." });
-  }
-  // Pertencimento à conta E status, na mesma regra que monta as opções do
-  // <select> (src/lib/responsavel.ts) — divergir faria a tela oferecer o que
-  // o servidor recusa.
-  erros.push(...validarResponsavel(usuarios, campos.responsavelId, responsavelAtualId));
+
+  // Pertencimento à conta E STATUS, pela mesma regra que monta as opções do
+  // <select> (src/lib/selecionavel.ts) — divergir faria a tela oferecer o que
+  // o servidor recusa, e foi conferir só o pertencimento que deixou passar
+  // uma emissão nova apontando para um ativo Vendido ou Bloqueado.
+  erros.push(
+    ...validarEscolha(ativos, campos.ativoId, jaGravadas?.ativoId ?? null, {
+      field: "ativoId",
+      invalido: "Selecione um ativo válido.",
+      indisponivel: "Este ativo não está mais ativo. Escolha outro.",
+    }),
+  );
+  erros.push(
+    ...validarResponsavel(usuarios, campos.responsavelId, jaGravadas?.responsavelId ?? null),
+  );
 
   const pessoasDaConta = new Set(pessoas.map((pessoa) => pessoa.id));
+  // Itens que os lançamentos JÁ gravados apontam: continuam aceitos mesmo
+  // arquivados depois, senão arquivar um item impediria qualquer edição
+  // posterior da emissão que o registrou.
+  const itensJaLancados = new Set(jaGravadas?.itensDeServico ?? []);
   for (const linha of servicos) {
     if (linha.pessoaId && !pessoasDaConta.has(linha.pessoaId)) {
       erros.push({
@@ -236,19 +261,26 @@ async function referenciasValidas(
         message: "Selecione uma pessoa válida.",
       });
     }
-    if (linha.itemRevisionalId && !itensReaisPorId.has(linha.itemRevisionalId)) {
-      erros.push({
-        field: `servico-${linha.indice}-itemRevisionalId`,
-        message: "Selecione um item trabalhado válido.",
-      });
-    }
+    erros.push(
+      ...validarEscolha(
+        itensRevisionais,
+        linha.itemRevisionalId,
+        itensJaLancados.has(linha.itemRevisionalId) ? linha.itemRevisionalId : null,
+        {
+          field: `servico-${linha.indice}-itemRevisionalId`,
+          invalido: "Selecione um item trabalhado válido.",
+          indisponivel: "Este item foi arquivado. Escolha outro.",
+        },
+      ),
+    );
   }
 
   return { erros, itensReaisPorId };
 }
 
-async function buscarItensReaisPorId(contaId: string) {
-  const itens = await listarItensRevisionais(contaId);
+function mapearItensReais(
+  itens: Awaited<ReturnType<typeof listarItensRevisionais>>,
+) {
   const mapa = new Map<string, ItemRevisionalReal>();
   for (const item of itens) {
     mapa.set(item.id, {
@@ -391,6 +423,8 @@ export async function criarEmissaoAction(
     usuarioSessao.contaId,
     campos,
     linhasDeServico,
+    // Criação: não há nada gravado, logo nenhuma exceção de status.
+    null,
   );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
@@ -496,9 +530,13 @@ export async function editarEmissaoAction(
     usuarioSessao.contaId,
     campos,
     linhasDeServico,
-    // Preserva o responsável JÁ gravado (ver validarResponsavel): desativar
-    // um usuário não pode tornar ineditáveis as emissões dele.
-    emissaoAtual.responsavelId,
+    // Preserva o que JÁ está gravado: desativar um ativo, um usuário ou
+    // arquivar um item não pode tornar ineditável a emissão que os registrou.
+    {
+      ativoId: emissaoAtual.ativoId,
+      responsavelId: emissaoAtual.responsavelId,
+      itensDeServico: emissaoAtual.servicos.map((servico) => servico.itemRevisionalId),
+    },
   );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };

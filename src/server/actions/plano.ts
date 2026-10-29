@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 
 import { validarResponsavel } from "@/src/lib/responsavel";
+import { validarEscolha } from "@/src/lib/selecionavel";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { listarAtivos } from "@/src/server/repositories/ativo";
@@ -12,6 +13,7 @@ import { listarItensRevisionais } from "@/src/server/repositories/item-revisiona
 import {
   arquivarPlano,
   atualizarPlano,
+  buscarPlano,
   criarPlano,
   type DadosItemDoPlano,
 } from "@/src/server/repositories/plano";
@@ -138,10 +140,15 @@ async function vinculoEResponsavelValidos(
     empresaId: string | null;
     responsavelId: string;
   },
-  /// Quem o plano JÁ tem como responsável — `null` na criação. Ver
-  /// validarResponsavel: o responsável gravado continua aceito mesmo
-  /// desativado depois, para a edição do plano antigo não travar.
-  responsavelAtualId: string | null = null,
+  /// O que o plano JÁ referencia — `null` na criação. Cada campo é uma
+  /// EXCEÇÃO às regras de status: o que está gravado continua aceito mesmo
+  /// tendo saído de circulação depois, para a edição do plano antigo não
+  /// travar.
+  jaGravadas: {
+    ativoId: string | null;
+    tipoAtivoId: string | null;
+    responsavelId: string;
+  } | null = null,
 ) {
   const [ativos, tipos, empresas, usuarios] = await Promise.all([
     listarAtivos(contaId),
@@ -151,12 +158,25 @@ async function vinculoEResponsavelValidos(
   ]);
 
   const erros: { field: string; message: string }[] = [];
-  if (campos.ativoId && !ativos.some((ativo) => ativo.id === campos.ativoId)) {
-    erros.push({ field: "vinculo", message: "Selecione um ativo válido." });
-  }
-  if (campos.tipoAtivoId && !tipos.some((tipo) => tipo.id === campos.tipoAtivoId)) {
-    erros.push({ field: "vinculo", message: "Selecione um tipo de ativo válido." });
-  }
+  // Pertencimento à conta E STATUS, pela mesma regra que monta as opções do
+  // <select> (src/lib/selecionavel.ts). Conferir só o pertencimento deixava
+  // uma requisição forjada vincular o plano a um ativo Vendido ou a um tipo
+  // Arquivado — a tela escondia a opção, e tela não é defesa.
+  erros.push(
+    ...validarEscolha(ativos, campos.ativoId ?? "", jaGravadas?.ativoId ?? null, {
+      field: "vinculo",
+      invalido: "Selecione um ativo válido.",
+      indisponivel: "Este ativo não está mais ativo. Escolha outro.",
+    }),
+  );
+  erros.push(
+    ...validarEscolha(tipos, campos.tipoAtivoId ?? "", jaGravadas?.tipoAtivoId ?? null, {
+      field: "vinculo",
+      invalido: "Selecione um tipo de ativo válido.",
+      indisponivel: "Este tipo de ativo foi arquivado. Escolha outro.",
+    }),
+  );
+  // Empresa não tem status no modelo (AD-17) — só pertencimento.
   if (campos.empresaId && !empresas.some((empresa) => empresa.id === campos.empresaId)) {
     erros.push({ field: "vinculo", message: "Selecione uma empresa válida." });
   }
@@ -164,7 +184,9 @@ async function vinculoEResponsavelValidos(
   // (src/lib/responsavel.ts), a MESMA que o <select> do modal usa para
   // montar as opções — divergir faria a tela oferecer o que o servidor
   // recusa. `responsavelAtualId` preserva quem já estava gravado.
-  erros.push(...validarResponsavel(usuarios, campos.responsavelId, responsavelAtualId));
+  erros.push(
+    ...validarResponsavel(usuarios, campos.responsavelId, jaGravadas?.responsavelId ?? null),
+  );
   return erros;
 }
 
@@ -229,7 +251,12 @@ export async function criarPlanoAction(
     return { ok: false, error: erros };
   }
 
-  const errosDeReferencia = await vinculoEResponsavelValidos(usuarioSessao.contaId, camposGerais);
+  const errosDeReferencia = await vinculoEResponsavelValidos(
+    usuarioSessao.contaId,
+    camposGerais,
+    // Criação: não há nada gravado, logo nenhuma exceção de status.
+    null,
+  );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }
@@ -300,7 +327,21 @@ export async function editarPlanoAction(
     return { ok: false, error: erros };
   }
 
-  const errosDeReferencia = await vinculoEResponsavelValidos(usuarioSessao.contaId, camposGerais);
+  // Lido ANTES de validar: é o que preserva o vínculo e o responsável já
+  // gravados. Sem isto, desativar um ativo ou um usuário tornaria o plano
+  // permanentemente ineditável — o defeito da Story 7.5.
+  const planoAtual = await buscarPlano(usuarioSessao.contaId, planoId);
+  const errosDeReferencia = await vinculoEResponsavelValidos(
+    usuarioSessao.contaId,
+    camposGerais,
+    planoAtual
+      ? {
+          ativoId: planoAtual.ativoId,
+          tipoAtivoId: planoAtual.tipoAtivoId,
+          responsavelId: planoAtual.responsavelId,
+        }
+      : null,
+  );
   if (errosDeReferencia.length > 0) {
     return { ok: false, error: errosDeReferencia };
   }

@@ -10,6 +10,7 @@ import { StatusBadge } from "@/src/components/shared/status-badge";
 // `padStart`, nenhum teto reescrito aqui.
 import { formatarInstante } from "@/src/lib/datas";
 import { opcoesDeResponsavel } from "@/src/lib/responsavel";
+import { opcoesSelecionaveis } from "@/src/lib/selecionavel";
 import { DURACAO_INVALIDA, formatarMinutos } from "@/src/lib/duracao";
 import {
   aprovarEmissaoAction,
@@ -726,9 +727,9 @@ export function LinhaServicoRow({
   // (mesmo critério de opcoesAtivo/opcoesPlano e da Story 5.4 para cargo/
   // função); o item que ESTA linha já referencia continua na lista mesmo se
   // arquivado depois, para a edição não perder o valor existente.
-  const opcoesItem = itensRevisionais.filter(
-    (item) => item.status === "Ativo" || item.id === linha.itemRevisionalId,
-  );
+  // A MESMA função que a Server Action usa (src/lib/selecionavel.ts) — é o
+  // que impede a tela de oferecer o que o servidor recusa.
+  const opcoesItem = opcoesSelecionaveis(itensRevisionais, linha.itemRevisionalId);
   const prefixo = `servico-${indice}`;
   const total = minutosDaLinhaDeServico(linha);
 
@@ -1015,9 +1016,7 @@ export function ModalEmissao({
   // depois (edição não pode perder silenciosamente o vínculo existente).
   // Story 7.5: não há mais uma lista de planos ao lado — o plano é derivado
   // deste ativo, e quem filtra por status "Ativo" lá é a própria derivação.
-  const opcoesAtivo = ativos.filter(
-    (ativo) => ativo.status === "Ativo" || ativo.id === emissao?.ativoId,
-  );
+  const opcoesAtivo = opcoesSelecionaveis(ativos, emissao?.ativoId ?? null);
   // Story 7.5 — a tela DERIVA, o servidor DECIDE. O que sai daqui é
   // pré-visualização: serve para montar o checklist da aba Itens (sem plano no
   // cliente, `linhas` vira `[]` e todos os campos `itemExecutado-*` somem do
