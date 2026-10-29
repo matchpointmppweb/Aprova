@@ -35,10 +35,13 @@ export function TabelaPerfis({
   perfis,
   podeCriar,
   podeEditar,
+  tetoDoAtor,
 }: {
   perfis: PerfilAcessoListagem[];
   podeCriar: boolean;
   podeEditar: boolean;
+  /// As permissões do PRÓPRIO usuário: o limite do que ele pode conceder.
+  tetoDoAtor: PermissaoListagem[];
 }) {
   const [modalAberto, setModalAberto] = useState<"create" | string | null>(null);
 
@@ -126,10 +129,20 @@ export function TabelaPerfis({
       </div>
 
       {modalAberto === "create" && podeCriar ? (
-        <ModalPerfil perfil={null} onFechar={fecharModal} onSucesso={fecharModal} />
+        <ModalPerfil
+          perfil={null}
+          tetoDoAtor={tetoDoAtor}
+          onFechar={fecharModal}
+          onSucesso={fecharModal}
+        />
       ) : null}
       {perfilEmEdicao && podeEditar ? (
-        <ModalPerfil perfil={perfilEmEdicao} onFechar={fecharModal} onSucesso={fecharModal} />
+        <ModalPerfil
+          perfil={perfilEmEdicao}
+          tetoDoAtor={tetoDoAtor}
+          onFechar={fecharModal}
+          onSucesso={fecharModal}
+        />
       ) : null}
     </>
   );

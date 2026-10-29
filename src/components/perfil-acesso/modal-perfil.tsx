@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { MODULOS_PERFIL, NOME_ADMINISTRADOR } from "@/src/lib/modulos";
+import { ACOES, tetoDoAtor as mapaDoTeto } from "@/src/lib/teto-de-permissao";
 import {
   criarPerfilAcessoAction,
   editarPerfilAcessoAction,
@@ -12,7 +13,7 @@ import {
   estadoInicialAcaoPerfil,
   mensagemDeErro,
 } from "@/src/server/actions/perfil-acesso-estado";
-import type { PerfilAcessoListagem } from "./tipos";
+import type { PerfilAcessoListagem, PermissaoListagem } from "./tipos";
 
 type AbaModal = "geral" | "permissoes";
 
@@ -37,22 +38,72 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
   );
 }
 
+/// Uma caixa da matriz de permissões.
+///
+/// Três estados, e a diferença entre os dois últimos é o que impede um
+/// apagamento silencioso:
+///
+/// - DENTRO do teto: caixa normal.
+/// - fora do teto e desmarcada: desabilitada. Marcar seria recusado pela
+///   Server Action, então a tela nem oferece.
+/// - fora do teto mas JÁ MARCADA: desabilitada E acompanhada de um input
+///   oculto com o mesmo nome. Uma caixa `disabled` NÃO é enviada pelo
+///   navegador — sem o oculto, abrir um perfil mais poderoso e salvar
+///   APAGARIA em silêncio toda permissão acima do teto do ator, que é pior
+///   do que o problema que o teto resolve.
+function CaixaDePermissao({
+  modulo,
+  acao,
+  marcada,
+  noTeto,
+}: {
+  modulo: string;
+  acao: string;
+  marcada: boolean;
+  noTeto: boolean;
+}) {
+  const nome = `perm-${modulo}-${acao}`;
+  const travada = !noTeto;
+
+  return (
+    <>
+      <input
+        type="checkbox"
+        name={travada ? undefined : nome}
+        defaultChecked={marcada}
+        disabled={travada}
+        title={
+          travada
+            ? "Você não pode alterar uma permissão que o seu próprio perfil não tem."
+            : undefined
+        }
+      />
+      {travada && marcada ? <input type="hidden" name={nome} value="on" /> : null}
+    </>
+  );
+}
+
 // Modal tabbed Geral/Permissões (UX-DR4), portado de Mockup.html:1334-1361.
 // perfil === null -> modo criação; perfil preenchido -> modo edição. Local a
 // esta tela (Code Map) — não um primitivo compartilhado ainda, é o único
 // modal do app até agora.
 export function ModalPerfil({
   perfil,
+  tetoDoAtor,
   onFechar,
   onSucesso,
 }: {
   perfil: PerfilAcessoListagem | null;
+  /// As permissões do próprio usuário: o limite do que ele pode conceder
+  /// (src/lib/teto-de-permissao.ts). A Server Action recusa o mesmo.
+  tetoDoAtor: PermissaoListagem[];
   onFechar: () => void;
   onSucesso: () => void;
 }) {
   const acao = perfil ? editarPerfilAcessoAction : criarPerfilAcessoAction;
   const [estado, formAction] = useActionState(acao, estadoInicialAcaoPerfil);
   const [aba, setAba] = useState<AbaModal>("geral");
+  const teto = mapaDoTeto(tetoDoAtor);
 
   useEffect(() => {
     if (estado.ok) {
@@ -160,30 +211,20 @@ export function ModalPerfil({
                 <tbody>
                   {MODULOS_PERFIL.map((modulo) => {
                     const atual = permissaoPorModulo.get(modulo.key);
+                    const permitido = teto.get(modulo.key);
                     return (
                       <tr key={modulo.key}>
                         <td>{modulo.label}</td>
-                        <td className="perm-check-col">
-                          <input
-                            type="checkbox"
-                            name={`perm-${modulo.key}-criar`}
-                            defaultChecked={atual?.criar ?? false}
-                          />
-                        </td>
-                        <td className="perm-check-col">
-                          <input
-                            type="checkbox"
-                            name={`perm-${modulo.key}-editar`}
-                            defaultChecked={atual?.editar ?? false}
-                          />
-                        </td>
-                        <td className="perm-check-col">
-                          <input
-                            type="checkbox"
-                            name={`perm-${modulo.key}-excluir`}
-                            defaultChecked={atual?.excluir ?? false}
-                          />
-                        </td>
+                        {ACOES.map((acao) => (
+                          <td className="perm-check-col" key={acao}>
+                            <CaixaDePermissao
+                              modulo={modulo.key}
+                              acao={acao}
+                              marcada={atual?.[acao] ?? false}
+                              noTeto={permitido?.[acao] ?? false}
+                            />
+                          </td>
+                        ))}
                       </tr>
                     );
                   })}

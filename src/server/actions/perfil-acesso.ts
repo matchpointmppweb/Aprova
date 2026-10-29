@@ -6,10 +6,12 @@ import { Prisma, type Modulo } from "@prisma/client";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { MODULOS_PERFIL, NOME_ADMINISTRADOR } from "@/src/lib/modulos";
+import { permissoesAcimaDoTeto } from "@/src/lib/teto-de-permissao";
 import {
   atualizarPerfilAcesso,
   buscarPerfilAcesso,
   criarPerfilAcesso,
+  permissoesDoPerfil,
   type PermissaoParaGravar,
 } from "@/src/server/repositories/perfil-acesso";
 import type { EstadoAcaoPerfil } from "./perfil-acesso-estado";
@@ -69,6 +71,17 @@ export async function criarPerfilAcessoAction(
   }
 
   const permissoes = lerPermissoes(formData);
+
+  // TETO (src/lib/teto-de-permissao.ts): ninguém concede o que não tem. Sem
+  // isto, quem administra perfis se auto-promovia a administrador total em
+  // dois cliques, com uma gravação perfeitamente legítima.
+  const erroDeTeto = permissoesAcimaDoTeto(
+    permissoes,
+    await permissoesDoPerfil(usuarioSessao.contaId, usuarioSessao.perfilAcessoId),
+  );
+  if (erroDeTeto.length > 0) {
+    return { ok: false, error: erroDeTeto };
+  }
 
   try {
     await criarPerfilAcesso(usuarioSessao.contaId, { nome, descricao, permissoes });
@@ -153,6 +166,18 @@ export async function editarPerfilAcessoAction(
         ],
       };
     }
+  }
+
+  // TETO, com a exceção do que o ALVO já tinha: manter não é conceder, e
+  // recusar a manutenção tornaria o perfil mais poderoso ineditável por quem
+  // administra perfis sem ter tudo.
+  const erroDeTeto = permissoesAcimaDoTeto(
+    permissoes,
+    await permissoesDoPerfil(usuarioSessao.contaId, usuarioSessao.perfilAcessoId),
+    perfilAtual.permissoes,
+  );
+  if (erroDeTeto.length > 0) {
+    return { ok: false, error: erroDeTeto };
   }
 
   let atualizou: boolean;

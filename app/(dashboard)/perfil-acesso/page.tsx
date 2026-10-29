@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { TabelaPerfis } from "@/src/components/perfil-acesso/tabela-perfis";
-import { listarPerfisAcessoCompleto } from "@/src/server/repositories/perfil-acesso";
+import {
+  listarPerfisAcessoCompleto,
+  permissoesDoPerfil,
+} from "@/src/server/repositories/perfil-acesso";
 
 export const metadata: Metadata = {
   title: "Perfil de acesso — Raiz",
@@ -16,10 +19,14 @@ export const metadata: Metadata = {
 export default async function PerfilAcessoPage() {
   const usuarioSessao = await exigirUsuarioAutenticado();
 
-  const [perfis, podeCriar, podeEditar] = await Promise.all([
+  // O TETO do ator (src/lib/teto-de-permissao.ts) vai junto para a tela
+  // poder desabilitar exatamente as caixas que a Server Action recusa — a
+  // mesma lista nos dois lados, como em can().
+  const [perfis, podeCriar, podeEditar, tetoDoAtor] = await Promise.all([
     listarPerfisAcessoCompleto(usuarioSessao.contaId),
     can(usuarioSessao, "criar", "perfil"),
     can(usuarioSessao, "editar", "perfil"),
+    permissoesDoPerfil(usuarioSessao.contaId, usuarioSessao.perfilAcessoId),
   ]);
 
   return (
@@ -28,7 +35,12 @@ export default async function PerfilAcessoPage() {
         Raiz / Configurações / <b>Perfil de acesso</b>
       </div>
 
-      <TabelaPerfis perfis={perfis} podeCriar={podeCriar} podeEditar={podeEditar} />
+      <TabelaPerfis
+        perfis={perfis}
+        podeCriar={podeCriar}
+        podeEditar={podeEditar}
+        tetoDoAtor={tetoDoAtor}
+      />
     </section>
   );
 }

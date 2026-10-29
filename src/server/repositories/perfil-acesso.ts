@@ -138,3 +138,20 @@ export async function atualizarPerfilAcesso(
     return true;
   });
 }
+
+// As permissões de UM perfil, escopadas pela conta (AD-1) — um
+// perfilAcessoId de outra conta nunca é encontrado e devolve lista vazia,
+// que o teto trata como "nenhuma permissão" (negar por omissão, mesmo
+// critério de can()).
+//
+// Existe separada de `buscarPerfilAcesso` porque o teto precisa das
+// permissões do ATOR, não do perfil que está sendo editado — são dois
+// perfis diferentes na mesma requisição, e reusar a outra função convidaria
+// a confundi-los.
+export async function permissoesDoPerfil(contaId: string, perfilAcessoId: string) {
+  const perfil = await prisma.perfilAcesso.findFirst({
+    where: { id: perfilAcessoId, contaId },
+    select: { permissoes: true },
+  });
+  return perfil?.permissoes ?? [];
+}
