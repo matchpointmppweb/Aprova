@@ -666,7 +666,7 @@ function LinhaItemEmissaoRow({
 // o acumulado do rodapé recalculam a cada tecla, e a coluna "Início / Horas"
 // troca de natureza conforme o modo. Os dois exigem que o componente conheça os
 // valores, o que inputs não-controlados não permitiam.
-type LinhaServico = {
+export type LinhaServico = {
   chave: number;
   pessoaId: string;
   itemRevisionalId: string;
@@ -701,7 +701,11 @@ function ErroDeCampo({
   );
 }
 
-function LinhaServicoRow({
+// Exportada só para o teste de componente poder renderizar a linha isolada
+// (tests/servico-linha.componente.test.tsx). É o único jeito de prender o
+// acoplamento entre os NOMES que ela renderiza e os que `lerServicos` lê —
+// template strings dos dois lados, que renomear só em um não quebra o build.
+export function LinhaServicoRow({
   indice,
   linha,
   pessoas,

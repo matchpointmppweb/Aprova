@@ -65,3 +65,41 @@ VERBOSE_PG=1 npm test
 
 Não há teste de interface: nada aqui renderiza uma página nem abre um navegador.
 Layout, contraste e usabilidade continuam sendo verificação manual.
+
+## Os dois projetos de teste
+
+A suíte roda em dois projetos do Vitest, com ambientes incompatíveis entre si.
+A divisão é pela EXTENSÃO do arquivo, então um teste novo cai no projeto certo
+pelo próprio nome.
+
+| | `servidor` | `componente` |
+|---|---|---|
+| arquivos | `tests/**/*.test.ts` | `tests/**/*.componente.test.tsx` |
+| ambiente | Node | jsdom |
+| banco | PostgreSQL efêmero de verdade | nenhum |
+| execução | serial (um banco só) | paralela |
+| custo | ~70s | ~4s |
+| comando | `npm run test:servidor` | `npm run test:componente` |
+
+`npm test` roda os dois.
+
+### O que cada um pega — e o que não pega
+
+O projeto `servidor` cobre REGRA: dado um estado, o que o sistema decide e o
+que grava. É onde vivem os defeitos caros, e por isso ele usa banco real em vez
+de Prisma mockado — um mock devolve o que o teste mandar, e nenhum `where`
+frouxo aparece assim.
+
+O projeto `componente` cobre FIAÇÃO: que a tela e a regra falam a mesma língua.
+O caso que o motivou: os nomes dos campos (`servico-{i}-inicio`) são montados
+por template string em dois lugares independentes, o componente e
+`lerServicos`. Renomear só um dos lados não é erro de compilação. Medido em
+29-10-2026: com o nome trocado no componente, os 353 testes de servidor
+passavam verdes enquanto o modal parava de enviar o campo.
+
+### O limite
+
+Teste de componente é caro de manter: ele quebra com mudança de layout, não só
+com defeito. Por isso ele é usado de propósito só onde há ACOPLAMENTO entre
+tela e servidor que nada mais prende — não para cobrir aparência, e não como
+substituto da conferência visual.
