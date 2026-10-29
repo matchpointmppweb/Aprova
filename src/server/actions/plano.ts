@@ -28,6 +28,7 @@ import {
   type ItemSelecionadoBruto,
 } from "./plano-estado";
 import { LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries).
@@ -280,6 +281,9 @@ export async function criarPlanoAction(
         error: [{ field: "nome", message: "Já existe um plano revisional com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarPlanoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -378,6 +382,9 @@ export async function editarPlanoAction(
         error: [{ field: "nome", message: "Já existe um plano revisional com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarPlanoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

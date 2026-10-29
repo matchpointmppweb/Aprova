@@ -13,6 +13,7 @@ import type {
   ValoresNovaConta,
 } from "./conta-estado";
 import { LIMITE_DOCUMENTO, LIMITE_NOME, lerTexto, lerTextoBruto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
 const PLANOS_VALIDOS: PlanoContratado[] = ["Essencial", "Corporativo"];
@@ -247,6 +248,9 @@ export async function editarContaAction(
         error: [{ field: "cnpj", message: "Este CNPJ já está em uso na plataforma." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarContaAction" }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

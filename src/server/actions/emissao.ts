@@ -44,6 +44,7 @@ import {
   type LinhaServicoBruta,
 } from "./emissao-estado";
 import { LIMITE_TEXTO_LONGO, lerTexto, lerTextoBruto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries) — inclusive uma
@@ -485,6 +486,9 @@ export async function criarEmissaoAction(
     if (isViolacaoDeServicoIncoerente(erro)) {
       return { ok: false, error: [ERRO_SERVICO_INCOERENTE] };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarEmissaoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -683,6 +687,9 @@ export async function editarEmissaoAction(
     if (isViolacaoDeServicoIncoerente(erro)) {
       return { ok: false, error: [ERRO_SERVICO_INCOERENTE] };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarEmissaoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

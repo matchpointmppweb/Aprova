@@ -16,6 +16,7 @@ import {
 } from "@/src/server/repositories/usuario";
 import type { EstadoAcaoUsuario } from "./usuario-estado";
 import { LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -146,6 +147,9 @@ export async function convidarUsuarioAction(
         error: [{ field: "email", message: ERRO_EMAIL_INDISPONIVEL }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "convidarUsuarioAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -287,6 +291,9 @@ export async function editarUsuarioAction(
         error: [{ field: "email", message: ERRO_EMAIL_INDISPONIVEL }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarUsuarioAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

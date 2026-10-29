@@ -16,6 +16,7 @@ import {
 } from "@/src/server/repositories/perfil-acesso";
 import type { EstadoAcaoPerfil } from "./perfil-acesso-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -93,6 +94,9 @@ export async function criarPerfilAcessoAction(
         error: [{ field: "nome", message: "Já existe um perfil com este nome nesta conta." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarPerfilAcessoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -199,6 +203,9 @@ export async function editarPerfilAcessoAction(
         error: [{ field: "nome", message: "Já existe um perfil com este nome nesta conta." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarPerfilAcessoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

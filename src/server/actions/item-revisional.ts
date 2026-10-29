@@ -14,6 +14,7 @@ import {
   type EstadoAcaoItemRevisional,
 } from "./item-revisional-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries).
@@ -137,6 +138,9 @@ export async function criarItemRevisionalAction(
         error: [{ field: "nome", message: "Já existe um item revisional com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarItemRevisionalAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -188,6 +192,9 @@ export async function editarItemRevisionalAction(
         error: [{ field: "nome", message: "Já existe um item revisional com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarItemRevisionalAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

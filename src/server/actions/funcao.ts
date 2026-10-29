@@ -8,6 +8,7 @@ import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarFuncao, criarFuncao } from "@/src/server/repositories/funcao";
 import type { EstadoAcaoFuncao } from "./funcao-estado";
 import { LIMITE_DESCRICAO, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -69,6 +70,9 @@ export async function criarFuncaoAction(
         error: [{ field: "descricao", message: "Já existe uma função com essa descrição." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarFuncaoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -123,6 +127,9 @@ export async function editarFuncaoAction(
         error: [{ field: "descricao", message: "Já existe uma função com essa descrição." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarFuncaoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

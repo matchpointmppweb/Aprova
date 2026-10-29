@@ -11,6 +11,7 @@ import {
 } from "@/src/server/repositories/tipo-ativo";
 import type { EstadoAcaoTipoAtivo } from "./tipo-ativo-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -80,6 +81,9 @@ export async function criarTipoAtivoAction(
         error: [{ field: "nome", message: "Já existe um tipo com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarTipoAtivoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -136,6 +140,9 @@ export async function editarTipoAtivoAction(
         error: [{ field: "nome", message: "Já existe um tipo com esse nome." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarTipoAtivoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

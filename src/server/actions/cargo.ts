@@ -8,6 +8,7 @@ import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarCargo, criarCargo } from "@/src/server/repositories/cargo";
 import type { EstadoAcaoCargo } from "./cargo-estado";
 import { LIMITE_DESCRICAO, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -68,6 +69,9 @@ export async function criarCargoAction(
         error: [{ field: "descricao", message: "Já existe um cargo com essa descrição." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarCargoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -122,6 +126,9 @@ export async function editarCargoAction(
         error: [{ field: "descricao", message: "Já existe um cargo com essa descrição." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarCargoAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 

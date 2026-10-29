@@ -8,6 +8,7 @@ import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarEmpresa, criarEmpresa } from "@/src/server/repositories/empresa";
 import type { EstadoAcaoEmpresa } from "./empresa-estado";
 import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO, lerTexto, validarTamanho } from "@/src/lib/texto";
+import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -78,6 +79,9 @@ export async function criarEmpresaAction(
         error: [{ field: "razaoSocial", message: "Já existe uma empresa com essa razão social." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "criarEmpresaAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
@@ -136,6 +140,9 @@ export async function editarEmpresaAction(
         error: [{ field: "razaoSocial", message: "Já existe uma empresa com essa razão social." }],
       };
     }
+    // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
+    // usuário continua genérica, mas o erro deixa de desaparecer.
+    registrarFalha({ operacao: "editarEmpresaAction", contaId: usuarioSessao.contaId }, erro);
     return { ok: false, error: ERRO_GENERICO };
   }
 
