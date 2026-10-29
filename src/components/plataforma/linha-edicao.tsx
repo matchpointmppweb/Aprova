@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/conta-estado";
 import type { ContaListagem } from "./tipos";
+import { LIMITE_DOCUMENTO, LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui. Mesmo
@@ -70,6 +71,7 @@ export function LinhaEdicao({
               <input
                 id={`ec-nome-${conta.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={conta.nome}
                 required
@@ -80,6 +82,7 @@ export function LinhaEdicao({
               <input
                 id={`ec-cnpj-${conta.id}`}
                 name="cnpj"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 defaultValue={conta.cnpj}
                 required

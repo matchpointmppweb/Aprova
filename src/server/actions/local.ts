@@ -11,6 +11,7 @@ import {
   type AreaPoligono,
 } from "@/src/server/repositories/local";
 import type { EstadoAcaoLocal } from "./local-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -47,9 +48,9 @@ function lerAreaPoligono(formData: FormData): AreaPoligono {
 }
 
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const endereco = String(formData.get("endereco") ?? "").trim();
-  const statusBruto = String(formData.get("status") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const endereco = lerTexto(formData, "endereco");
+  const statusBruto = lerTexto(formData, "status");
   return {
     nome,
     endereco,
@@ -78,6 +79,10 @@ export async function criarLocalAction(
   const { nome, endereco, status, areaPoligono } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(endereco, LIMITE_DESCRICAO, "endereco", "Endereço"));
   if (!nome) erros.push({ field: "nome", message: "Informe o nome do local." });
   if (!endereco) erros.push({ field: "endereco", message: "Informe o endereço do local." });
   if (!STATUS_VALIDOS.includes(status as StatusLocal)) {
@@ -126,10 +131,14 @@ export async function editarLocalAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const localId = String(formData.get("localId") ?? "").trim();
+  const localId = lerTexto(formData, "localId");
   const { nome, endereco, status, areaPoligono } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(endereco, LIMITE_DESCRICAO, "endereco", "Endereço"));
   if (!localId) erros.push({ field: "localId", message: "Local inválido." });
   if (!nome) erros.push({ field: "nome", message: "Informe o nome do local." });
   if (!endereco) erros.push({ field: "endereco", message: "Informe o endereço do local." });

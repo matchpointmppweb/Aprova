@@ -13,6 +13,7 @@ import {
   validarControlesDeItemRevisional,
   type EstadoAcaoItemRevisional,
 } from "./item-revisional-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries).
@@ -32,7 +33,7 @@ function isErroDeNomeDuplicado(erro: unknown): boolean {
 // validação de "ao menos 1 de 3, positivo" em
 // validarControlesDeItemRevisional (item-revisional-estado.ts).
 function lerCampoNumerico(formData: FormData, nome: string): number | null {
-  const bruto = String(formData.get(nome) ?? "").trim();
+  const bruto = lerTexto(formData, nome);
   if (!bruto) return null;
   const valor = Number(bruto);
   // Number.isInteger rejeita decimais (ex. "90.5") aqui, na validação, em
@@ -42,14 +43,22 @@ function lerCampoNumerico(formData: FormData, nome: string): number | null {
 }
 
 function lerTextoOpcional(formData: FormData, nome: string): string | null {
-  const bruto = String(formData.get(nome) ?? "").trim();
+  const bruto = lerTexto(formData, nome);
   return bruto ? bruto : null;
 }
 
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const descricaoBruta = String(formData.get("descricao") ?? "").trim();
-  const statusBruto = String(formData.get("status") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const descricaoBruta = lerTexto(formData, "descricao");
+  // Teto de tamanho aqui, e não em `validarCampos`: `descricao` é opcional
+  // e não entra naquele contrato de campos obrigatórios.
+  const errosDeDescricao = validarTamanho(
+    descricaoBruta,
+    LIMITE_DESCRICAO,
+    "descricao",
+    "Descrição",
+  );
+  const statusBruto = lerTexto(formData, "status");
   return {
     nome,
     descricao: descricaoBruta ? descricaoBruta : null,
@@ -64,6 +73,7 @@ function lerCampos(formData: FormData) {
     kmPadrao: lerCampoNumerico(formData, "kmPadrao"),
     horasPadrao: lerCampoNumerico(formData, "horasPadrao"),
     status: statusBruto,
+    errosDeTexto: errosDeDescricao,
   };
 }
 
@@ -82,6 +92,8 @@ function validarCampos(campos: {
     erros.push({ field: "status", message: "Selecione um status válido." });
   }
   erros.push(...validarControlesDeItemRevisional(campos));
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(campos.nome, LIMITE_NOME, "nome", "Nome"));
   return erros;
 }
 
@@ -103,9 +115,12 @@ export async function criarItemRevisionalAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const campos = lerCampos(formData);
+  // `errosDeTexto` sai do objeto de propósito: `campos` é espalhado direto
+  // no repositório, e um campo a mais ali vira argumento desconhecido no
+  // Prisma.
+  const { errosDeTexto, ...campos } = lerCampos(formData);
 
-  const erros = validarCampos(campos);
+  const erros = [...validarCampos(campos), ...errosDeTexto];
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
@@ -146,10 +161,13 @@ export async function editarItemRevisionalAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const itemRevisionalId = String(formData.get("itemRevisionalId") ?? "").trim();
-  const campos = lerCampos(formData);
+  const itemRevisionalId = lerTexto(formData, "itemRevisionalId");
+  // `errosDeTexto` sai do objeto de propósito: `campos` é espalhado direto
+  // no repositório, e um campo a mais ali vira argumento desconhecido no
+  // Prisma.
+  const { errosDeTexto, ...campos } = lerCampos(formData);
 
-  const erros = validarCampos(campos);
+  const erros = [...validarCampos(campos), ...errosDeTexto];
   if (!itemRevisionalId) {
     erros.push({ field: "itemRevisionalId", message: "Item revisional inválido." });
   }
@@ -201,7 +219,7 @@ export async function excluirItemRevisionalAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const itemRevisionalId = String(formData.get("itemRevisionalId") ?? "").trim();
+  const itemRevisionalId = lerTexto(formData, "itemRevisionalId");
   if (!itemRevisionalId) {
     return { ok: false, error: ERRO_GENERICO };
   }

@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { criarAtivoAction } from "@/src/server/actions/ativo";
 import { estadoInicialAcaoAtivo, mensagemDeErro } from "@/src/server/actions/ativo-estado";
 import type { EmpresaOpcao, TipoAtivoOpcao } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -70,6 +71,7 @@ export function LinhaCriacao({
               <input
                 id="ca-nome"
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Ex.: Compressor de ar CP-015"
                 required
@@ -93,6 +95,7 @@ export function LinhaCriacao({
               <input
                 id="ca-localizacao"
                 name="localizacao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 placeholder="Ex.: Planta 1 · Setor B"
                 required
@@ -114,6 +117,7 @@ export function LinhaCriacao({
               <input
                 id="ca-numeroSerie"
                 name="numeroSerie"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Opcional"
               />

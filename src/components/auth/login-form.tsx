@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 
 import { entrarAction } from "@/src/server/actions/auth";
 import { estadoInicialAcaoAuth } from "@/src/server/actions/auth-estado";
+import { LIMITE_NOME } from "@/src/lib/texto";
 
 function BotaoEntrar() {
   const { pending } = useFormStatus();
@@ -35,6 +36,7 @@ export function LoginForm() {
           <input
             id="li-email"
             name="email"
+            maxLength={LIMITE_NOME}
             type="email"
             placeholder="voce@empresa.com.br"
             autoComplete="email"

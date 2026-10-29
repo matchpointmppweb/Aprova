@@ -10,6 +10,7 @@ import {
   criarTipoAtivo,
 } from "@/src/server/repositories/tipo-ativo";
 import type { EstadoAcaoTipoAtivo } from "./tipo-ativo-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -24,9 +25,9 @@ function isErroDeNomeDuplicado(erro: unknown): boolean {
 }
 
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const descricaoBruta = String(formData.get("descricao") ?? "").trim();
-  const statusBruto = String(formData.get("status") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const descricaoBruta = lerTexto(formData, "descricao");
+  const statusBruto = lerTexto(formData, "status");
   return {
     nome,
     descricao: descricaoBruta ? descricaoBruta : null,
@@ -54,6 +55,10 @@ export async function criarTipoAtivoAction(
   const { nome, descricao, status } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(descricao, LIMITE_DESCRICAO, "descricao", "Descrição"));
   if (!nome) erros.push({ field: "nome", message: "Informe o nome do tipo." });
   if (!STATUS_VALIDOS.includes(status as StatusTipoAtivo)) {
     erros.push({ field: "status", message: "Selecione um status válido." });
@@ -100,10 +105,14 @@ export async function editarTipoAtivoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const tipoAtivoId = String(formData.get("tipoAtivoId") ?? "").trim();
+  const tipoAtivoId = lerTexto(formData, "tipoAtivoId");
   const { nome, descricao, status } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(descricao, LIMITE_DESCRICAO, "descricao", "Descrição"));
   if (!tipoAtivoId) erros.push({ field: "tipoAtivoId", message: "Tipo inválido." });
   if (!nome) erros.push({ field: "nome", message: "Informe o nome do tipo." });
   if (!STATUS_VALIDOS.includes(status as StatusTipoAtivo)) {

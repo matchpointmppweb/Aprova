@@ -15,6 +15,7 @@ import {
   type ResultadoConvite,
 } from "@/src/server/repositories/usuario";
 import type { EstadoAcaoUsuario } from "./usuario-estado";
+import { LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -101,9 +102,9 @@ export async function convidarUsuarioAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const nome = String(formData.get("nome") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
   const email = normalizarEmail(formData.get("email"));
-  const perfilAcessoId = String(formData.get("perfilAcessoId") ?? "").trim();
+  const perfilAcessoId = lerTexto(formData, "perfilAcessoId");
 
   const erros: { field: string; message: string }[] = [];
   if (!nome) erros.push({ field: "nome", message: "Informe o nome." });
@@ -114,6 +115,9 @@ export async function convidarUsuarioAction(
   if (!perfilAcessoId) {
     erros.push({ field: "perfilAcessoId", message: "Selecione um perfil de acesso." });
   }
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(email, LIMITE_NOME, "email", "E-mail"));
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
@@ -192,11 +196,11 @@ export async function editarUsuarioAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const usuarioId = String(formData.get("usuarioId") ?? "").trim();
-  const nome = String(formData.get("nome") ?? "").trim();
+  const usuarioId = lerTexto(formData, "usuarioId");
+  const nome = lerTexto(formData, "nome");
   const email = normalizarEmail(formData.get("email"));
-  const perfilAcessoId = String(formData.get("perfilAcessoId") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim() as StatusUsuario;
+  const perfilAcessoId = lerTexto(formData, "perfilAcessoId");
+  const status = lerTexto(formData, "status") as StatusUsuario;
 
   const erros: { field: string; message: string }[] = [];
   if (!usuarioId) erros.push({ field: "usuarioId", message: "Usuário inválido." });
@@ -208,6 +212,9 @@ export async function editarUsuarioAction(
   if (!perfilAcessoId) {
     erros.push({ field: "perfilAcessoId", message: "Selecione um perfil de acesso." });
   }
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(email, LIMITE_NOME, "email", "E-mail"));
   if (!STATUS_VALIDOS.includes(status)) {
     erros.push({ field: "status", message: "Selecione um status válido." });
   }

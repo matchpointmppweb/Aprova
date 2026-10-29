@@ -14,6 +14,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/perfil-acesso-estado";
 import type { PerfilAcessoListagem, PermissaoListagem } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 type AbaModal = "geral" | "permissoes";
 
@@ -169,6 +170,7 @@ export function ModalPerfil({
                   <input
                     id="perfil-nome"
                     name="nome"
+                    maxLength={LIMITE_NOME}
                     type="text"
                     placeholder="Ex.: Supervisor de planta"
                     defaultValue={perfil?.nome ?? ""}
@@ -186,6 +188,7 @@ export function ModalPerfil({
                   <input
                     id="perfil-descricao"
                     name="descricao"
+                    maxLength={LIMITE_DESCRICAO}
                     type="text"
                     placeholder="O que esse perfil pode fazer"
                     defaultValue={perfil?.descricao ?? ""}

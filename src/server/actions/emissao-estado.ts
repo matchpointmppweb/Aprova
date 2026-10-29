@@ -16,6 +16,7 @@ import {
   type MotivoDeRecusa,
   type ResultadoDeDuracao,
 } from "@/src/lib/duracao";
+import { lerTexto } from "@/src/lib/texto";
 
 export type ErroDeValidacao = { field: string; message: string };
 
@@ -283,7 +284,7 @@ export const ERRO_EXCESSO_SERVICOS = `Uma emissão aceita no máximo ${MAX_LINHA
 export function lerServicos(
   formData: FormData,
 ): { ok: true; linhas: LinhaServicoBruta[] } | { ok: false; erro: string } {
-  const totalBruto = Number(String(formData.get("servicoCount") ?? "0").trim());
+  const totalBruto = Number(lerTexto(formData, "servicoCount") || "0");
   if (!Number.isFinite(totalBruto) || !Number.isInteger(totalBruto) || totalBruto <= 0) {
     return { ok: true, linhas: [] };
   }
@@ -294,7 +295,7 @@ export function lerServicos(
 
   const linhas: LinhaServicoBruta[] = [];
   for (let indice = 0; indice < total; indice++) {
-    const pessoaId = String(formData.get(`servico-${indice}-pessoaId`) ?? "").trim();
+    const pessoaId = lerTexto(formData, `servico-${indice}-pessoaId`);
     const itemRevisionalId = String(
       formData.get(`servico-${indice}-itemRevisionalId`) ?? "",
     ).trim();
@@ -302,10 +303,10 @@ export function lerServicos(
     // `modo` fica FORA da checagem de linha fantasma de propósito — o <select>
     // sempre manda um valor, então incluí-lo faria toda linha em branco parecer
     // preenchida e virar erro de campo obrigatório.
-    const modo = String(formData.get(`servico-${indice}-modo`) ?? "").trim();
-    const horas = String(formData.get(`servico-${indice}-horas`) ?? "").trim();
-    const inicio = String(formData.get(`servico-${indice}-inicio`) ?? "").trim();
-    const fim = String(formData.get(`servico-${indice}-fim`) ?? "").trim();
+    const modo = lerTexto(formData, `servico-${indice}-modo`);
+    const horas = lerTexto(formData, `servico-${indice}-horas`);
+    const inicio = lerTexto(formData, `servico-${indice}-inicio`);
+    const fim = lerTexto(formData, `servico-${indice}-fim`);
 
     if (!pessoaId && !itemRevisionalId && !horas && !inicio && !fim) continue;
     linhas.push({ indice, pessoaId, itemRevisionalId, modo, horas, inicio, fim });

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/empresa-estado";
 import type { EmpresaListagem } from "./tipos";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -74,6 +75,7 @@ export function LinhaEdicao({
               <input
                 id={`ee-razao-social-${empresa.id}`}
                 name="razaoSocial"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={empresa.razaoSocial}
                 required
@@ -84,6 +86,7 @@ export function LinhaEdicao({
               <input
                 id={`ee-nome-fantasia-${empresa.id}`}
                 name="nomeFantasia"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={empresa.nomeFantasia}
                 required
@@ -94,6 +97,7 @@ export function LinhaEdicao({
               <input
                 id={`ee-cnpj-${empresa.id}`}
                 name="cnpj"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 defaultValue={empresa.cnpj ?? ""}
               />
@@ -103,6 +107,7 @@ export function LinhaEdicao({
               <input
                 id={`ee-cpf-${empresa.id}`}
                 name="cpf"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 defaultValue={empresa.cpf ?? ""}
               />
@@ -112,6 +117,7 @@ export function LinhaEdicao({
               <input
                 id={`ee-observacao-${empresa.id}`}
                 name="observacao"
+                maxLength={LIMITE_TEXTO_LONGO}
                 type="text"
                 defaultValue={empresa.observacao ?? ""}
               />

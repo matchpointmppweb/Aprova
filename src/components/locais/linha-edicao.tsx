@@ -10,6 +10,7 @@ import {
 } from "@/src/server/actions/local-estado";
 import { MapaEditor, type PontoMapa } from "./mapa-editor";
 import type { LocalListagem } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -83,6 +84,7 @@ export function LinhaEdicao({
               <input
                 id={`el-nome-${local.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={local.nome}
                 required
@@ -93,6 +95,7 @@ export function LinhaEdicao({
               <input
                 id={`el-endereco-${local.id}`}
                 name="endereco"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={local.endereco}
                 required

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/usuario-estado";
 import type { PerfilAcessoOpcao } from "./tipos";
+import { LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -77,6 +78,7 @@ export function LinhaConvite({
               <input
                 id="cv-email"
                 name="email"
+                maxLength={LIMITE_NOME}
                 type="email"
                 placeholder="nome@empresa.com.br"
                 required

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/item-revisional-estado";
 import type { ItemRevisionalListagem } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -83,6 +84,7 @@ export function LinhaEdicao({
               <input
                 id={`ei-nome-${item.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={item.nome}
                 required
@@ -93,6 +95,7 @@ export function LinhaEdicao({
               <input
                 id={`ei-descricao-${item.id}`}
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={item.descricao ?? ""}
               />

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/local-estado";
 import { MapaEditor, type PontoMapa } from "./mapa-editor";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -73,6 +74,7 @@ export function LinhaCriacao({
               <input
                 id="cl-nome"
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Ex.: Planta 3 · Depósito"
                 required
@@ -83,6 +85,7 @@ export function LinhaCriacao({
               <input
                 id="cl-endereco"
                 name="endereco"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 placeholder="Rua, número, bairro, cidade"
                 required

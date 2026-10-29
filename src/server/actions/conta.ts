@@ -12,6 +12,7 @@ import type {
   EstadoAcaoCriacaoConta,
   ValoresNovaConta,
 } from "./conta-estado";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, lerTexto, lerTextoBruto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
 const PLANOS_VALIDOS: PlanoContratado[] = ["Essencial", "Corporativo"];
@@ -68,19 +69,22 @@ function isErroDeCnpjDuplicado(erro: unknown): boolean {
 }
 
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
   // Só dígitos antes de gravar/comparar contra @@unique([cnpj]) — sem isso,
   // "12.345.678/0001-90" e "12345678000190" (mesmo CNPJ, pontuação
   // diferente) passariam pela constraint como valores distintos.
-  const cnpj = String(formData.get("cnpj") ?? "").replace(/\D/g, "");
+  const cnpj = lerTextoBruto(formData, "cnpj").replace(/\D/g, "");
   const planoContratado = String(
     formData.get("planoContratado") ?? "",
   ).trim() as PlanoContratado;
-  const status = String(formData.get("status") ?? "").trim() as StatusConta;
+  const status = lerTexto(formData, "status") as StatusConta;
 
   const erros: { field: string; message: string }[] = [];
   if (!nome) erros.push({ field: "nome", message: "Informe o nome da conta." });
   if (!cnpj) erros.push({ field: "cnpj", message: "Informe o CNPJ." });
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(cnpj, LIMITE_DOCUMENTO, "cnpj", "CNPJ"));
   if (!PLANOS_VALIDOS.includes(planoContratado)) {
     erros.push({ field: "planoContratado", message: "Selecione um plano válido." });
   }
@@ -94,8 +98,8 @@ function lerCampos(formData: FormData) {
 // Nome e e-mail do primeiro Administrador (Story 6.7) — lidos SÓ na criação:
 // editar uma conta não mexe em quem administra ela.
 function lerAdministrador(formData: FormData) {
-  const nome = String(formData.get("adminNome") ?? "").trim();
-  const email = String(formData.get("adminEmail") ?? "")
+  const nome = lerTexto(formData, "adminNome");
+  const email = lerTextoBruto(formData, "adminEmail")
     .trim()
     .toLowerCase();
 
@@ -136,7 +140,7 @@ export async function criarContaAction(
   // digitado — seis campos é redigitação demais para um CNPJ repetido.
   const valores: ValoresNovaConta = {
     nome,
-    cnpj: String(formData.get("cnpj") ?? "").trim(),
+    cnpj: lerTexto(formData, "cnpj"),
     planoContratado,
     status,
     adminNome: administrador.nome,
@@ -226,7 +230,7 @@ export async function editarContaAction(
 ): Promise<EstadoAcaoConta> {
   await exigirOperadorDePlataforma();
 
-  const contaId = String(formData.get("contaId") ?? "").trim();
+  const contaId = lerTexto(formData, "contaId");
   const { nome, cnpj, planoContratado, status, erros } = lerCampos(formData);
   if (!contaId) erros.push({ field: "contaId", message: "Conta inválida." });
   if (erros.length > 0) {

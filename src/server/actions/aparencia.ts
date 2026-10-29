@@ -7,6 +7,7 @@ import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarConta } from "@/src/server/repositories/conta";
 import type { EstadoAcaoAparencia } from "./aparencia-estado";
+import { lerTexto } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -32,7 +33,7 @@ export async function atualizarPaletaAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const paletaDeCores = String(formData.get("paletaDeCores") ?? "").trim();
+  const paletaDeCores = lerTexto(formData, "paletaDeCores");
   if (!ehPaletaValida(paletaDeCores)) {
     // Nunca expõe detalhe interno (Boundaries) — chave desconhecida é
     // tratada como o mesmo erro genérico, nada é persistido.

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/tipo-ativo-estado";
 import type { TipoAtivoListagem } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -79,6 +80,7 @@ export function LinhaEdicao({
               <input
                 id={`et-nome-${tipo.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={tipo.nome}
                 required
@@ -89,6 +91,7 @@ export function LinhaEdicao({
               <input
                 id={`et-descricao-${tipo.id}`}
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={tipo.descricao ?? ""}
               />

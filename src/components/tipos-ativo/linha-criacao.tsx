@@ -8,6 +8,7 @@ import {
   estadoInicialAcaoTipoAtivo,
   mensagemDeErro,
 } from "@/src/server/actions/tipo-ativo-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -68,6 +69,7 @@ export function LinhaCriacao({
               <input
                 id="ct-nome"
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Ex.: Instrumento de medição"
                 required
@@ -78,6 +80,7 @@ export function LinhaCriacao({
               <input
                 id="ct-descricao"
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 placeholder="Descreva brevemente esse tipo"
               />

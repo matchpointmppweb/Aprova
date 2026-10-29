@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/cargo-estado";
 import type { CargoListagem } from "./tipos";
+import { LIMITE_DESCRICAO } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -79,6 +80,7 @@ export function LinhaEdicao({
               <input
                 id={`ec-descricao-${cargo.id}`}
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={cargo.descricao}
                 required

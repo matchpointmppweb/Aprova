@@ -8,6 +8,7 @@ import {
   estadoInicialAcaoEmpresa,
   mensagemDeErro,
 } from "@/src/server/actions/empresa-estado";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -69,6 +70,7 @@ export function LinhaCriacao({
               <input
                 id="ce-razao-social"
                 name="razaoSocial"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Ex.: Raiz Manutenção Industrial Ltda."
                 required
@@ -79,6 +81,7 @@ export function LinhaCriacao({
               <input
                 id="ce-nome-fantasia"
                 name="nomeFantasia"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Ex.: Raiz Manutenção"
                 required
@@ -89,6 +92,7 @@ export function LinhaCriacao({
               <input
                 id="ce-cnpj"
                 name="cnpj"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 placeholder="00.000.000/0000-00"
               />
@@ -98,6 +102,7 @@ export function LinhaCriacao({
               <input
                 id="ce-cpf"
                 name="cpf"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 placeholder="000.000.000-00 (se aplicável)"
               />
@@ -107,6 +112,7 @@ export function LinhaCriacao({
               <input
                 id="ce-observacao"
                 name="observacao"
+                maxLength={LIMITE_TEXTO_LONGO}
                 type="text"
                 placeholder="Observações gerais"
               />

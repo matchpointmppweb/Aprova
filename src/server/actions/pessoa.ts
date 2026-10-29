@@ -8,6 +8,7 @@ import { listarCargos } from "@/src/server/repositories/cargo";
 import { listarFuncoes } from "@/src/server/repositories/funcao";
 import { atualizarPessoa, criarPessoa } from "@/src/server/repositories/pessoa";
 import type { EstadoAcaoPessoa } from "./pessoa-estado";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -17,11 +18,11 @@ const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente
 // submit. cargoId/funcaoId são obrigatórios (diferente de Locais/Empresas,
 // onde os campos extras eram opcionais).
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const cpf = String(formData.get("cpf") ?? "").trim();
-  const cargoId = String(formData.get("cargoId") ?? "").trim();
-  const funcaoId = String(formData.get("funcaoId") ?? "").trim();
-  const observacaoBruta = String(formData.get("observacao") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const cpf = lerTexto(formData, "cpf");
+  const cargoId = lerTexto(formData, "cargoId");
+  const funcaoId = lerTexto(formData, "funcaoId");
+  const observacaoBruta = lerTexto(formData, "observacao");
   return {
     nome,
     cpf,
@@ -42,6 +43,9 @@ function validarCamposGerais(campos: {
   if (!campos.cpf) erros.push({ field: "cpf", message: "Informe o CPF." });
   if (!campos.cargoId) erros.push({ field: "cargoId", message: "Selecione um cargo." });
   if (!campos.funcaoId) erros.push({ field: "funcaoId", message: "Selecione uma função." });
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(campos.nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(campos.cpf, LIMITE_DOCUMENTO, "cpf", "CPF"));
   return erros;
 }
 
@@ -130,7 +134,7 @@ export async function editarPessoaAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const pessoaId = String(formData.get("pessoaId") ?? "").trim();
+  const pessoaId = lerTexto(formData, "pessoaId");
   const campos = lerCampos(formData);
 
   const erros = validarCamposGerais(campos);

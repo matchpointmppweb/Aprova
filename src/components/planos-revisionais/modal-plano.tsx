@@ -14,6 +14,7 @@ import type {
   TipoAtivoOpcao,
   UsuarioOpcao,
 } from "./tipos";
+import { LIMITE_NOME } from "@/src/lib/texto";
 
 type AbaModal = "geral" | "itens";
 type Vinculo = "ativo" | "tipo" | "empresa";
@@ -244,6 +245,7 @@ export function ModalPlano({
                   <input
                     id="plano-nome"
                     name="nome"
+                    maxLength={LIMITE_NOME}
                     type="text"
                     placeholder="Ex.: Inspeção trimestral"
                     defaultValue={plano?.nome ?? ""}

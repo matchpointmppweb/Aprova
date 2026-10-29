@@ -28,6 +28,7 @@ import {
 } from "@/src/server/auth/limite-de-tentativas";
 import type { SessaoAtiva, UsuarioSessao } from "@/src/server/auth/tipos";
 import type { EstadoAcaoAuth } from "./auth-estado";
+import { lerTexto, lerTextoBruto } from "@/src/lib/texto";
 
 const ERRO_CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
 
@@ -111,8 +112,8 @@ export async function entrarAction(
   _estadoAnterior: EstadoAcaoAuth,
   formData: FormData,
 ): Promise<EstadoAcaoAuth> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const senha = String(formData.get("senha") ?? "");
+  const email = lerTexto(formData, "email").toLowerCase();
+  const senha = lerTextoBruto(formData, "senha");
   const manterConectado = formData.get("manterConectado") === "on";
 
   if (!email || !senha) {
@@ -207,7 +208,7 @@ export async function escolherAmbienteAction(
   _estadoAnterior: EstadoAcaoAuth,
   formData: FormData,
 ): Promise<EstadoAcaoAuth> {
-  const contaId = String(formData.get("contaId") ?? "").trim();
+  const contaId = lerTexto(formData, "contaId");
 
   if (!contaId) {
     return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
@@ -298,7 +299,7 @@ export async function trocarDeContaAction(
   _estadoAnterior: EstadoAcaoAuth,
   formData: FormData,
 ): Promise<EstadoAcaoAuth> {
-  const contaId = String(formData.get("contaId") ?? "").trim();
+  const contaId = lerTexto(formData, "contaId");
 
   if (!contaId) {
     return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
@@ -422,7 +423,7 @@ export async function solicitarResetSenhaAction(
   _estadoAnterior: EstadoAcaoAuth,
   formData: FormData,
 ): Promise<EstadoAcaoAuth> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = lerTexto(formData, "email").toLowerCase();
   if (!email) {
     return { ok: false, error: "Informe seu e-mail." };
   }
@@ -466,9 +467,9 @@ export async function redefinirSenhaAction(
   _estadoAnterior: EstadoAcaoAuth,
   formData: FormData,
 ): Promise<EstadoAcaoAuth> {
-  const token = String(formData.get("token") ?? "");
-  const novaSenha = String(formData.get("novaSenha") ?? "");
-  const confirmarSenha = String(formData.get("confirmarSenha") ?? "");
+  const token = lerTextoBruto(formData, "token");
+  const novaSenha = lerTextoBruto(formData, "novaSenha");
+  const confirmarSenha = lerTextoBruto(formData, "confirmarSenha");
 
   if (!token) {
     return {

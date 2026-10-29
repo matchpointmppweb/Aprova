@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/pessoa-estado";
 import type { OpcaoReferencia, PessoaListagem } from "./tipos";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -94,6 +95,7 @@ export function LinhaEdicao({
               <input
                 id={`ep-nome-${pessoa.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={pessoa.nome}
                 required
@@ -104,6 +106,7 @@ export function LinhaEdicao({
               <input
                 id={`ep-cpf-${pessoa.id}`}
                 name="cpf"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 defaultValue={pessoa.cpf}
                 required
@@ -144,6 +147,7 @@ export function LinhaEdicao({
               <input
                 id={`ep-observacao-${pessoa.id}`}
                 name="observacao"
+                maxLength={LIMITE_TEXTO_LONGO}
                 type="text"
                 defaultValue={pessoa.observacao ?? ""}
               />

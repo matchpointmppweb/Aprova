@@ -9,6 +9,7 @@ import {
   estadoInicialCriacaoConta,
   mensagemDeErro,
 } from "@/src/server/actions/conta-estado";
+import { LIMITE_DOCUMENTO, LIMITE_NOME } from "@/src/lib/texto";
 
 // Erro do campo, junto do input que o causou — o resumo no topo continua
 // existindo, mas com seis campos ele não diz qual deles recusar.
@@ -86,6 +87,7 @@ export function LinhaCriacao({
               <input
                 id="cc-nome"
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Razão social"
                 required
@@ -98,6 +100,7 @@ export function LinhaCriacao({
               <input
                 id="cc-cnpj"
                 name="cnpj"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 placeholder="00.000.000/0001-00"
                 required

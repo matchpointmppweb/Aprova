@@ -27,6 +27,7 @@ import {
   type ItemRevisionalReal,
   type ItemSelecionadoBruto,
 } from "./plano-estado";
+import { LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries).
@@ -43,19 +44,19 @@ function isErroDeNomeDuplicado(erro: unknown): boolean {
 // Valores inválidos (NaN/decimal) são tratados como null pela leitura, mesmo
 // padrão de src/server/actions/item-revisional.ts.
 function lerCampoNumerico(formData: FormData, nome: string): number | null {
-  const bruto = String(formData.get(nome) ?? "").trim();
+  const bruto = lerTexto(formData, nome);
   if (!bruto) return null;
   const valor = Number(bruto);
   return Number.isFinite(valor) && Number.isInteger(valor) ? valor : null;
 }
 
 function lerCamposGerais(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const vinculo = String(formData.get("vinculo") ?? "").trim();
-  const ativoIdBruto = String(formData.get("ativoId") ?? "").trim();
-  const tipoAtivoIdBruto = String(formData.get("tipoAtivoId") ?? "").trim();
-  const empresaIdBruto = String(formData.get("empresaId") ?? "").trim();
-  const responsavelId = String(formData.get("responsavelId") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const vinculo = lerTexto(formData, "vinculo");
+  const ativoIdBruto = lerTexto(formData, "ativoId");
+  const tipoAtivoIdBruto = lerTexto(formData, "tipoAtivoId");
+  const empresaIdBruto = lerTexto(formData, "empresaId");
+  const responsavelId = lerTexto(formData, "responsavelId");
 
   // Só considera o valor do vínculo cujo radio está de fato selecionado —
   // um <select> do lado "desligado" do radio pode continuar com valor
@@ -121,6 +122,8 @@ function validarCamposGerais(campos: {
   if (!campos.nome) {
     erros.push({ field: "nome", message: "Informe o nome do plano." });
   }
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(campos.nome, LIMITE_NOME, "nome", "Nome"));
   if (!campos.responsavelId) {
     erros.push({ field: "responsavelId", message: "Selecione um responsável." });
   }
@@ -303,8 +306,8 @@ export async function editarPlanoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const planoId = String(formData.get("planoId") ?? "").trim();
-  const updatedAtBruto = String(formData.get("updatedAt") ?? "").trim();
+  const planoId = lerTexto(formData, "planoId");
+  const updatedAtBruto = lerTexto(formData, "updatedAt");
   const camposGerais = lerCamposGerais(formData);
   const { itens: itensDaConta, mapa: itensReaisPorId } = await buscarItensReaisPorId(
     usuarioSessao.contaId,
@@ -400,7 +403,7 @@ export async function excluirPlanoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const planoId = String(formData.get("planoId") ?? "").trim();
+  const planoId = lerTexto(formData, "planoId");
   if (!planoId) {
     return { ok: false, error: ERRO_GENERICO };
   }

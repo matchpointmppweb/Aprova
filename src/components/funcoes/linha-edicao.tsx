@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/funcao-estado";
 import type { FuncaoListagem } from "./tipos";
+import { LIMITE_DESCRICAO } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -79,6 +80,7 @@ export function LinhaEdicao({
               <input
                 id={`ef-descricao-${funcao.id}`}
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={funcao.descricao}
                 required

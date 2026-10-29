@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 
 import { solicitarResetSenhaAction } from "@/src/server/actions/auth";
 import { estadoInicialAcaoAuth } from "@/src/server/actions/auth-estado";
+import { LIMITE_NOME } from "@/src/lib/texto";
 
 function BotaoEnviar() {
   const { pending } = useFormStatus();
@@ -42,6 +43,7 @@ export function EsqueciSenhaForm() {
             <input
               id="fp-email"
               name="email"
+              maxLength={LIMITE_NOME}
               type="email"
               placeholder="voce@empresa.com.br"
               autoComplete="email"

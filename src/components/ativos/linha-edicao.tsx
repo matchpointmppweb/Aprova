@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { editarAtivoAction } from "@/src/server/actions/ativo";
 import { estadoInicialAcaoAtivo, mensagemDeErro } from "@/src/server/actions/ativo-estado";
 import type { AtivoListagem, EmpresaOpcao, TipoAtivoOpcao } from "./tipos";
+import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 const OPCOES_STATUS: { value: string; label: string }[] = [
   { value: "Ativo", label: "Ativo" },
@@ -80,6 +81,7 @@ export function LinhaEdicao({
               <input
                 id={`ea-nome-${ativo.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={ativo.nome}
                 required
@@ -105,6 +107,7 @@ export function LinhaEdicao({
               <input
                 id={`ea-localizacao-${ativo.id}`}
                 name="localizacao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 defaultValue={ativo.localizacao}
                 required
@@ -130,6 +133,7 @@ export function LinhaEdicao({
               <input
                 id={`ea-numeroSerie-${ativo.id}`}
                 name="numeroSerie"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={ativo.numeroSerie ?? ""}
                 placeholder="Opcional"

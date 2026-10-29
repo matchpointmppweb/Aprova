@@ -15,6 +15,7 @@ import {
   type PermissaoParaGravar,
 } from "@/src/server/repositories/perfil-acesso";
 import type { EstadoAcaoPerfil } from "./perfil-acesso-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -42,8 +43,8 @@ function lerPermissoes(formData: FormData): PermissaoParaGravar[] {
 }
 
 function lerCamposGerais(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const descricaoBruta = String(formData.get("descricao") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const descricaoBruta = lerTexto(formData, "descricao");
   return { nome, descricao: descricaoBruta ? descricaoBruta : null };
 }
 
@@ -116,10 +117,14 @@ export async function editarPerfilAcessoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const perfilAcessoId = String(formData.get("perfilAcessoId") ?? "").trim();
+  const perfilAcessoId = lerTexto(formData, "perfilAcessoId");
   const { nome, descricao } = lerCamposGerais(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(...validarTamanho(descricao, LIMITE_DESCRICAO, "descricao", "Descrição"));
   if (!perfilAcessoId) erros.push({ field: "perfilAcessoId", message: "Perfil inválido." });
   if (!nome) erros.push({ field: "nome", message: "Informe o nome do perfil." });
   if (erros.length > 0) {

@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/pessoa-estado";
 import type { OpcaoReferencia } from "./tipos";
+import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -83,6 +84,7 @@ export function LinhaCriacao({
               <input
                 id="cp-nome"
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 placeholder="Nome completo"
                 required
@@ -93,6 +95,7 @@ export function LinhaCriacao({
               <input
                 id="cp-cpf"
                 name="cpf"
+                maxLength={LIMITE_DOCUMENTO}
                 type="text"
                 placeholder="000.000.000-00"
                 required
@@ -129,6 +132,7 @@ export function LinhaCriacao({
               <input
                 id="cp-observacao"
                 name="observacao"
+                maxLength={LIMITE_TEXTO_LONGO}
                 type="text"
                 placeholder="Observações gerais"
               />

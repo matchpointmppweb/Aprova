@@ -43,6 +43,7 @@ import {
   type ItemRevisionalReal,
   type LinhaServicoBruta,
 } from "./emissao-estado";
+import { LIMITE_TEXTO_LONGO, lerTexto, lerTextoBruto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries) — inclusive uma
@@ -70,7 +71,7 @@ const ERRO_SERVICO_INCOERENTE: ErroDeValidacao = {
 // recém-trocado lido em 0km), só valor abaixo de zero não faz sentido para
 // nenhum dos três controles.
 function lerCampoNumerico(formData: FormData, nome: string): number | null {
-  const bruto = String(formData.get(nome) ?? "").trim();
+  const bruto = lerTexto(formData, nome);
   if (!bruto) return null;
   const valor = Number(bruto);
   return Number.isFinite(valor) && Number.isInteger(valor) && valor >= 0 ? valor : null;
@@ -86,16 +87,16 @@ function lerCampoNumerico(formData: FormData, nome: string): number | null {
 // vale só como ESCOLHA DE DESEMPATE numa ambiguidade, e é revalidada contra os
 // candidatos reais em `derivarPlanoDaEmissao` — nunca aceita como o plano.
 function lerCamposGerais(formData: FormData) {
-  const ativoId = String(formData.get("ativoId") ?? "").trim();
-  const planoEscolhidoId = String(formData.get("planoId") ?? "").trim();
-  const responsavelId = String(formData.get("responsavelId") ?? "").trim();
+  const ativoId = lerTexto(formData, "ativoId");
+  const planoEscolhidoId = lerTexto(formData, "planoId");
+  const responsavelId = lerTexto(formData, "responsavelId");
   // Story 5.5: setor (validado contra o enum em validarCamposGerais) + os
   // três marcos opcionais de data/hora, cada um podendo vir como null
   // (campo vazio) ou "invalido" (valor malformado -> erro de campo).
-  const setor = String(formData.get("setor") ?? "").trim();
-  const dataAgendamento = parseDataHora(String(formData.get("dataAgendamento") ?? ""));
-  const dataInicio = parseDataHora(String(formData.get("dataInicio") ?? ""));
-  const dataFim = parseDataHora(String(formData.get("dataFim") ?? ""));
+  const setor = lerTexto(formData, "setor");
+  const dataAgendamento = parseDataHora(lerTextoBruto(formData, "dataAgendamento"));
+  const dataInicio = parseDataHora(lerTextoBruto(formData, "dataInicio"));
+  const dataFim = parseDataHora(lerTextoBruto(formData, "dataFim"));
   return {
     ativoId,
     planoEscolhidoId,
@@ -174,8 +175,8 @@ function camposDeSetorEDatas(campos: ReturnType<typeof lerCamposGerais>) {
 // campos ocultos, então vivem numa única função em vez de duplicadas em
 // cada Server Action.
 function lerIdentificacaoEmissao(formData: FormData) {
-  const emissaoId = String(formData.get("emissaoId") ?? "").trim();
-  const updatedAtBruto = String(formData.get("updatedAt") ?? "").trim();
+  const emissaoId = lerTexto(formData, "emissaoId");
+  const updatedAtBruto = lerTexto(formData, "updatedAt");
 
   const erros: ErroDeValidacao[] = [];
   if (!emissaoId) erros.push({ field: "emissaoId", message: "Emissão inválida." });
@@ -360,9 +361,25 @@ function montarItensNovos(
       medicaoDias: lerCampoNumerico(formData, `itemMedicaoDias-${id}`),
       medicaoKm: lerCampoNumerico(formData, `itemMedicaoKm-${id}`),
       medicaoHoras: lerCampoNumerico(formData, `itemMedicaoHoras-${id}`),
-      observacao: String(formData.get(`itemObs-${id}`) ?? "").trim() || null,
+      observacao: lerTexto(formData, `itemObs-${id}`) || null,
     };
   });
+}
+
+/// Teto de tamanho das observações do checklist.
+///
+/// Varre o FormData em vez de receber a lista de itens: as observações são
+/// campos indexados por ID (`itemObs-{id}`) e aparecem nos dois caminhos de
+/// montagem (itens novos e itens existentes). Validar nos dois lugares
+/// convidaria a divergirem; validar na origem cobre os dois de uma vez.
+function validarObservacoesDosItens(formData: FormData) {
+  const erros: ErroDeValidacao[] = [];
+  for (const [chave, valor] of formData.entries()) {
+    if (!chave.startsWith("itemObs-")) continue;
+    if (typeof valor !== "string") continue;
+    erros.push(...validarTamanho(valor.trim(), LIMITE_TEXTO_LONGO, chave, "Observação"));
+  }
+  return erros;
 }
 
 // Atualiza as linhas EXISTENTES da emissão (Boundaries: edição sem trocar o
@@ -383,7 +400,7 @@ function montarItensExistentes(
       medicaoDias: lerCampoNumerico(formData, `itemMedicaoDias-${id}`),
       medicaoKm: lerCampoNumerico(formData, `itemMedicaoKm-${id}`),
       medicaoHoras: lerCampoNumerico(formData, `itemMedicaoHoras-${id}`),
-      observacao: String(formData.get(`itemObs-${id}`) ?? "").trim() || null,
+      observacao: lerTexto(formData, `itemObs-${id}`) || null,
     };
   });
 }
@@ -414,7 +431,11 @@ export async function criarEmissaoAction(
   }
   const linhasDeServico = leituraDeServicos.linhas;
   const { erros: errosDeServico, servicos } = validarServicos(linhasDeServico);
-  const erros = [...validarCamposGerais(campos), ...errosDeServico];
+  const erros = [
+    ...validarCamposGerais(campos),
+    ...errosDeServico,
+    ...validarObservacoesDosItens(formData),
+  ];
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
@@ -504,7 +525,12 @@ export async function editarEmissaoAction(
     updatedAtEsperado,
     erros: errosDeIdentificacao,
   } = lerIdentificacaoEmissao(formData);
-  const erros = [...validarCamposGerais(campos), ...errosDeServico, ...errosDeIdentificacao];
+  const erros = [
+    ...validarCamposGerais(campos),
+    ...errosDeServico,
+    ...errosDeIdentificacao,
+    ...validarObservacoesDosItens(formData),
+  ];
 
   if (erros.length > 0) {
     return { ok: false, error: erros };
@@ -692,7 +718,10 @@ async function executarTransicaoStatus(
 
   let motivo: string | undefined;
   if (opcoes?.exigirMotivo) {
-    motivo = String(formData.get("motivo") ?? "").trim();
+    motivo = lerTexto(formData, "motivo");
+    erros.push(
+      ...validarTamanho(motivo, LIMITE_TEXTO_LONGO, "motivo", "Motivo da reprovação"),
+    );
     if (!motivo) {
       erros.push({ field: "motivo", message: "Informe o motivo da reprovação." });
     }

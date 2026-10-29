@@ -9,6 +9,7 @@ import {
   mensagemDeErro,
 } from "@/src/server/actions/usuario-estado";
 import type { PerfilAcessoOpcao, UsuarioListagem } from "./tipos";
+import { LIMITE_NOME } from "@/src/lib/texto";
 
 // "Convite pendente" é status system-managed (definido na criação do
 // convite, limpo automaticamente no 1º login) — nunca uma opção que um
@@ -85,6 +86,7 @@ export function LinhaEdicao({
               <input
                 id={`ed-nome-${usuario.id}`}
                 name="nome"
+                maxLength={LIMITE_NOME}
                 type="text"
                 defaultValue={usuario.nome}
                 required
@@ -95,6 +97,7 @@ export function LinhaEdicao({
               <input
                 id={`ed-email-${usuario.id}`}
                 name="email"
+                maxLength={LIMITE_NOME}
                 type="email"
                 defaultValue={usuario.email}
                 required

@@ -9,6 +9,7 @@ import { atualizarAtivo, criarAtivo } from "@/src/server/repositories/ativo";
 import { listarEmpresas } from "@/src/server/repositories/empresa";
 import { listarTiposAtivo } from "@/src/server/repositories/tipo-ativo";
 import type { EstadoAcaoAtivo } from "./ativo-estado";
+import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 // Nunca expõe detalhe de constraint/banco (Boundaries) — inclusive uma
@@ -20,12 +21,20 @@ const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente
 const STATUS_VALIDOS: StatusAtivo[] = ["Ativo", "Inativo", "Bloqueado", "Vendido"];
 
 function lerCampos(formData: FormData) {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const tipoAtivoId = String(formData.get("tipoAtivoId") ?? "").trim();
-  const localizacao = String(formData.get("localizacao") ?? "").trim();
-  const empresaIdBruto = String(formData.get("empresaId") ?? "").trim();
-  const numeroSerieBruto = String(formData.get("numeroSerie") ?? "").trim();
-  const statusBruto = String(formData.get("status") ?? "").trim();
+  const nome = lerTexto(formData, "nome");
+  const tipoAtivoId = lerTexto(formData, "tipoAtivoId");
+  const localizacao = lerTexto(formData, "localizacao");
+  const empresaIdBruto = lerTexto(formData, "empresaId");
+  const numeroSerieBruto = lerTexto(formData, "numeroSerie");
+  // Teto de tamanho aqui, e não em `validarCampos`: `numeroSerie` é
+  // opcional e não entra naquele contrato de campos obrigatórios.
+  const errosDeNumeroSerie = validarTamanho(
+    numeroSerieBruto,
+    LIMITE_NOME,
+    "numeroSerie",
+    "Número de série",
+  );
+  const statusBruto = lerTexto(formData, "status");
   return {
     nome,
     tipoAtivoId,
@@ -35,6 +44,7 @@ function lerCampos(formData: FormData) {
     empresaId: empresaIdBruto ? empresaIdBruto : null,
     numeroSerie: numeroSerieBruto ? numeroSerieBruto : null,
     status: statusBruto,
+    errosDeTexto: errosDeNumeroSerie,
   };
 }
 
@@ -46,6 +56,11 @@ function validarCampos(campos: {
 }) {
   const erros: { field: string; message: string }[] = [];
   if (!campos.nome) erros.push({ field: "nome", message: "Informe o nome do ativo." });
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(campos.nome, LIMITE_NOME, "nome", "Nome"));
+  erros.push(
+    ...validarTamanho(campos.localizacao, LIMITE_DESCRICAO, "localizacao", "Localização"),
+  );
   if (!campos.tipoAtivoId) {
     erros.push({ field: "tipoAtivoId", message: "Selecione um tipo." });
   }
@@ -93,10 +108,13 @@ export async function criarAtivoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status } =
+  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status, errosDeTexto } =
     lerCampos(formData);
 
-  const erros = validarCampos({ nome, tipoAtivoId, localizacao, status });
+  const erros = [
+    ...validarCampos({ nome, tipoAtivoId, localizacao, status }),
+    ...errosDeTexto,
+  ];
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
@@ -153,11 +171,14 @@ export async function editarAtivoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const ativoId = String(formData.get("ativoId") ?? "").trim();
-  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status } =
+  const ativoId = lerTexto(formData, "ativoId");
+  const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status, errosDeTexto } =
     lerCampos(formData);
 
-  const erros = validarCampos({ nome, tipoAtivoId, localizacao, status });
+  const erros = [
+    ...validarCampos({ nome, tipoAtivoId, localizacao, status }),
+    ...errosDeTexto,
+  ];
   if (!ativoId) erros.push({ field: "ativoId", message: "Ativo inválido." });
   if (erros.length > 0) {
     return { ok: false, error: erros };
@@ -221,7 +242,7 @@ export async function excluirAtivoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const ativoId = String(formData.get("ativoId") ?? "").trim();
+  const ativoId = lerTexto(formData, "ativoId");
   if (!ativoId) {
     return { ok: false, error: ERRO_GENERICO };
   }

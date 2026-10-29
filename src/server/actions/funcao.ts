@@ -7,6 +7,7 @@ import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarFuncao, criarFuncao } from "@/src/server/repositories/funcao";
 import type { EstadoAcaoFuncao } from "./funcao-estado";
+import { LIMITE_DESCRICAO, lerTexto, validarTamanho } from "@/src/lib/texto";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -21,8 +22,8 @@ function isErroDeDescricaoDuplicada(erro: unknown): boolean {
 }
 
 function lerCampos(formData: FormData) {
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const statusBruto = String(formData.get("status") ?? "").trim();
+  const descricao = lerTexto(formData, "descricao");
+  const statusBruto = lerTexto(formData, "status");
   return { descricao, status: statusBruto };
 }
 
@@ -45,6 +46,9 @@ export async function criarFuncaoAction(
   const { descricao, status } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(descricao, LIMITE_DESCRICAO, "descricao", "Descrição"));
   if (!descricao) erros.push({ field: "descricao", message: "Informe a descrição da função." });
   if (!STATUS_VALIDOS.includes(status as StatusFuncao)) {
     erros.push({ field: "status", message: "Selecione um status válido." });
@@ -90,10 +94,13 @@ export async function editarFuncaoAction(
     return { ok: false, error: ERRO_SEM_PERMISSAO };
   }
 
-  const funcaoId = String(formData.get("funcaoId") ?? "").trim();
+  const funcaoId = lerTexto(formData, "funcaoId");
   const { descricao, status } = lerCampos(formData);
 
   const erros: { field: string; message: string }[] = [];
+
+  // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
+  erros.push(...validarTamanho(descricao, LIMITE_DESCRICAO, "descricao", "Descrição"));
   if (!funcaoId) erros.push({ field: "funcaoId", message: "Função inválida." });
   if (!descricao) erros.push({ field: "descricao", message: "Informe a descrição da função." });
   if (!STATUS_VALIDOS.includes(status as StatusFuncao)) {

@@ -8,6 +8,7 @@ import {
   estadoInicialAcaoFuncao,
   mensagemDeErro,
 } from "@/src/server/actions/funcao-estado";
+import { LIMITE_DESCRICAO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
 // que o renderiza) — por isso Salvar e Cancelar são agrupados aqui: o
@@ -69,6 +70,7 @@ export function LinhaCriacao({
               <input
                 id="fc-descricao"
                 name="descricao"
+                maxLength={LIMITE_DESCRICAO}
                 type="text"
                 placeholder="Ex.: Elétrica"
                 required

@@ -11,6 +11,7 @@ import { StatusBadge } from "@/src/components/shared/status-badge";
 import { formatarInstante } from "@/src/lib/datas";
 import { opcoesDeResponsavel } from "@/src/lib/responsavel";
 import { opcoesSelecionaveis } from "@/src/lib/selecionavel";
+import { LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 import { DURACAO_INVALIDA, formatarMinutos } from "@/src/lib/duracao";
 import {
   aprovarEmissaoAction,
@@ -203,7 +204,13 @@ function FormReprovar({
       <input type="hidden" name="updatedAt" value={emissao.updatedAt.toISOString()} />
       <div className="f">
         <label htmlFor="emissao-motivo-reprovacao">Motivo da reprovação</label>
-        <textarea id="emissao-motivo-reprovacao" name="motivo" rows={3} required />
+        <textarea
+          id="emissao-motivo-reprovacao"
+          name="motivo"
+          rows={3}
+          maxLength={LIMITE_TEXTO_LONGO}
+          required
+        />
       </div>
       {erro ? <div className="form-error">{erro}</div> : null}
       <div className="row" style={{ gap: 10, marginTop: 10 }}>
@@ -539,6 +546,7 @@ function LinhaItemEmissaoRow({
             <input
               id={`itemObs-${linha.itemRevisionalId}`}
               name={`itemObs-${linha.itemRevisionalId}`}
+              maxLength={LIMITE_TEXTO_LONGO}
               type="text"
               aria-label={`Observação: ${linha.nome}`}
               defaultValue={linha.observacaoInicial}
