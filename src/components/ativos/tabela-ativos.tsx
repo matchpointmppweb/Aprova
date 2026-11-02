@@ -45,7 +45,7 @@ function BotaoExcluir({ ativo, onSucesso }: { ativo: AtivoListagem; onSucesso: (
       }}
     >
       <input type="hidden" name="ativoId" value={ativo.id} />
-      <BotaoExcluirSubmit />
+      <BotaoExcluirSubmit rotulo={`Excluir ${ativo.nome}`} />
     </form>
   );
 }
@@ -53,11 +53,20 @@ function BotaoExcluir({ ativo, onSucesso }: { ativo: AtivoListagem; onSucesso: (
 // useFormStatus só funciona num componente descendente do <form> (mesmo
 // padrão de Acoes em linha-criacao.tsx/linha-edicao.tsx) — por isso o botão
 // de submit fica isolado aqui em vez de ler `pending` direto em BotaoExcluir.
-function BotaoExcluirSubmit() {
+/// `rotulo` existe porque "Excluir", repetido em toda linha da tabela, não
+/// diz a um leitor de tela O QUE será excluído — e esta é a ação que não dá
+/// para desfazer tentando de novo.
+function BotaoExcluirSubmit({ rotulo }: { rotulo: string }) {
   const { pending } = useFormStatus();
   return (
-    <button className="icon-btn" type="submit" title="Excluir" disabled={pending}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <button
+      className="icon-btn"
+      type="submit"
+      title="Excluir"
+      aria-label={rotulo}
+      disabled={pending}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z" />
       </svg>
     </button>
@@ -128,7 +137,7 @@ export function TabelaAtivos({
           }
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           Novo ativo
@@ -143,18 +152,20 @@ export function TabelaAtivos({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por código ou nome"
+              aria-label="Buscar por código ou nome"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
         </div>
         <select
           className="status-select"
+          aria-label="Filtrar por status"
           value={tipoFiltro}
           onChange={(evento) => setTipoFiltro(evento.target.value)}
         >
@@ -167,6 +178,7 @@ export function TabelaAtivos({
         </select>
         <select
           className="status-select"
+          aria-label="Filtrar por status"
           value={statusFiltro}
           onChange={(evento) => setStatusFiltro(evento.target.value as "all" | StatusAtivo)}
         >
@@ -235,13 +247,14 @@ export function TabelaAtivos({
                         <button
                           className="icon-btn"
                           type="button"
+                          aria-label={`Editar ${ativo.nome}`}
                           title="Editar"
                           disabled={!podeEditar}
                           onClick={() =>
                             setLinhaAberta((atual) => (atual === ativo.id ? null : ativo.id))
                           }
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                             <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                           </svg>
                         </button>

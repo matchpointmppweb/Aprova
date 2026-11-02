@@ -76,18 +76,27 @@ function BotaoExcluir({ plano, onSucesso }: { plano: PlanoListagem; onSucesso: (
       }}
     >
       <input type="hidden" name="planoId" value={plano.id} />
-      <BotaoExcluirSubmit />
+      <BotaoExcluirSubmit rotulo={`Excluir ${plano.nome}`} />
     </form>
   );
 }
 
 // useFormStatus só funciona num componente descendente do <form> — mesmo
 // padrão de BotaoExcluirSubmit em tabela-itens.tsx.
-function BotaoExcluirSubmit() {
+/// `rotulo` existe porque "Excluir", repetido em toda linha da tabela, não
+/// diz a um leitor de tela O QUE será excluído — e esta é a ação que não dá
+/// para desfazer tentando de novo.
+function BotaoExcluirSubmit({ rotulo }: { rotulo: string }) {
   const { pending } = useFormStatus();
   return (
-    <button className="icon-btn" type="submit" title="Excluir" disabled={pending}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <button
+      className="icon-btn"
+      type="submit"
+      title="Excluir"
+      aria-label={rotulo}
+      disabled={pending}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z" />
       </svg>
     </button>
@@ -168,7 +177,7 @@ export function TabelaPlanos({
           disabled={!podeCriar}
           onClick={() => setModalAberto("create")}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           Novo plano
@@ -177,18 +186,20 @@ export function TabelaPlanos({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por plano, vínculo ou responsável"
+              aria-label="Buscar por plano, vínculo ou responsável"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
         </div>
         <select
           className="status-select"
+          aria-label="Filtrar por status"
           value={statusFiltro}
           onChange={(evento) => setStatusFiltro(evento.target.value as FiltroStatus)}
         >
@@ -244,11 +255,12 @@ export function TabelaPlanos({
                       <button
                         className="icon-btn"
                         type="button"
+                        aria-label={`Editar ${plano.nome}`}
                         title="Editar"
                         disabled={!podeEditar}
                         onClick={() => setModalAberto(plano.id)}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                         </svg>
                       </button>

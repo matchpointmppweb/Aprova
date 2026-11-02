@@ -81,7 +81,7 @@ export function TabelaPessoas({
           disabled={!podeCriar || faltaPreRequisito}
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           Nova pessoa
@@ -100,25 +100,26 @@ export function TabelaPessoas({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por nome ou CPF"
+              aria-label="Buscar por nome ou CPF"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
         </div>
         <div className="filter-chip">
           Cargo
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </div>
         <div className="filter-chip">
           Função
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </div>
@@ -170,13 +171,14 @@ export function TabelaPessoas({
                       <button
                         className="icon-btn"
                         type="button"
+                        aria-label={`Editar ${pessoa.nome}`}
                         title="Editar"
                         disabled={!podeEditar}
                         onClick={() =>
                           setLinhaAberta((atual) => (atual === pessoa.id ? null : pessoa.id))
                         }
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                         </svg>
                       </button>

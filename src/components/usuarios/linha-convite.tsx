@@ -66,7 +66,7 @@ export function LinhaConvite({
     <tr className="form-row" id="create-usuarios">
       <td colSpan={5}>
         <div className="form-row-label">Convidar usuário</div>
-        {erro ? <div className="form-error">{erro}</div> : null}
+        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

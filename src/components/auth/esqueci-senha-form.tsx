@@ -31,7 +31,7 @@ export function EsqueciSenhaForm() {
         link para redefinir sua senha.
       </p>
 
-      {estado.error ? <div className="form-error">{estado.error}</div> : null}
+      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
       {estado.ok && estado.message ? (
         <div className="form-success">{estado.message}</div>
       ) : null}

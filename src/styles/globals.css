@@ -525,6 +525,13 @@ tr.form-row td{background:var(--paper-2) !important;padding:16px 18px;}
 .map-hint{position:absolute;left:10px;bottom:10px;background:rgba(21,34,25,0.72);color:#fff;font-size:11px;padding:5px 9px;border-radius:100px;pointer-events:none;}
 .map-actions{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap;}
 
+/* Operação por teclado do editor de área (02-11-2026). O foco precisa ser
+   VISÍVEL: a superfície é um <svg> e, sem contorno próprio, quem navega por
+   teclado não tem como saber que chegou nela. */
+.map-draw:focus-visible{outline:2px solid var(--pine);outline-offset:2px;}
+.map-cursor line{stroke:#152219;stroke-width:2;stroke-dasharray:3 2;}
+.map-estado{margin-top:7px;font-size:11.5px;color:var(--ink-soft);}
+
 .perm-table{width:100%;border-collapse:collapse;}
 .perm-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line);}
 .perm-table th.perm-check-col{text-align:center;}

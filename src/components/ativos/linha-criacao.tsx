@@ -63,7 +63,7 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-ativos">
       <td colSpan={7}>
         <div className="form-row-label">Novo ativo</div>
-        {erro ? <div className="form-error">{erro}</div> : null}
+        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

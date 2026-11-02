@@ -105,7 +105,7 @@ export function TabelaEmissao({
           disabled={!podeCriar}
           onClick={() => setModalAberto("create")}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           Nova emissão
@@ -114,18 +114,20 @@ export function TabelaEmissao({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por nº de emissão ou ativo"
+              aria-label="Buscar por nº de emissão ou ativo"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
         </div>
         <select
           className="status-select"
+          aria-label="Filtrar por status"
           value={statusFiltro}
           onChange={(evento) => setStatusFiltro(evento.target.value as FiltroStatus)}
         >
@@ -189,20 +191,22 @@ export function TabelaEmissao({
                         href={`/emissao/${emissao.id}/os`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        aria-label={`Imprimir a Ordem de Serviço ${emissao.codigo}`}
                         title="Imprimir OS"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
                         </svg>
                       </a>
                       <button
                         className="icon-btn"
                         type="button"
+                        aria-label={`Editar ${emissao.codigo}`}
                         title="Editar"
                         disabled={!podeEditar}
                         onClick={() => setModalAberto(emissao.id)}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                         </svg>
                       </button>

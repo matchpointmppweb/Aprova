@@ -212,7 +212,7 @@ function FormReprovar({
           required
         />
       </div>
-      {erro ? <div className="form-error">{erro}</div> : null}
+      {erro ? <div className="form-error" role="alert">{erro}</div> : null}
       <div className="row" style={{ gap: 10, marginTop: 10 }}>
         <SubmitTransicao label="Confirmar reprovação" pendingLabel="Reprovando..." variante="btn-primary" />
         <CancelarTransicao onCancelar={onCancelar} />
@@ -842,8 +842,8 @@ export function LinhaServicoRow({
         {total.tipo === "ok" ? formatarMinutos(total.minutos) : DURACAO_INVALIDA}
       </td>
       <td className="col-acao-sv">
-        <button className="icon-btn" type="button" title="Remover serviço" onClick={onRemover}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <button className="icon-btn" type="button" title="Remover serviço" aria-label="Remover serviço" onClick={onRemover}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
           </svg>
         </button>
@@ -1284,7 +1284,7 @@ export function ModalEmissao({
         <div className="modal-header">
           <h2>{emissao ? `Editar emissão · ${emissao.codigo}` : "Nova emissão"}</h2>
           <button className="modal-close" type="button" onClick={onFechar}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -1721,7 +1721,7 @@ export function ModalEmissao({
                 onClick={adicionarServico}
                 style={{ marginTop: 12 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 Adicionar serviço

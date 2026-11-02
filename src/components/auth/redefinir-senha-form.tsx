@@ -27,7 +27,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
       <h2>Redefinir senha</h2>
       <p className="lede">Escolha uma nova senha para sua conta.</p>
 
-      {estado.error ? <div className="form-error">{estado.error}</div> : null}
+      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
       {estado.ok && estado.message ? (
         <div className="form-success">{estado.message}</div>
       ) : null}

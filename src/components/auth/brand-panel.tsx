@@ -6,7 +6,7 @@
 export function BrandPanel() {
   return (
     <div className="login-brand">
-      <svg className="grid-art" viewBox="0 0 500 800" preserveAspectRatio="none">
+      <svg className="grid-art" viewBox="0 0 500 800" preserveAspectRatio="none" aria-hidden="true">
         <g stroke="rgba(255,255,255,0.10)" strokeWidth="1">
           <line x1="0" y1="100" x2="500" y2="100" />
           <line x1="0" y1="200" x2="500" y2="200" />
@@ -31,7 +31,7 @@ export function BrandPanel() {
       </svg>
       <div className="login-brand-top">
         <div className="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 2C8 6 5 9 5 13a7 7 0 0 0 14 0c0-4-3-7-7-11z" fill="currentColor" />
           </svg>
         </div>

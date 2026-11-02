@@ -65,7 +65,7 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-locais">
       <td colSpan={5}>
         <div className="form-row-label">Novo local</div>
-        {erro ? <div className="form-error">{erro}</div> : null}
+        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
         <form action={formAction}>
           <input type="hidden" name="areaPoligono" value={JSON.stringify(pontos)} />
           <div className="inline-form">

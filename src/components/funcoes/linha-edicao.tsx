@@ -71,7 +71,7 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-funcoes-${funcao.id}`}>
       <td colSpan={3}>
         <div className="form-row-label">Editar função · {funcao.descricao}</div>
-        {erro ? <div className="form-error">{erro}</div> : null}
+        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
         <form action={formAction}>
           <input type="hidden" name="funcaoId" value={funcao.id} />
           <div className="inline-form">
