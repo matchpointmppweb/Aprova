@@ -209,6 +209,49 @@ describe("resolução do vínculo (NFR6)", () => {
   });
 });
 
+// Diferido da Story 6.5, fechado em 02-11-2026: o layout do painel consultava
+// os ambientes em TODA requisição autenticada — com join em conta e perfil —
+// inclusive para a maioria que tem um ambiente só e descarta o resultado.
+//
+// A contagem que o layout precisa já existia: quando a resolução chega pela
+// derivação do vínculo único, ela contou. O que faltava era não jogar o número
+// fora.
+describe("a contagem de ambientes que a resolução já sabe", () => {
+  test("vínculo único resolve com a contagem igual a 1", async () => {
+    const ambiente = await criarAmbiente();
+
+    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
+      ambiente.identidade.id,
+      STATUS_COM_LOGIN,
+    );
+
+    expect(resolucao.tipo).toBe("resolvido");
+    if (resolucao.tipo !== "resolvido") return;
+    expect(resolucao.usuario.ambientesEscolhiveis).toBe(1);
+  });
+
+  test("resolver pela conta ativa gravada NÃO inventa contagem", async () => {
+    // O vizinho que impede a otimização de virar defeito: neste caminho a
+    // consulta de contagem nunca roda, e devolver 1 faria o layout esconder o
+    // seletor de quem tem dois ambientes — trancando a pessoa na conta atual.
+    const identidade = await criarIdentidade();
+    const alfa = await criarConta();
+    const beta = await criarConta();
+    await criarVinculo(identidade.id, alfa.id, (await criarPerfil(alfa.id)).id);
+    await criarVinculo(identidade.id, beta.id, (await criarPerfil(beta.id)).id);
+
+    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
+      identidade.id,
+      STATUS_COM_LOGIN,
+      alfa.id,
+    );
+
+    expect(resolucao.tipo).toBe("resolvido");
+    if (resolucao.tipo !== "resolvido") return;
+    expect(resolucao.usuario.ambientesEscolhiveis).toBeNull();
+  });
+});
+
 describe("opções de ambiente (FR22/UX-DR12)", () => {
   test("só lista ambientes utilizáveis, com nome da conta e perfil", async () => {
     const identidade = await criarIdentidade();

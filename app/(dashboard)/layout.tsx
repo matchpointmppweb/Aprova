@@ -27,7 +27,26 @@ export default async function DashboardLayout({
   // função que a tela de seleção da 6.4 usa (AD-1) — nunca uma consulta própria
   // daqui, para o que a topbar oferece e o que a Server Action revalida nunca
   // divergirem. Com um único ambiente a `Topbar` não renderiza seletor nenhum.
-  const opcoesDeConta = await listarOpcoesDeAmbiente(usuario.id);
+  //
+  // Diferido da 6.5, fechado em 02-11-2026: a consulta rodava em TODA
+  // requisição autenticada, com join em conta e perfil, inclusive para a
+  // maioria que tem um ambiente só e descarta o resultado. Quando a guarda
+  // resolveu pela derivação do vínculo único, ela JÁ contou — e nesse caso a
+  // lista é previsível sem consultar nada.
+  //
+  // Quando a contagem não é conhecida (sessão com conta ativa gravada, que é
+  // exatamente quem tem mais de um ambiente), a consulta continua — é o caso
+  // que precisa do seletor.
+  const opcoesDeConta =
+    usuario.ambientesEscolhiveis === 1
+      ? [
+          {
+            contaId: usuario.contaId,
+            contaNome: usuario.conta.nome,
+            perfilNome: usuario.perfilAcesso.nome,
+          },
+        ]
+      : await listarOpcoesDeAmbiente(usuario.id);
 
   return (
     <>

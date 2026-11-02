@@ -141,8 +141,18 @@ type VinculoComRelacoes = NonNullable<Awaited<ReturnType<typeof buscarVinculoUti
 
 export type UsuarioResolvidoPeloVinculo = ReturnType<typeof compor>;
 
-function compor(vinculo: VinculoComRelacoes) {
+/// `ambientesEscolhiveis` é o que a resolução JÁ descobriu, quando descobriu:
+/// `1` quando chegou aqui pela derivação do vínculo único, e `null` quando
+/// resolveu pela conta ativa gravada — nesse caminho a contagem nunca é feita,
+/// e inventar um número seria pior do que admitir que não se sabe.
+///
+/// Existe para o layout do painel não repetir a consulta de ambientes em TODA
+/// requisição autenticada só para descartar o resultado (diferido da Story
+/// 6.5). Quem tem um ambiente só — a maioria — não precisa de seletor nenhum,
+/// e é justamente nesse caso que a contagem já está em mãos.
+function compor(vinculo: VinculoComRelacoes, ambientesEscolhiveis: number | null = null) {
   return {
+    ambientesEscolhiveis,
     ...vinculo.usuario,
     // `nome` é o do VÍNCULO (Story 6.6), a MESMA origem de `listarUsuarios`.
     // Depois desta story nada volta a escrever `nome` na identidade: sem isto, o
@@ -219,7 +229,9 @@ export async function resolverUsuarioAutenticadoPeloVinculo(
     statusPermitidos.includes(unico.usuario.status);
 
   return acessivel
-    ? { tipo: "resolvido", usuario: compor(unico) }
+    // A contagem é 1 por construção: `escolhiveis` tem exatamente um item
+    // neste ramo.
+    ? { tipo: "resolvido", usuario: compor(unico, 1) }
     : { tipo: "sem-ambiente" };
 }
 
