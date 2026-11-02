@@ -686,3 +686,34 @@ table tfoot td.rel-num{font-family:var(--font-ibm-plex-mono), monospace;}
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Esqueleto de carregamento e fronteira de erro (02-11-2026)
+   --------------------------------------------------------------------------- */
+/* As faixas têm a altura dos elementos que vão substituir — cabeçalho e
+   linhas de tabela — para a página não SALTAR quando o conteúdo chega. */
+.esqueleto{display:flex;flex-direction:column;gap:14px;}
+.esq-barra{background:var(--line);border-radius:var(--radius-s);animation:esq-pulso 1.4s ease-in-out infinite;}
+.esq-crumb{width:220px;height:12px;}
+.esq-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;}
+.esq-titulo{width:200px;height:22px;margin-bottom:9px;}
+.esq-subtitulo{width:300px;height:13px;}
+.esq-botao{width:130px;height:36px;flex:none;}
+.esq-tabela{display:flex;flex-direction:column;gap:9px;border:1px solid var(--line);border-radius:var(--radius-m);padding:14px;background:var(--white);}
+.esq-linha{height:17px;}
+.esq-linha:first-child{height:12px;width:60%;}
+.esq-aviso{margin:14px 0 0;font-size:12px;color:var(--ink-soft);}
+
+/* `prefers-reduced-motion`: a pulsação é decoração, e para quem pediu menos
+   movimento ela é justamente o tipo de coisa a desligar. A faixa continua
+   visível — o que informa é a forma, não o pulso. */
+@keyframes esq-pulso{0%,100%{opacity:1}50%{opacity:0.45}}
+@media (prefers-reduced-motion: reduce){
+  .esq-barra{animation:none;}
+}
+
+.erro-pagina{max-width:520px;border:1px solid var(--line);border-radius:var(--radius-m);background:var(--white);padding:22px;}
+.erro-pagina h1{font-size:18px;margin:0 0 9px;}
+.erro-pagina p{font-size:13.5px;line-height:1.55;color:var(--ink-soft);margin:0 0 14px;}
+.erro-digest code{font-size:12px;background:var(--paper);padding:2px 6px;border-radius:var(--radius-s);}
+.erro-acoes{display:flex;gap:10px;flex-wrap:wrap;}
