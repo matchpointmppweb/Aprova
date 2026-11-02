@@ -29,6 +29,7 @@ import {
 import type { SessaoAtiva, UsuarioSessao } from "@/src/server/auth/tipos";
 import type { EstadoAcaoAuth } from "./auth-estado";
 import { lerTexto, lerTextoBruto } from "@/src/lib/texto";
+import { revogarSessaoRecemCriada } from "@/src/server/auth/revogar";
 
 const ERRO_CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
 
@@ -75,8 +76,19 @@ const ERRO_PRIMEIRO_ACESSO =
 // aqui — com dois vínculos, no momento do login ainda não se sabe qual conta é
 // a da pessoa, e promover antes da escolha ativaria um vínculo que ela talvez
 // nem fosse usar.
+/// `tokenDaSessao` distingue os DOIS chamadores, e a distinção não é
+/// cosmética:
+///
+/// - `entrarAction` acabou de criar a sessão nesta requisição, então o cookie
+///   dela NÃO está nos cabeçalhos e só a revogação por token funciona.
+/// - `escolherAmbienteAction` roda numa requisição já autenticada, em que o
+///   cookie existe — ali `signOut` é o caminho certo, e é ele que também
+///   limpa o cookie do navegador.
+///
+/// Usar um só dos dois quebraria metade dos casos, em silêncio.
 async function concluirEntrada(
   usuario: UsuarioResolvidoPeloVinculo,
+  tokenDaSessao: string | null,
 ): Promise<EstadoAcaoAuth | null> {
   if (
     usuario.status === "ConvitePendente" ||
@@ -93,7 +105,11 @@ async function concluirEntrada(
         throw new Error("promoção de convidado não afetou nenhuma linha");
       }
     } catch {
-      await auth.api.signOut({ headers: await headers() }).catch(() => {});
+      if (tokenDaSessao) {
+        await revogarSessaoRecemCriada(tokenDaSessao);
+      } else {
+        await auth.api.signOut({ headers: await headers() }).catch(() => {});
+      }
       return { ok: false, error: ERRO_PRIMEIRO_ACESSO };
     }
   }
@@ -130,11 +146,16 @@ export async function entrarAction(
   }
 
   let usuarioSessao: UsuarioSessao | null = null;
+  let tokenDaSessao: string | null = null;
   try {
     const resultado = await auth.api.signInEmail({
       body: { email, password: senha, rememberMe: manterConectado },
     });
     usuarioSessao = resultado.user as unknown as UsuarioSessao;
+    // O token da sessão que ACABOU de nascer. Guardado porque os caminhos de
+    // recusa abaixo precisam revogá-la, e o cookie dela não está nos
+    // cabeçalhos desta requisição — ver src/server/auth/revogar.ts.
+    tokenDaSessao = typeof resultado.token === "string" ? resultado.token : null;
   } catch {
     await registrarFalha("login", email, ip);
     // Oportunista: não há tarefa agendada no projeto, e este caminho já é
@@ -179,7 +200,7 @@ export async function entrarAction(
       redirect(ROTA_CONTAS_PLATAFORMA);
     }
 
-    await auth.api.signOut({ headers: await headers() }).catch(() => {});
+    await revogarSessaoRecemCriada(tokenDaSessao);
     return { ok: false, error: ERRO_SEM_AMBIENTE };
   }
 
@@ -191,7 +212,7 @@ export async function entrarAction(
     redirect(ROTA_ESCOLHER_AMBIENTE);
   }
 
-  const erro = await concluirEntrada(resolucao.usuario);
+  const erro = await concluirEntrada(resolucao.usuario, tokenDaSessao);
   if (erro) {
     return erro;
   }
@@ -256,7 +277,9 @@ export async function escolherAmbienteAction(
   // revogada por concluirEntrada e nada fica apontando para um vínculo não
   // promovido — o que faria a guarda expulsar a pessoa sem explicação na
   // requisição seguinte.
-  const erro = await concluirEntrada(resolucao.usuario);
+  // Sem token: a sessão não nasceu nesta requisição, o cookie existe, e
+  // `concluirEntrada` usa `signOut`.
+  const erro = await concluirEntrada(resolucao.usuario, null);
   if (erro) {
     return erro;
   }
@@ -265,11 +288,16 @@ export async function escolherAmbienteAction(
   // exatamente o caso para o qual o `where` foi endurecido. Seguir para "/"
   // faria a guarda ver sessão sem conta ativa e devolver à seleção, num laço
   // sem mensagem nenhuma. Mesmo compare-and-set dos demais desta story.
-  const { count } = await definirContaAtivaDaSessao(
-    sessaoAtiva.id,
-    usuarioSessao.id,
+  // Os nomes e o e-mail vão para a linha de auditoria da PRIMEIRA escolha,
+  // pelos mesmos motivos de `trocarContaAtivaDaSessao`: é o que mantém o
+  // registro legível depois de a conta ser renomeada ou apagada.
+  const { count } = await definirContaAtivaDaSessao({
+    sessaoId: sessaoAtiva.id,
+    usuarioId: usuarioSessao.id,
+    usuarioEmail: resolucao.usuario.email,
     contaId,
-  );
+    contaNome: resolucao.usuario.conta.nome,
+  });
   if (count === 0) {
     return { ok: false, error: ERRO_ESCOLHA_INVALIDA };
   }

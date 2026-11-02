@@ -147,6 +147,58 @@ describe("entrarAction", () => {
     expect(resultado.estado.ok).toBe(false);
   });
 
+  // Diferido da Story 6.2, fechado em 02-11-2026. O teste acima conferia só
+  // o `ok: false` — e com isso passava verde enquanto a sessão SOBREVIVIA à
+  // recusa. `signOut` recebia os cabeçalhos da requisição, e o cookie da
+  // sessão havia nascido dentro dela, então não estava ali: nada era
+  // revogado.
+  //
+  // O efeito era o repique. `app/(auth)/layout.tsx` decide "já autenticado"
+  // por `getSession()`, achava a sessão viva e mandava para "/"; a guarda do
+  // painel não achava ambiente e mandava de volta para "/login".
+  test("a recusa por falta de ambiente REVOGA a sessão recém-criada", async () => {
+    const identidade = await criarIdentidade();
+    await comCredencial(identidade.id);
+
+    const resultado = await entrar(identidade.email, SENHA);
+
+    expect(resultado.tipo).toBe("estado");
+    // A sessão nasceu em signInEmail e tem de ter sido apagada. Zero, não
+    // "alguma": uma sessão órfã é uma porta aberta com prazo de sete dias.
+    expect(await db.session.count({ where: { userId: identidade.id } })).toBe(0);
+  });
+
+  test("a entrada ACEITA deixa a sessão de pé", async () => {
+    // O vizinho que impede a correção de virar outro defeito: revogar sempre
+    // deixaria ninguém entrar.
+    const { identidade } = await criarAmbiente();
+    await comCredencial(identidade.id);
+
+    await entrar(identidade.email, SENHA);
+
+    expect(await db.session.count({ where: { userId: identidade.id } })).toBe(1);
+  });
+
+  test("a recusa não derruba sessões ANTERIORES de outra identidade", async () => {
+    // A revogação é por TOKEN, não por usuário: um `deleteMany` por userId
+    // derrubaria a sessão que a pessoa tem em outro navegador, e um por conta
+    // derrubaria a de todo mundo.
+    const outro = await criarAmbiente();
+    const sessaoDeOutro = await db.session.create({
+      data: {
+        userId: outro.identidade.id,
+        token: "token-de-outra-sessao",
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+
+    const identidade = await criarIdentidade();
+    await comCredencial(identidade.id);
+    await entrar(identidade.email, SENHA);
+
+    expect(await db.session.findUnique({ where: { id: sessaoDeOutro.id } })).not.toBeNull();
+  });
+
   test("identidade banida não entra, mesmo com a senha certa", async () => {
     const { identidade } = await criarAmbiente();
     await comCredencial(identidade.id);

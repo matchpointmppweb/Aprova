@@ -328,6 +328,10 @@ export async function aplicarNomeDoVinculo<T extends ComResponsavel>(
   return resolvido;
 }
 
+// Usada pelos dois compare-and-set de conta ativa abaixo: é o único jeito de
+// desfazer o que já correu dentro de uma transação do Prisma.
+class TrocaNaoAplicada extends Error {}
+
 // A conta ativa vive na SESSÃO (`model Session`), que é tabela do nosso banco
 // como qualquer outra — então a escrita é de repositório (AD-1), e não uma
 // chamada ao Better Auth. Escrever pela sessão (e não pela identidade) é o que
@@ -339,15 +343,60 @@ export async function aplicarNomeDoVinculo<T extends ComResponsavel>(
 // inclui `userId` mesmo assim — uma sessão só pode receber a conta ativa da
 // própria identidade, e amarrar isso no `where` é mais barato do que confiar
 // em quem chama.
-export async function definirContaAtivaDaSessao(
-  sessaoId: string,
-  usuarioId: string,
-  contaId: string,
-) {
-  return prisma.session.updateMany({
-    where: { id: sessaoId, userId: usuarioId },
-    data: { contaAtivaId: contaId },
-  });
+/// Nome gravado como conta ANTERIOR na primeira escolha da sessão.
+///
+/// Não é "" nem o nome de conta nenhuma: a trilha precisa distinguir três
+/// coisas que a FK nula sozinha confunde — a primeira escolha, uma conta
+/// apagada depois (que mantém o nome copiado) e um erro de gravação.
+export const SEM_CONTA_ANTERIOR = "(primeira escolha da sessão)";
+
+export async function definirContaAtivaDaSessao({
+  sessaoId,
+  usuarioId,
+  usuarioEmail,
+  contaId,
+  contaNome,
+}: {
+  sessaoId: string;
+  usuarioId: string;
+  usuarioEmail: string;
+  contaId: string;
+  contaNome: string;
+}) {
+  // Diferido da Story 6.5, fechado em 02-11-2026: a escolha INICIAL não
+  // entrava no histórico, então uma sessão que entrava em A e trocava para B
+  // mostrava só "A -> B" — sem nada registrando quem a colocou em A. A
+  // trilha começava no meio da história, que é o mesmo que não ter trilha
+  // para a pergunta "como essa pessoa chegou nesta conta?".
+  //
+  // Na MESMA transação da escrita da sessão, pelo mesmo motivo de
+  // `trocarContaAtivaDaSessao`: uma escolha sem rastro é exatamente o que não
+  // pode sobrar.
+  try {
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.session.updateMany({
+        where: { id: sessaoId, userId: usuarioId },
+        data: { contaAtivaId: contaId },
+      });
+      if (count === 0) throw new TrocaNaoAplicada();
+
+      await tx.trocaDeConta.create({
+        data: {
+          usuarioId,
+          usuarioEmail,
+          // Sem conta anterior: a FK fica nula e o nome recebe o sentinela.
+          contaAnteriorId: null,
+          contaAnteriorNome: SEM_CONTA_ANTERIOR,
+          contaNovaId: contaId,
+          contaNovaNome: contaNome,
+        },
+      });
+    });
+  } catch (erro) {
+    if (erro instanceof TrocaNaoAplicada) return { count: 0 };
+    throw erro;
+  }
+  return { count: 1 };
 }
 
 // Troca de conta com a sessão já estabelecida (Story 6.5, FR23 — a revisão do
@@ -370,7 +419,6 @@ export async function definirContaAtivaDaSessao(
 //
 // Escreve sem validar o vínculo: quem chama já revalidou contra o banco as duas
 // pontas (a conta anterior e a nova), como a `escolherAmbienteAction` faz.
-class TrocaNaoAplicada extends Error {}
 
 export async function trocarContaAtivaDaSessao({
   sessaoId,
