@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import type { Modulo } from "@prisma/client";
 
 import { prisma } from "./db";
@@ -12,7 +14,19 @@ import { prisma } from "./db";
 // de MODULOS_PERFIL) são acrescentadas aqui pela Story 1.3 — não há
 // exclusão de perfil nesta story.
 
-export async function buscarPermissaoDoModulo(
+// Memoizado por REQUISIÇÃO (`cache` do React — mesmo motivo e mesma
+// referência de src/server/auth/sessao.ts).
+//
+// Uma página chama `can()` três vezes para o mesmo módulo, mudando só a ação
+// (criar/editar/excluir) — e as três caem aqui com argumentos IDÊNTICOS,
+// porque a linha de permissão carrega as três ações. Eram três consultas
+// iguais por página; agora é uma.
+//
+// Escopo de requisição, não de processo: uma alteração de permissão vale na
+// requisição seguinte. Guardar isto entre requisições daria a alguém acesso
+// que acabou de ser retirado, e AD-2 manda consultar o servidor antes de todo
+// efeito.
+export const buscarPermissaoDoModulo = cache(async function buscarPermissaoDoModulo(
   perfilAcessoId: string,
   contaId: string,
   modulo: Modulo,
@@ -20,7 +34,7 @@ export async function buscarPermissaoDoModulo(
   return prisma.permissaoModulo.findFirst({
     where: { modulo, perfilAcesso: { id: perfilAcessoId, contaId } },
   });
-}
+});
 
 export async function listarPerfisAcesso(contaId: string) {
   return prisma.perfilAcesso.findMany({

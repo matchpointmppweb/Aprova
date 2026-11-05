@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -40,7 +42,27 @@ import {
 //     seleção, que é o caminho de recuperação correto.
 //
 // Nunca se escolhe um vínculo arbitrariamente.
-export async function exigirUsuarioAutenticado() {
+// Memoizado por REQUISIÇÃO com o `cache` do React, que é o caminho
+// documentado para deduplicar acesso a banco fora do `fetch`
+// (01-app/02-guides/caching-without-cache-components.md).
+//
+// Sem isto a resolução rodava DUAS VEZES por página: o layout chama, e a
+// página chama de novo — e cada chamada faz uma consulta de sessão mais uma
+// de vínculo. Eram três idas sequenciais ao banco pagas em dobro, antes de a
+// página ler o primeiro dado. Numa implantação em que a função e o banco
+// ficam em continentes diferentes, isso sozinho respondia por perto de meio
+// segundo de espera (medido em 05-11-2026).
+//
+// O cache é do RENDER, não entre requisições: cada requisição resolve a
+// sessão e revalida o vínculo contra o banco exatamente uma vez, que é o que
+// NFR6 pede. Não é `cookieCache` — guardar a sessão no cookie faria uma
+// sessão apagada no banco continuar valendo, desfazendo a revogação imediata
+// da Story de login recusado (97aa963).
+//
+// Os efeitos colaterais do caminho de recuperação (limpar o ponteiro morto,
+// signOut) passam a rodar uma vez por requisição em vez de duas — o
+// comportamento correto, e não uma consequência aceita de lado.
+export const exigirUsuarioAutenticado = cache(async function exigirUsuarioAutenticado() {
   const cabecalhos = await headers();
   const sessao = await auth.api.getSession({ headers: cabecalhos });
 
@@ -98,7 +120,7 @@ export async function exigirUsuarioAutenticado() {
   }
 
   return resolucao.usuario;
-}
+});
 
 // Gate exclusivo da área segregada do operador de plataforma
 // (app/(plataforma), Story 1.4, AD-13) — nunca can()/PerfilAcesso, nunca o
@@ -123,7 +145,9 @@ export async function exigirUsuarioAutenticado() {
 // Autenticado e ativo, porém sem o flag, não é sessão inválida — é acesso
 // negado a esta área específica, então redireciona para "/" em vez de derrubar
 // a sessão.
-export async function exigirOperadorDePlataforma() {
+// Memoizado pelo mesmo motivo: o layout da área de plataforma e a página de
+// Contas o chamam cada um por sua vez.
+export const exigirOperadorDePlataforma = cache(async function exigirOperadorDePlataforma() {
   const cabecalhos = await headers();
   const sessao = await auth.api.getSession({ headers: cabecalhos });
 
@@ -144,4 +168,4 @@ export async function exigirOperadorDePlataforma() {
   }
 
   return identidade;
-}
+});
