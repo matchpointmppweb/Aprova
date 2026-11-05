@@ -590,6 +590,8 @@ async function popularPlanos(ctx: Ctx): Promise<PlanoCriado[]> {
     });
 
     for (const [ordem, indiceItem] of p.itens.entries()) {
+      const override =
+        ordem === 0 && ITENS[indiceItem].diasPadrao !== undefined ? 75 : null;
       await prisma.planoItemRevisional.upsert({
         where: {
           planoId_itemRevisionalId: {
@@ -608,10 +610,14 @@ async function popularPlanos(ctx: Ctx): Promise<PlanoCriado[]> {
           // item que só controla km ou horas daria a ele um controle que o
           // catálogo não lhe deu — e apagaria justamente o plano "sem controle
           // de dias", que existe aqui para mostrar o estado ambíguo.
-          diasOverride:
-            ordem === 0 && ITENS[indiceItem].diasPadrao !== undefined ? 75 : null,
+          diasOverride: override,
         },
-        update: {},
+        // `update` repete o override em vez de ser `{}`: com um update vazio,
+        // uma correção no catálogo (como a de não sobrescrever dias de um
+        // item que só mede km) nunca alcançaria as linhas já gravadas, e o
+        // banco de quem rodou a versão antiga ficaria com o valor errado para
+        // sempre — exatamente o que aconteceu no banco local em 05-11-2026.
+        update: { diasOverride: override },
       });
     }
 
@@ -652,13 +658,38 @@ async function popularEmissoes(ctx: Ctx, planos: PlanoCriado[]): Promise<number>
   const ano = HOJE.getFullYear();
   let criadas = 0;
 
+  // A numeração CONTINUA de onde a conta parou, em vez de começar em 1.
+  // Numa conta que já tem emissões — o caso de semear dentro de uma conta de
+  // uso real, e não numa recém-criada —, começar em 1 bateria na
+  // `@@unique([contaId, ano, seq])` e o script criaria menos emissões do que
+  // diz, em silêncio. É a mesma conta que `criarEmissao` faz (count + 1).
+  const maiorSeq = await prisma.emissao.aggregate({
+    where: { contaId: ctx.contaId, ano },
+    _max: { seq: true },
+  });
+  const base = maiorSeq._max.seq ?? 0;
+
   for (const [indice, e] of EMISSOES.entries()) {
-    const seq = indice + 1;
+    const seq = base + indice + 1;
     const plano = planos[e.plano];
     const dataEmissao = diasAtras(e.emitidaHa);
 
-    const existente = await prisma.emissao.findUnique({
-      where: { contaId_ano_seq: { contaId: ctx.contaId, ano, seq } },
+    // Idempotência por (ativo, plano, data), e não por `seq`: com a
+    // numeração continuando da conta, o `seq` de uma mesma emissão muda entre
+    // execuções, e usá-lo como chave criaria um segundo lote a cada vez.
+    //
+    // Limite conhecido: as datas derivam de HOJE, então reexecutar NO MESMO
+    // DIA não duplica nada (o caso normal), mas reexecutar dias depois gera
+    // um lote novo, porque aquelas emissões são, para esta checagem, outras
+    // emissões. Quem quiser repetir a semeadura mais tarde apaga o lote
+    // anterior primeiro.
+    const existente = await prisma.emissao.findFirst({
+      where: {
+        contaId: ctx.contaId,
+        ativoId: ctx.ativos[e.ativo].id,
+        planoId: plano.id,
+        dataEmissao,
+      },
       select: { id: true },
     });
     if (existente) continue;
