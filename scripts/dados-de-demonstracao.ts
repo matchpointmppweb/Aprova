@@ -39,6 +39,18 @@
  */
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { hashPassword } from "better-auth/crypto";
+import dotenv from "dotenv";
+
+// `.env.local` só preenche o que ainda não veio do ambiente — o padrão do
+// dotenv, que não sobrescreve. É isso que mantém `dev-local.mjs` no comando:
+// ele exporta a DATABASE_URL do banco local antes de chamar este script, e
+// esse valor continua vencendo o do arquivo.
+//
+// Carregar o arquivo não afrouxa nada: a DATABASE_URL dele aponta para
+// produção, e `bancoRemoto()` continua recusando o banco remoto sem
+// autorização explícita. O que isto evita é ter de extrair a URL do arquivo à
+// mão para rodar o script onde ele deve rodar.
+dotenv.config({ path: ".env.local", quiet: true });
 
 const prisma = new PrismaClient();
 
