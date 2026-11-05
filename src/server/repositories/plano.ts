@@ -250,20 +250,39 @@ export type ResolucaoAtivoDoPlano = {
 export const MS_POR_DIA = 24 * 60 * 60 * 1000;
 const JANELA_VENCE_EM_BREVE_DIAS = 7;
 
-// Fórmula de agendamento (Design Notes / Boundaries, decisão confirmada sem
-// base documental): proximaData(ativo, plano) = MIN(ativo.createdAt +
-// diasEfetivo(item)) entre os itens selecionados do plano que têm controle
-// de dias (próprio ou sobrescrito) não-nulo. diasEfetivo(item) =
+// Fórmula de agendamento: proximaData(ativo, plano) = MIN(base(item) +
+// diasEfetivo(item)) entre os itens selecionados do plano que têm controle de
+// dias (próprio ou sobrescrito) não-nulo. diasEfetivo(item) =
 // override.diasOverride ?? item.diasPadrao. Itens só de km/horas não
-// contribuem (Epic 4 ainda não existe Emissão com histórico de medição
-// real). Se nenhum item selecionado tiver controle de dias, proximaData é
-// null e pendente é false.
+// contribuem. Se nenhum item selecionado tiver controle de dias, proximaData
+// é null e pendente é false.
+//
+// `base(item)` é a data da ÚLTIMA execução aprovada daquele item neste ativo
+// por este plano — e `ativo.createdAt` só quando nunca houve nenhuma.
+//
+// Era só `ativo.createdAt` até aqui, e isso tornava o atraso permanente: a
+// conta não olhava o histórico de emissões, então qualquer ativo mais velho
+// que o intervalo do seu plano aparecia Atrasado para sempre, tivesse ele dez
+// revisões concluídas ou nenhuma. Nada o trazia de volta para No prazo, e a
+// tela de Planos — que existe para dizer o que fazer hoje — ficava inteira
+// vermelha e sem informação. Achado ao semear dados de demonstração com
+// ativos de idades variadas (05-11-2026).
+//
+// A base é por ITEM, não por emissão: uma emissão que executou a troca de
+// óleo e não a inspeção de freios adia só a troca de óleo. Tomar a data da
+// emissão para todos os itens dela adiaria o que ninguém fez.
+//
+// Só emissão `Emitido` conta. Um rascunho ou uma emissão em análise descrevem
+// serviço que ainda não foi aprovado, e deixá-los adiar a revisão permitiria
+// zerar a pendência de um ativo sem nunca concluir nada.
 function calcularProximaData(
   ativoCreatedAt: Date,
   itens: {
+    itemRevisionalId: string;
     diasOverride: number | null;
     itemRevisional: { diasPadrao: number | null };
   }[],
+  ultimaExecucaoDoItem: ReadonlyMap<string, Date>,
 ): Date | null {
   let menorData: Date | null = null;
 
@@ -271,13 +290,64 @@ function calcularProximaData(
     const diasEfetivo = item.diasOverride ?? item.itemRevisional.diasPadrao;
     if (diasEfetivo === null) continue;
 
-    const data = new Date(ativoCreatedAt.getTime() + diasEfetivo * MS_POR_DIA);
+    const base = ultimaExecucaoDoItem.get(item.itemRevisionalId) ?? ativoCreatedAt;
+    const data = new Date(base.getTime() + diasEfetivo * MS_POR_DIA);
     if (menorData === null || data.getTime() < menorData.getTime()) {
       menorData = data;
     }
   }
 
   return menorData;
+}
+
+/// Chave de `(ativo, plano, item)` para o histórico de execução. Função
+/// própria, e não template inline nos dois lugares, porque montar a chave de
+/// um lado e lê-la do outro com ordens diferentes falharia em silêncio — o
+/// `get` devolveria `undefined` e tudo voltaria a contar da entrada do ativo,
+/// que é exatamente o defeito que esta mudança corrige.
+function chaveDeExecucao(ativoId: string, planoId: string, itemRevisionalId: string): string {
+  return `${ativoId}|${planoId}|${itemRevisionalId}`;
+}
+
+/// Data da última execução APROVADA de cada item, por ativo e plano.
+///
+/// Uma consulta só para a conta inteira (ou para um plano, quando a tela pede
+/// um), e não uma por ativo: `resolverAtivosDoPlano` roda na listagem de
+/// Planos e no painel inicial, onde um N+1 por ativo apareceria na hora.
+async function historicoDeExecucao(
+  contaId: string,
+  planoId?: string,
+): Promise<Map<string, Date>> {
+  const emissoes = await prisma.emissao.findMany({
+    where: {
+      contaId,
+      status: "Emitido",
+      ...(planoId ? { planoId } : {}),
+    },
+    select: {
+      ativoId: true,
+      planoId: true,
+      dataEmissao: true,
+      itens: {
+        where: { executado: true },
+        select: { itemRevisionalId: true },
+      },
+    },
+  });
+
+  const ultima = new Map<string, Date>();
+  for (const emissao of emissoes) {
+    for (const item of emissao.itens) {
+      const chave = chaveDeExecucao(emissao.ativoId, emissao.planoId, item.itemRevisionalId);
+      const atual = ultima.get(chave);
+      // A MAIS RECENTE vence: duas emissões do mesmo item adiam a revisão até
+      // a última, não até a primeira que a consulta devolveu.
+      if (!atual || emissao.dataEmissao.getTime() > atual.getTime()) {
+        ultima.set(chave, emissao.dataEmissao);
+      }
+    }
+  }
+  return ultima;
 }
 
 function calcularPendente(proximaData: Date | null, agora: Date): boolean {
@@ -304,21 +374,28 @@ export async function resolverAtivosDoPlano(
 ): Promise<ResolucaoAtivoDoPlano[]> {
   const agora = new Date();
 
-  const planos = await prisma.planoRevisional.findMany({
-    where: {
-      contaId,
-      status: "Ativo",
-      ...(planoId ? { id: planoId } : {}),
-    },
-    include: {
-      itens: {
-        select: {
-          diasOverride: true,
-          itemRevisional: { select: { diasPadrao: true } },
+  const [planos, ultimaExecucao] = await Promise.all([
+    prisma.planoRevisional.findMany({
+      where: {
+        contaId,
+        status: "Ativo",
+        ...(planoId ? { id: planoId } : {}),
+      },
+      include: {
+        itens: {
+          select: {
+            // `itemRevisionalId` entra aqui porque é a chave do histórico de
+            // execução: sem ele não há como saber de QUAL item é a última
+            // data aprovada.
+            itemRevisionalId: true,
+            diasOverride: true,
+            itemRevisional: { select: { diasPadrao: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    historicoDeExecucao(contaId, planoId),
+  ]);
 
   if (planos.length === 0) return [];
 
@@ -394,7 +471,22 @@ export async function resolverAtivosDoPlano(
           : [];
 
     for (const ativo of ativosResolvidos) {
-      const proximaData = calcularProximaData(ativo.createdAt, plano.itens);
+      // Histórico recortado para este par (ativo, plano): o cálculo por item
+      // recebe só as datas que lhe dizem respeito, em vez de ter de conhecer
+      // o formato da chave.
+      const execucoesDesteAtivo = new Map<string, Date>();
+      for (const item of plano.itens) {
+        const data = ultimaExecucao.get(
+          chaveDeExecucao(ativo.id, plano.id, item.itemRevisionalId),
+        );
+        if (data) execucoesDesteAtivo.set(item.itemRevisionalId, data);
+      }
+
+      const proximaData = calcularProximaData(
+        ativo.createdAt,
+        plano.itens,
+        execucoesDesteAtivo,
+      );
       resultado.push({
         ativoId: ativo.id,
         planoId: plano.id,

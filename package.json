@@ -18,7 +18,8 @@
     "test:servidor": "vitest run --project servidor",
     "test:componente": "vitest run --project componente",
     "verificar": "npm run lint && npm run typecheck && npm run test && npm run prisma:deriva",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "dados:demo": "tsx scripts/dados-de-demonstracao.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

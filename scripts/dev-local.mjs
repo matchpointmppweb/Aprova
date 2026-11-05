@@ -8,7 +8,8 @@
  *
  * O que faz: sobe o mesmo PostgreSQL embarcado dos testes (mas PERSISTENTE, em
  * `.dev-db/`, para os dados sobreviverem entre execuções), aplica as
- * migrations, semeia o cenário de teste na primeira vez, e então roda
+ * migrations, semeia o cenário de teste e os cadastros de demonstração na
+ * primeira vez, e então roda
  * `next dev` com a DATABASE_URL apontando para ele. Ao encerrar (Ctrl+C), o
  * banco é derrubado e os dados ficam onde estão, prontos para a próxima.
  *
@@ -128,6 +129,8 @@ try {
     rodar("npx", ["tsx", "prisma/seed.ts"], "seed");
     console.log("Semeando o cenário de teste multiconta ...");
     rodar("npx", ["tsx", "scripts/cenario-de-teste.ts"], "cenário de teste");
+    console.log("Semeando os cadastros de demonstração ...");
+    rodar("npx", ["tsx", "scripts/dados-de-demonstracao.ts"], "dados de demonstração");
   }
 
   console.log(`\nBanco LOCAL em uso (produção intocada). Subindo o Next ...\n`);
