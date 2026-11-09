@@ -1,0 +1,14 @@
+# Commits que o `git blame` deve PULAR.
+#
+# Só entram aqui commits que mexeram em formatação e em nada mais. Se um
+# commit mudou comportamento, ele NUNCA entra — esconder uma mudança real do
+# blame é apagar a resposta para "por que esta linha existe?".
+#
+# Para isto valer na sua máquina, uma vez por clone:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# No GitHub é automático: a tela de blame lê este arquivo sozinha.
+
+# style: formatar o repositório com prettier
+0c62b2209391cfbb6b509065cd9df37822284b08
