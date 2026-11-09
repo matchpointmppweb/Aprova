@@ -1,0 +1,32 @@
+# Gerado ou de terceiros
+node_modules/
+.next/
+out/
+package-lock.json
+next-env.d.ts
+*.tsbuildinfo
+
+# Banco local descartável
+.dev-db/
+
+# Artefatos de planejamento (fora do repo, mas podem existir na máquina)
+.claude/
+_bmad/
+_bmad-output/
+
+# O mockup de referência NÃO é formatado, e não é descuido.
+#
+# Trinta comentários do código apontam para linhas exatas dele
+# ("portado de Mockup.html:1077-1144"). Reformatá-lo move todas as linhas e
+# transforma essas trinta referências em endereços errados — que é pior do que
+# não ter referência, porque o leitor vai conferir e achar outra coisa.
+#
+# Ele também não é código que se mantém: é o desenho original da interface,
+# congelado, usado só para consulta (AD-4 — interface portada do mockup, não
+# redesenhada).
+Mockup.html
+Mockups/
+
+# SQL das migrations: o Prettier não formata .sql, mas deixar explícito evita
+# que alguém ache que esqueceram.
+prisma/migrations/
