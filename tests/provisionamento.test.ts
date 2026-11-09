@@ -26,10 +26,7 @@ const CONTA: DadosDaConta = {
 
 const ADMIN = { nome: "Primeiro Admin", email: "admin@cliente-novo.local" };
 
-function provisionar(
-  conta: Partial<DadosDaConta> = {},
-  administrador: Partial<typeof ADMIN> = {},
-) {
+function provisionar(conta: Partial<DadosDaConta> = {}, administrador: Partial<typeof ADMIN> = {}) {
   return prisma.$transaction(
     (tx) =>
       provisionarContaEm(tx, {
@@ -51,9 +48,7 @@ describe("provisionamento de conta (FR25/AD-27)", () => {
       where: { contaId: resultado.conta.id },
       orderBy: { nome: "asc" },
     });
-    expect(perfis.map((p) => p.nome).sort()).toEqual(
-      PERFIS_PADRAO.map((p) => p.nome).sort(),
-    );
+    expect(perfis.map((p) => p.nome).sort()).toEqual(PERFIS_PADRAO.map((p) => p.nome).sort());
 
     const vinculos = await db.vinculoConta.findMany({
       where: { contaId: resultado.conta.id },
@@ -76,10 +71,9 @@ describe("provisionamento de conta (FR25/AD-27)", () => {
       const permissoes = await db.permissaoModulo.findMany({
         where: { perfilAcessoId: perfil.id },
       });
-      expect(
-        permissoes.map((p) => p.modulo).sort(),
-        `perfil ${perfil.nome}`,
-      ).toEqual([...MODULOS_COM_PERMISSAO].sort());
+      expect(permissoes.map((p) => p.modulo).sort(), `perfil ${perfil.nome}`).toEqual(
+        [...MODULOS_COM_PERMISSAO].sort(),
+      );
     }
   });
 

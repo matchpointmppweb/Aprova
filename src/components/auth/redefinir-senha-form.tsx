@@ -29,20 +29,19 @@ function BotaoRedefinir() {
 // action, e é lá que o par "nova" x "confirmar" é comparado. Validar só no
 // cliente deixaria a regra contornável por quem enviasse o formulário direto.
 export function RedefinirSenhaForm({ token }: { token: string }) {
-  const [estado, formAction] = useActionState(
-    redefinirSenhaAction,
-    estadoInicialAcaoAuth,
-  );
+  const [estado, formAction] = useActionState(redefinirSenhaAction, estadoInicialAcaoAuth);
 
   return (
     <div className="login-form">
       <h2>Redefinir senha</h2>
       <p className="lede">Escolha uma nova senha para sua conta.</p>
 
-      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
-      {estado.ok && estado.message ? (
-        <div className="form-success">{estado.message}</div>
+      {estado.error ? (
+        <div className="form-error" role="alert">
+          {estado.error}
+        </div>
       ) : null}
+      {estado.ok && estado.message ? <div className="form-success">{estado.message}</div> : null}
 
       {/* Depois do sucesso o formulário é trocado por um link para o login, e
           não por um redirecionamento automático: a pessoa precisa ler a
@@ -77,7 +76,11 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
           <BotaoRedefinir />
         </form>
       ) : (
-        <Link href="/login" className="btn btn-primary login-submit" style={{ textDecoration: "none" }}>
+        <Link
+          href="/login"
+          className="btn btn-primary login-submit"
+          style={{ textDecoration: "none" }}
+        >
           Ir para o login
         </Link>
       )}

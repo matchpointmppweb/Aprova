@@ -99,9 +99,7 @@ describe("edição de usuário escopada pela conta (NFR2)", () => {
     const { conta, identidade, vinculo } = await criarAmbiente();
     const nomeOriginalDaIdentidade = identidade.nome;
 
-    expect(
-      await atualizarUsuario(conta.id, identidade.id, { nome: "Nome novo" }),
-    ).toBe(true);
+    expect(await atualizarUsuario(conta.id, identidade.id, { nome: "Nome novo" })).toBe(true);
 
     const vinculoAtualizado = await db.vinculoConta.findUniqueOrThrow({
       where: { id: vinculo.id },

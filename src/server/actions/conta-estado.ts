@@ -41,10 +41,7 @@ export type EstadoAcaoCriacaoConta = EstadoAcaoConta<DadosCriacaoConta>;
 export const estadoInicialCriacaoConta: EstadoAcaoCriacaoConta = { ok: false };
 
 // A mensagem do erro daquele campo específico, para renderizar junto do input.
-export function erroDoCampo(
-  erro: EstadoAcaoConta["error"],
-  campo: string,
-): string | undefined {
+export function erroDoCampo(erro: EstadoAcaoConta["error"], campo: string): string | undefined {
   if (!erro || typeof erro === "string") return undefined;
   return erro.find((item) => item.field === campo)?.message;
 }

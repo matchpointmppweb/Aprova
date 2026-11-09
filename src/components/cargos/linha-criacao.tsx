@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { criarCargoAction } from "@/src/server/actions/cargo";
-import {
-  estadoInicialAcaoCargo,
-  mensagemDeErro,
-} from "@/src/server/actions/cargo-estado";
+import { estadoInicialAcaoCargo, mensagemDeErro } from "@/src/server/actions/cargo-estado";
 import { LIMITE_DESCRICAO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
@@ -22,12 +19,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -44,10 +36,7 @@ export function LinhaCriacao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    criarCargoAction,
-    estadoInicialAcaoCargo,
-  );
+  const [estado, formAction] = useActionState(criarCargoAction, estadoInicialAcaoCargo);
 
   useEffect(() => {
     if (estado.ok) {
@@ -62,7 +51,11 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-cargos">
       <td colSpan={3}>
         <div className="form-row-label">Novo cargo</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

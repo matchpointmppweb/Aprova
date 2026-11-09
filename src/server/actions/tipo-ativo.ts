@@ -5,10 +5,7 @@ import { Prisma, type StatusTipoAtivo } from "@prisma/client";
 
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
-import {
-  atualizarTipoAtivo,
-  criarTipoAtivo,
-} from "@/src/server/repositories/tipo-ativo";
+import { atualizarTipoAtivo, criarTipoAtivo } from "@/src/server/repositories/tipo-ativo";
 import type { EstadoAcaoTipoAtivo } from "./tipo-ativo-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 import { registrarFalha } from "@/src/server/log";

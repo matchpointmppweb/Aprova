@@ -31,10 +31,7 @@ describe("resolução do vínculo (NFR6)", () => {
       nomeNaConta: "Ana na Alfa",
     });
 
-    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
-      identidade.id,
-      STATUS_COM_ACESSO,
-    );
+    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(identidade.id, STATUS_COM_ACESSO);
 
     expect(resolucao.tipo).toBe("resolvido");
     if (resolucao.tipo !== "resolvido") return;
@@ -54,10 +51,7 @@ describe("resolução do vínculo (NFR6)", () => {
     await criarVinculo(identidade.id, alfa.id, (await criarPerfil(alfa.id)).id);
     await criarVinculo(identidade.id, beta.id, (await criarPerfil(beta.id)).id);
 
-    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
-      identidade.id,
-      STATUS_COM_ACESSO,
-    );
+    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(identidade.id, STATUS_COM_ACESSO);
 
     expect(resolucao.tipo).toBe("ambiguo");
   });
@@ -65,10 +59,7 @@ describe("resolução do vínculo (NFR6)", () => {
   test("nenhum ambiente é 'sem-ambiente', não 'ambiguo'", async () => {
     const identidade = await criarIdentidade();
 
-    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
-      identidade.id,
-      STATUS_COM_ACESSO,
-    );
+    const resolucao = await resolverUsuarioAutenticadoPeloVinculo(identidade.id, STATUS_COM_ACESSO);
 
     expect(resolucao.tipo).toBe("sem-ambiente");
   });
@@ -195,16 +186,10 @@ describe("resolução do vínculo (NFR6)", () => {
       status: "ConvitePendente",
     });
 
-    const noLogin = await resolverUsuarioAutenticadoPeloVinculo(
-      identidade.id,
-      STATUS_COM_LOGIN,
-    );
+    const noLogin = await resolverUsuarioAutenticadoPeloVinculo(identidade.id, STATUS_COM_LOGIN);
     expect(noLogin.tipo).toBe("resolvido");
 
-    const noPainel = await resolverUsuarioAutenticadoPeloVinculo(
-      identidade.id,
-      STATUS_COM_ACESSO,
-    );
+    const noPainel = await resolverUsuarioAutenticadoPeloVinculo(identidade.id, STATUS_COM_ACESSO);
     expect(noPainel.tipo).toBe("sem-ambiente");
   });
 });

@@ -17,10 +17,10 @@ Não existe banco de desenvolvimento compartilhado. A `DATABASE_URL` do
 
 Consequências que já morderam:
 
-| Comando | O que faz de verdade |
-| --- | --- |
-| `npm run dev` | sobe o Next **conectado em produção** |
-| `npm run build` | roda `prisma migrate deploy` **em produção** |
+| Comando             | O que faz de verdade                             |
+| ------------------- | ------------------------------------------------ |
+| `npm run dev`       | sobe o Next **conectado em produção**            |
+| `npm run build`     | roda `prisma migrate deploy` **em produção**     |
 | `npm run dev:local` | sobe um PostgreSQL local em `.dev-db/` e usa ele |
 
 Para desenvolver e testar à mão, use **`npm run dev:local`**. Ele aplica as
@@ -52,12 +52,12 @@ Para começar o banco local do zero, apague a pasta `.dev-db/`.
 `dev:local` semeia três conjuntos de identidades. Todas com a senha
 `teste1234`:
 
-| E-mail | Para quê |
-| --- | --- |
-| `admin@raiz.local` | administrador raiz, único com acesso à área de Contas |
-| `multi@teste.local` | vinculado a DUAS contas — para na tela de escolha de ambiente |
-| `unica@teste.local` | uma conta só — entra direto, sem tela intermediária |
-| `rogerio@alfa.example.com` | administrador de uma conta cheia de dados de demonstração |
+| E-mail                     | Para quê                                                      |
+| -------------------------- | ------------------------------------------------------------- |
+| `admin@raiz.local`         | administrador raiz, único com acesso à área de Contas         |
+| `multi@teste.local`        | vinculado a DUAS contas — para na tela de escolha de ambiente |
+| `unica@teste.local`        | uma conta só — entra direto, sem tela intermediária           |
+| `rogerio@alfa.example.com` | administrador de uma conta cheia de dados de demonstração     |
 
 ---
 
@@ -100,13 +100,13 @@ vercel.json                 região das funções (ver "Implantação")
 
 ### Onde mexer, por tipo de mudança
 
-| Quero… | Mexo em |
-| --- | --- |
-| mudar uma tela | `src/components/<modulo>/` |
-| mudar uma validação de formulário | `src/server/actions/<modulo>.ts` |
-| mudar uma consulta ou escrita | `src/server/repositories/<modulo>.ts` |
-| mudar uma regra pura (formatar, validar, calcular) | `src/lib/` |
-| mudar o modelo de dados | `prisma/schema.prisma` **+ uma migration nova** |
+| Quero…                                             | Mexo em                                         |
+| -------------------------------------------------- | ----------------------------------------------- |
+| mudar uma tela                                     | `src/components/<modulo>/`                      |
+| mudar uma validação de formulário                  | `src/server/actions/<modulo>.ts`                |
+| mudar uma consulta ou escrita                      | `src/server/repositories/<modulo>.ts`           |
+| mudar uma regra pura (formatar, validar, calcular) | `src/lib/`                                      |
+| mudar o modelo de dados                            | `prisma/schema.prisma` **+ uma migration nova** |
 
 A camada é sempre a mesma: **tela → Server Action → repositório → Prisma**. Uma
 tela nunca fala com o Prisma, e um repositório nunca decide permissão.
@@ -135,53 +135,53 @@ próprio código, no arquivo indicado.
 
 As treze primeiras vêm do documento de arquitetura, com estes títulos:
 
-| | |
-| --- | --- |
-| **AD-1** | Isolamento multiempresa via repositório centralizado |
-| **AD-2** | Autorização centralizada |
-| **AD-3** | Server Actions como caminho padrão de mutação |
-| **AD-4** | Interface portada do mockup, não redesenhada |
-| **AD-5** | Migrations versionadas como única via de mudança de schema |
-| **AD-6** | Banco isolado por ambiente via branching |
-| **AD-7** | Rastreamento de erros desde o primeiro deploy |
-| **AD-8** | Aplicabilidade de plano: centralizada e computada na leitura |
-| **AD-9** | Escrita composta pai+filhos é transacional, com concorrência controlada |
-| **AD-10** | Exclusão é soft-delete via status, nunca hard-delete em cascata |
-| **AD-11** | Aparência: modo claro/escuro e paleta são mecanismos distintos |
-| **AD-12** | Testes de isolamento e autorização são obrigatórios antes de publicar |
-| **AD-13** | Operador de plataforma é papel separado do RBAC por conta |
+|           |                                                                         |
+| --------- | ----------------------------------------------------------------------- |
+| **AD-1**  | Isolamento multiempresa via repositório centralizado                    |
+| **AD-2**  | Autorização centralizada                                                |
+| **AD-3**  | Server Actions como caminho padrão de mutação                           |
+| **AD-4**  | Interface portada do mockup, não redesenhada                            |
+| **AD-5**  | Migrations versionadas como única via de mudança de schema              |
+| **AD-6**  | Banco isolado por ambiente via branching                                |
+| **AD-7**  | Rastreamento de erros desde o primeiro deploy                           |
+| **AD-8**  | Aplicabilidade de plano: centralizada e computada na leitura            |
+| **AD-9**  | Escrita composta pai+filhos é transacional, com concorrência controlada |
+| **AD-10** | Exclusão é soft-delete via status, nunca hard-delete em cascata         |
+| **AD-11** | Aparência: modo claro/escuro e paleta são mecanismos distintos          |
+| **AD-12** | Testes de isolamento e autorização são obrigatórios antes de publicar   |
+| **AD-13** | Operador de plataforma é papel separado do RBAC por conta               |
 
 De **AD-14 em diante** não existe definição canônica em documento nenhum: foram
 estabelecidas durante a implementação e só existem nos comentários do código.
 O que segue é o índice de onde cada uma está explicada.
 
-| | | Explicada em |
-| --- | --- | --- |
-| **AD-14** | a área do Local é polígono decorativo em coordenadas do desenho, nunca latitude/longitude | `src/components/locais/mapa-editor.tsx` |
-| **AD-15** | `Setor` é enum fixo e fica FORA do enum `Modulo` — não tem módulo de permissão próprio | `src/server/actions/emissao-estado.ts` |
-| **AD-17** | Empresa não tem status; toda empresa cadastrada é sempre selecionável | `src/components/ativos/tipos.ts` |
-| **AD-18** | mesmo padrão de Empresas: só "Editar", sem filtro de ativo/inativo | `src/components/emissao/tipos.ts` |
-| **AD-19** | o código `EM-{ano}-{seq}` deriva só de `dataEmissao`; os marcos de agendamento não o influenciam | `prisma/schema.prisma` |
-| **AD-20** | as linhas da aba Serviço são substituídas em bloco, sem id próprio | `src/server/repositories/emissao.ts` |
-| **AD-23** | a guarda de sessão preservou a FORMA do retorno, e foi isso que evitou mudar todo chamador | `src/server/auth/sessao.ts` |
-| **AD-24** | a troca de ambiente muta a conta ativa da sessão | `src/server/actions/auth.ts` |
-| **AD-25** | `listarUsuarios` é a origem única do seletor de responsável | `src/server/repositories/usuario.ts` |
-| **AD-26** | dado existente é corrigido de forma versionada, dentro da migration | `prisma/migrations/20260915210000_add_vinculo_conta/` |
-| **AD-27** | provisionamento de conta tem uma via só, compartilhada pelo seed e pelo operador | `src/server/repositories/provisionamento.ts` |
-| **AD-28** | duração é minuto inteiro no banco, com o modo (período ou duração) PERSISTIDO, nunca inferido | `src/lib/duracao.ts` |
-| **AD-29** | totais são sempre derivados na leitura, nunca coluna | `src/components/emissao/modal-emissao.tsx` |
-| **AD-30** | entrada inválida é RECUSADA com erro no campo — nunca zero silencioso nem truncamento | `src/components/emissao/modal-emissao.tsx` |
-| **AD-31** | o estado de um item da aba Itens é derivado na leitura, em três níveis | `src/server/actions/emissao-estado.ts` |
-| **AD-32** | o plano da emissão é derivado do ativo escolhido | `src/components/emissao/modal-emissao.tsx` |
-| **AD-33** | a data de emissão não é editável | `src/components/emissao/modal-emissao.tsx` |
+|           |                                                                                                  | Explicada em                                          |
+| --------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| **AD-14** | a área do Local é polígono decorativo em coordenadas do desenho, nunca latitude/longitude        | `src/components/locais/mapa-editor.tsx`               |
+| **AD-15** | `Setor` é enum fixo e fica FORA do enum `Modulo` — não tem módulo de permissão próprio           | `src/server/actions/emissao-estado.ts`                |
+| **AD-17** | Empresa não tem status; toda empresa cadastrada é sempre selecionável                            | `src/components/ativos/tipos.ts`                      |
+| **AD-18** | mesmo padrão de Empresas: só "Editar", sem filtro de ativo/inativo                               | `src/components/emissao/tipos.ts`                     |
+| **AD-19** | o código `EM-{ano}-{seq}` deriva só de `dataEmissao`; os marcos de agendamento não o influenciam | `prisma/schema.prisma`                                |
+| **AD-20** | as linhas da aba Serviço são substituídas em bloco, sem id próprio                               | `src/server/repositories/emissao.ts`                  |
+| **AD-23** | a guarda de sessão preservou a FORMA do retorno, e foi isso que evitou mudar todo chamador       | `src/server/auth/sessao.ts`                           |
+| **AD-24** | a troca de ambiente muta a conta ativa da sessão                                                 | `src/server/actions/auth.ts`                          |
+| **AD-25** | `listarUsuarios` é a origem única do seletor de responsável                                      | `src/server/repositories/usuario.ts`                  |
+| **AD-26** | dado existente é corrigido de forma versionada, dentro da migration                              | `prisma/migrations/20260915210000_add_vinculo_conta/` |
+| **AD-27** | provisionamento de conta tem uma via só, compartilhada pelo seed e pelo operador                 | `src/server/repositories/provisionamento.ts`          |
+| **AD-28** | duração é minuto inteiro no banco, com o modo (período ou duração) PERSISTIDO, nunca inferido    | `src/lib/duracao.ts`                                  |
+| **AD-29** | totais são sempre derivados na leitura, nunca coluna                                             | `src/components/emissao/modal-emissao.tsx`            |
+| **AD-30** | entrada inválida é RECUSADA com erro no campo — nunca zero silencioso nem truncamento            | `src/components/emissao/modal-emissao.tsx`            |
+| **AD-31** | o estado de um item da aba Itens é derivado na leitura, em três níveis                           | `src/server/actions/emissao-estado.ts`                |
+| **AD-32** | o plano da emissão é derivado do ativo escolhido                                                 | `src/components/emissao/modal-emissao.tsx`            |
+| **AD-33** | a data de emissão não é editável                                                                 | `src/components/emissao/modal-emissao.tsx`            |
 
 ### NFR — requisitos não funcionais citados no código
 
-| | |
-| --- | --- |
+|          |                                                                               |
+| -------- | ----------------------------------------------------------------------------- |
 | **NFR2** | não vazar a existência de uma conta ou identidade para quem não deveria saber |
-| **NFR6** | a conta ativa e o perfil são revalidados contra o banco a cada requisição |
-| **NFR7** | nunca aceitar entrada inválida em silêncio (par de AD-30) |
+| **NFR6** | a conta ativa e o perfil são revalidados contra o banco a cada requisição     |
+| **NFR7** | nunca aceitar entrada inválida em silêncio (par de AD-30)                     |
 
 ### "Story N.M"
 
@@ -199,7 +199,7 @@ há teste prendendo cada uma.
 
 **Toda leitura e toda escrita é escopada por `contaId`.** Sem exceção. Uma
 linha filha que não tem `contaId` próprio filtra pelo lado do pai. Um `id` de
-outra conta precisa simplesmente *não ser encontrado* — nunca ser encontrado e
+outra conta precisa simplesmente _não ser encontrado_ — nunca ser encontrado e
 recusado depois. Ver `tests/isolamento.test.ts`.
 
 **`can()` roda no servidor antes de todo efeito.** A tela usa o MESMO resultado
@@ -230,10 +230,10 @@ Detalhe completo em [`tests/LEIA-ME.md`](tests/LEIA-ME.md). O resumo:
 
 Dois projetos de Vitest, separados pela extensão do arquivo:
 
-| | arquivo | ambiente | duração |
-| --- | --- | --- | --- |
-| `servidor` | `*.test.ts` | Node + PostgreSQL real e efêmero | ~70–120s |
-| `componente` | `*.componente.test.tsx` | jsdom + Testing Library | ~4–8s |
+|              | arquivo                 | ambiente                         | duração  |
+| ------------ | ----------------------- | -------------------------------- | -------- |
+| `servidor`   | `*.test.ts`             | Node + PostgreSQL real e efêmero | ~70–120s |
+| `componente` | `*.componente.test.tsx` | jsdom + Testing Library          | ~4–8s    |
 
 ```bash
 npm test                 # os dois

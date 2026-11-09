@@ -155,7 +155,11 @@ describe("validarServicos aplica a regra", () => {
   test("jornada sequencial legítima continua passando inteira", () => {
     const { erros, servicos } = validarServicos([
       linha(0, { inicio: "2026-01-15T08:00", fim: "2026-01-15T10:00" }),
-      linha(1, { itemRevisionalId: OUTRO_ITEM, inicio: "2026-01-15T10:00", fim: "2026-01-15T12:00" }),
+      linha(1, {
+        itemRevisionalId: OUTRO_ITEM,
+        inicio: "2026-01-15T10:00",
+        fim: "2026-01-15T12:00",
+      }),
       linha(2, { pessoaId: BRUNO, inicio: "2026-01-15T08:00", fim: "2026-01-15T12:00" }),
     ]);
     expect(erros).toEqual([]);

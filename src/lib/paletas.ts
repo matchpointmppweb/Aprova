@@ -31,7 +31,10 @@ function escurecer(hex: string, quantidade: number): string {
   const r = parseInt(valor.substring(0, 2), 16);
   const g = parseInt(valor.substring(2, 4), 16);
   const b = parseInt(valor.substring(4, 6), 16);
-  const canal = (c: number) => Math.round(c * (1 - quantidade)).toString(16).padStart(2, "0");
+  const canal = (c: number) =>
+    Math.round(c * (1 - quantidade))
+      .toString(16)
+      .padStart(2, "0");
   return `#${canal(r)}${canal(g)}${canal(b)}`;
 }
 

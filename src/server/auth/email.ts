@@ -12,7 +12,5 @@ import "server-only";
  * é neutra em vez de assumir que é sempre um reset.
  */
 export async function logarLinkDeDefinicaoDeSenha(email: string, url: string) {
-  console.log(
-    `[definir-senha] link de definição de senha para ${email}: ${url}`,
-  );
+  console.log(`[definir-senha] link de definição de senha para ${email}: ${url}`);
 }

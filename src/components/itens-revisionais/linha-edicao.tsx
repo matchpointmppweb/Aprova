@@ -28,12 +28,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -75,7 +70,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-itens-${item.id}`}>
       <td colSpan={5}>
         <div className="form-row-label">Editar item · {item.nome}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="itemRevisionalId" value={item.id} />
           <div className="inline-form">
@@ -157,12 +156,7 @@ export function LinhaEdicao({
             </div>
             <div className="f">
               <label htmlFor={`ei-status-${item.id}`}>Status</label>
-              <select
-                id={`ei-status-${item.id}`}
-                name="status"
-                required
-                defaultValue={item.status}
-              >
+              <select id={`ei-status-${item.id}`} name="status" required defaultValue={item.status}>
                 {OPCOES_STATUS.map((opcao) => (
                   <option key={opcao.value} value={opcao.value}>
                     {opcao.label}

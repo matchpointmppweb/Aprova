@@ -40,7 +40,9 @@ const ERRO_JA_TEM_ACESSO = "Esta pessoa já tem acesso a esta conta.";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizarEmail(valor: FormDataEntryValue | null) {
-  return String(valor ?? "").trim().toLowerCase();
+  return String(valor ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 // Sinaliza, de dentro da transação da guarda de "último Administrador", que
@@ -65,18 +67,11 @@ class UltimoAdministradorAtivoError extends Error {}
 // campos (["email"]), ora como nome do índice ("usuarios_email_key") — os dois
 // casam.
 function isErroDeEmailDuplicado(erro: unknown): boolean {
-  if (
-    !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
-    erro.code !== "P2002"
-  ) {
+  if (!(erro instanceof Prisma.PrismaClientKnownRequestError) || erro.code !== "P2002") {
     return false;
   }
   const alvo = erro.meta?.target;
-  const campos = Array.isArray(alvo)
-    ? alvo.map(String)
-    : typeof alvo === "string"
-      ? [alvo]
-      : [];
+  const campos = Array.isArray(alvo) ? alvo.map(String) : typeof alvo === "string" ? [alvo] : [];
   return campos.some((campo) => campo === "email" || campo.includes("email"));
 }
 

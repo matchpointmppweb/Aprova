@@ -127,8 +127,7 @@ export type AtivoDerivavel = {
 
 export type DerivacaoDePlano<T> =
   /// `candidatos` nunca é vazio aqui, e `sugestao` é sempre `candidatos[0]`.
-  | { tipo: "ok"; sugestao: T; candidatos: T[] }
-  | { tipo: "sem-plano" };
+  { tipo: "ok"; sugestao: T; candidatos: T[] } | { tipo: "sem-plano" };
 
 /// Quanto mais específico o vínculo, menor o número — é a ordem de preferência
 /// escolhida em 26-10-2026: o plano feito para AQUELE ativo vence; depois o
@@ -747,9 +746,7 @@ export type PeriodoLancado = {
 /// O erro vai para o `-inicio` da linha POSTERIOR: é a que a pessoa acabou de
 /// mexer, e culpar a primeira mandaria o foco para um lançamento que já estava
 /// certo.
-export function sobreposicoesDeServico(
-  periodos: readonly PeriodoLancado[],
-): ErroDeValidacao[] {
+export function sobreposicoesDeServico(periodos: readonly PeriodoLancado[]): ErroDeValidacao[] {
   const erros: ErroDeValidacao[] = [];
   for (let b = 0; b < periodos.length; b++) {
     for (let a = 0; a < b; a++) {
@@ -780,7 +777,10 @@ export function validarServicos(linhas: LinhaServicoBruta[]): {
     const errosDaLinha: ErroDeValidacao[] = [];
 
     if (!linha.pessoaId) {
-      errosDaLinha.push({ field: `${prefixo}-pessoaId`, message: "Selecione a pessoa do serviço." });
+      errosDaLinha.push({
+        field: `${prefixo}-pessoaId`,
+        message: "Selecione a pessoa do serviço.",
+      });
     }
     if (!linha.itemRevisionalId) {
       errosDaLinha.push({
@@ -827,7 +827,10 @@ export function validarServicos(linhas: LinhaServicoBruta[]): {
     const inicio = parseDataHora(linha.inicio);
     const fim = parseDataHora(linha.fim);
     if (inicio === "invalido") {
-      errosDaLinha.push({ field: `${prefixo}-inicio`, message: "Informe um início de serviço válido." });
+      errosDaLinha.push({
+        field: `${prefixo}-inicio`,
+        message: "Informe um início de serviço válido.",
+      });
     }
     if (fim === "invalido") {
       errosDaLinha.push({ field: `${prefixo}-fim`, message: "Informe um fim de serviço válido." });

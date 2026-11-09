@@ -48,9 +48,7 @@ export function validarVinculoXor(
   tipoAtivoId: string | null,
   empresaId: string | null,
 ): ErroDeValidacao[] {
-  const preenchidos = [ativoId, tipoAtivoId, empresaId].filter(
-    (valor) => valor !== null,
-  ).length;
+  const preenchidos = [ativoId, tipoAtivoId, empresaId].filter((valor) => valor !== null).length;
 
   if (preenchidos !== 1) {
     return [

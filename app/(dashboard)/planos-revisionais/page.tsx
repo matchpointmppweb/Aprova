@@ -59,19 +59,29 @@ function agregarPorPlano(resolucoes: ResolucaoAtivoDoPlano[]) {
 export default async function PlanosRevisionaisPage() {
   const usuarioSessao = await exigirUsuarioAutenticado();
 
-  const [planosTodos, resolucoes, ativos, tiposAtivo, empresas, itensRevisionais, usuarios, podeCriar, podeEditar, podeExcluir] =
-    await Promise.all([
-      listarPlanos(usuarioSessao.contaId),
-      resolverAtivosDoPlano(usuarioSessao.contaId),
-      listarAtivos(usuarioSessao.contaId),
-      listarTiposAtivo(usuarioSessao.contaId),
-      listarEmpresas(usuarioSessao.contaId),
-      listarItensRevisionais(usuarioSessao.contaId),
-      listarUsuarios(usuarioSessao.contaId),
-      can(usuarioSessao, "criar", "planos"),
-      can(usuarioSessao, "editar", "planos"),
-      can(usuarioSessao, "excluir", "planos"),
-    ]);
+  const [
+    planosTodos,
+    resolucoes,
+    ativos,
+    tiposAtivo,
+    empresas,
+    itensRevisionais,
+    usuarios,
+    podeCriar,
+    podeEditar,
+    podeExcluir,
+  ] = await Promise.all([
+    listarPlanos(usuarioSessao.contaId),
+    resolverAtivosDoPlano(usuarioSessao.contaId),
+    listarAtivos(usuarioSessao.contaId),
+    listarTiposAtivo(usuarioSessao.contaId),
+    listarEmpresas(usuarioSessao.contaId),
+    listarItensRevisionais(usuarioSessao.contaId),
+    listarUsuarios(usuarioSessao.contaId),
+    can(usuarioSessao, "criar", "planos"),
+    can(usuarioSessao, "editar", "planos"),
+    can(usuarioSessao, "excluir", "planos"),
+  ]);
 
   const agregadoPorPlano = agregarPorPlano(resolucoes);
 

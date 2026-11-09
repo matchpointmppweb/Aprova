@@ -28,10 +28,7 @@ export function SeletorDeConta({
   opcoes: OpcaoDeAmbiente[];
   contaAtivaId: string;
 }) {
-  const [estado, formAction, pendente] = useActionState(
-    trocarDeContaAction,
-    estadoInicialAcaoAuth,
-  );
+  const [estado, formAction, pendente] = useActionState(trocarDeContaAction, estadoInicialAcaoAuth);
 
   return (
     <form action={formAction} style={{ display: "flex", alignItems: "center", gap: 8 }}>

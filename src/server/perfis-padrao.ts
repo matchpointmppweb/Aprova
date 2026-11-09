@@ -41,11 +41,8 @@ const MODULOS_NAO_CONFIGURAVEIS: Modulo[] = [Modulo.contas];
 // sem nenhuma permissão marcada, que é o ponto. O tipo de retorno
 // (`ModuloConfiguravel[]`) é o que amarra esta lista ao registro de rótulos da
 // UI: as duas são exatamente o mesmo conjunto, cobrado pelo compilador.
-export const MODULOS_COM_PERMISSAO: ModuloConfiguravel[] = Object.values(
-  Modulo,
-).filter(
-  (modulo): modulo is ModuloConfiguravel =>
-    !MODULOS_NAO_CONFIGURAVEIS.includes(modulo),
+export const MODULOS_COM_PERMISSAO: ModuloConfiguravel[] = Object.values(Modulo).filter(
+  (modulo): modulo is ModuloConfiguravel => !MODULOS_NAO_CONFIGURAVEIS.includes(modulo),
 );
 
 export const ACESSO_TOTAL = { criar: true, editar: true, excluir: true } as const;
@@ -72,14 +69,11 @@ export const PERFIS_PADRAO: PerfilPadrao[] = [
   {
     nome: NOME_ADMINISTRADOR,
     descricao: "Acesso completo a todos os módulos.",
-    permissoes: Object.fromEntries(
-      MODULOS_COM_PERMISSAO.map((modulo) => [modulo, ACESSO_TOTAL]),
-    ),
+    permissoes: Object.fromEntries(MODULOS_COM_PERMISSAO.map((modulo) => [modulo, ACESSO_TOTAL])),
   },
   {
     nome: "Técnico de manutenção",
-    descricao:
-      "Cadastra/edita ativos, edita itens e planos revisionais, cria e edita emissões.",
+    descricao: "Cadastra/edita ativos, edita itens e planos revisionais, cria e edita emissões.",
     permissoes: {
       ativos: { criar: true, editar: true, excluir: false },
       itens: { criar: false, editar: true, excluir: false },
@@ -96,11 +90,8 @@ export const PERFIS_PADRAO: PerfilPadrao[] = [
   },
   {
     nome: "Somente leitura",
-    descricao:
-      "Visualização em todos os módulos, sem nenhuma permissão de escrita.",
-    permissoes: Object.fromEntries(
-      MODULOS_COM_PERMISSAO.map((modulo) => [modulo, SEM_ACESSO]),
-    ),
+    descricao: "Visualização em todos os módulos, sem nenhuma permissão de escrita.",
+    permissoes: Object.fromEntries(MODULOS_COM_PERMISSAO.map((modulo) => [modulo, SEM_ACESSO])),
   },
 ];
 

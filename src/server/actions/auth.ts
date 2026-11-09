@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import {
-  ativarUsuarioConvidado,
-  registrarUltimoAcesso,
-} from "@/src/server/repositories/usuario";
+import { ativarUsuarioConvidado, registrarUltimoAcesso } from "@/src/server/repositories/usuario";
 import {
   definirContaAtivaDaSessao,
   resolveuAConta,
@@ -49,11 +46,9 @@ const ERRO_MUITAS_TENTATIVAS =
 const ERRO_SEM_AMBIENTE =
   "Nenhum ambiente disponível para este acesso. Fale com o administrador da sua conta.";
 
-const ERRO_ESCOLHA_INVALIDA =
-  "Escolha inválida. Selecione um dos ambientes disponíveis.";
+const ERRO_ESCOLHA_INVALIDA = "Escolha inválida. Selecione um dos ambientes disponíveis.";
 
-const ERRO_PRIMEIRO_ACESSO =
-  "Não foi possível concluir seu primeiro acesso. Tente novamente.";
+const ERRO_PRIMEIRO_ACESSO = "Não foi possível concluir seu primeiro acesso. Tente novamente.";
 
 // Passos finais comuns à entrada direta (um vínculo) e à entrada após escolha
 // (vários vínculos): promover o convidado, se for o caso, e registrar o último
@@ -90,10 +85,7 @@ async function concluirEntrada(
   usuario: UsuarioResolvidoPeloVinculo,
   tokenDaSessao: string | null,
 ): Promise<EstadoAcaoAuth | null> {
-  if (
-    usuario.status === "ConvitePendente" ||
-    usuario.statusDoVinculo === "ConvitePendente"
-  ) {
+  if (usuario.status === "ConvitePendente" || usuario.statusDoVinculo === "ConvitePendente") {
     try {
       // count 0 significa que a pessoa NÃO terminou a chamada podendo entrar:
       // sem vínculo com esta conta, ou desativada (identidade ou vínculo)
@@ -184,10 +176,7 @@ export async function entrarAction(
   // vínculo), escolher (vários) ou recusar por ambiente indisponível (zero).
   // Nenhuma conta ativa é passada aqui: a sessão acabou de nascer, e quem tem
   // um vínculo só nunca precisa de nada gravado.
-  const resolucao = await resolverUsuarioAutenticadoPeloVinculo(
-    usuarioSessao.id,
-    STATUS_COM_LOGIN,
-  );
+  const resolucao = await resolverUsuarioAutenticadoPeloVinculo(usuarioSessao.id, STATUS_COM_LOGIN);
 
   if (resolucao.tipo === "sem-ambiente") {
     // O operador de plataforma é a exceção, e é o ponto do AD-13: o papel é da
@@ -352,11 +341,7 @@ export async function trocarDeContaAction(
   // com a conta apontada, a resolução cai em derivação e devolveria OUTRA conta.
   const ponteiro = sessaoAtiva.contaAtivaId;
   const atual = ponteiro
-    ? await resolverUsuarioAutenticadoPeloVinculo(
-        usuarioSessao.id,
-        STATUS_COM_ACESSO,
-        ponteiro,
-      )
+    ? await resolverUsuarioAutenticadoPeloVinculo(usuarioSessao.id, STATUS_COM_ACESSO, ponteiro)
     : null;
 
   // Ponteiro ausente ou morto tem desfecho PRÓPRIO, e não o mesmo da troca para
@@ -486,8 +471,7 @@ export async function solicitarResetSenhaAction(
   // simplesmente não recebe e-mail.
   return {
     ok: true,
-    message:
-      "Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.",
+    message: "Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.",
   };
 }
 
@@ -518,8 +502,7 @@ export async function redefinirSenhaAction(
     // Nunca expõe detalhe interno/stack (Boundaries) — mensagem genérica.
     return {
       ok: false,
-      error:
-        "Não foi possível redefinir sua senha. O link pode ter expirado — solicite um novo.",
+      error: "Não foi possível redefinir sua senha. O link pode ter expirado — solicite um novo.",
     };
   }
 

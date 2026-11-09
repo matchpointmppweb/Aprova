@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test } from "vitest";
 
 import { listarUsuarios, criarUsuarioConvidado } from "@/src/server/repositories/usuario";
 import { aplicarNomeDoVinculoEmLista } from "@/src/server/repositories/vinculo-conta";
-import { buscarPermissaoDoModulo, listarPerfisAcesso } from "@/src/server/repositories/perfil-acesso";
+import {
+  buscarPermissaoDoModulo,
+  listarPerfisAcesso,
+} from "@/src/server/repositories/perfil-acesso";
 import { can } from "@/src/server/auth/can";
 
 import {
@@ -118,15 +121,9 @@ describe("isolamento entre contas (NFR2/AD-1)", () => {
     });
 
     expect(
-      await can(
-        { contaId: conta.id, perfilAcessoId: semPermissoes.id },
-        "criar",
-        "ativos",
-      ),
+      await can({ contaId: conta.id, perfilAcessoId: semPermissoes.id }, "criar", "ativos"),
     ).toBe(false);
-    expect(
-      await buscarPermissaoDoModulo(semPermissoes.id, conta.id, "ativos"),
-    ).toBeNull();
+    expect(await buscarPermissaoDoModulo(semPermissoes.id, conta.id, "ativos")).toBeNull();
   });
 });
 
@@ -148,12 +145,12 @@ describe("identidade global (FR20/FR21)", () => {
     await criarVinculo(identidade.id, beta.id, tecnico.id);
 
     // Administrador na Alfa, Técnico sem permissão na Beta — a MESMA pessoa.
-    expect(
-      await can({ contaId: alfa.id, perfilAcessoId: admin.id }, "excluir", "ativos"),
-    ).toBe(true);
-    expect(
-      await can({ contaId: beta.id, perfilAcessoId: tecnico.id }, "excluir", "ativos"),
-    ).toBe(false);
+    expect(await can({ contaId: alfa.id, perfilAcessoId: admin.id }, "excluir", "ativos")).toBe(
+      true,
+    );
+    expect(await can({ contaId: beta.id, perfilAcessoId: tecnico.id }, "excluir", "ativos")).toBe(
+      false,
+    );
   });
 
   test("o e-mail é único na plataforma inteira", async () => {

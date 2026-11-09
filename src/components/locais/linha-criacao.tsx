@@ -4,10 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { criarLocalAction } from "@/src/server/actions/local";
-import {
-  estadoInicialAcaoLocal,
-  mensagemDeErro,
-} from "@/src/server/actions/local-estado";
+import { estadoInicialAcaoLocal, mensagemDeErro } from "@/src/server/actions/local-estado";
 import { MapaEditor, type PontoMapa } from "./mapa-editor";
 import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
@@ -23,12 +20,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -46,10 +38,7 @@ export function LinhaCriacao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    criarLocalAction,
-    estadoInicialAcaoLocal,
-  );
+  const [estado, formAction] = useActionState(criarLocalAction, estadoInicialAcaoLocal);
   const [pontos, setPontos] = useState<PontoMapa[]>([]);
 
   useEffect(() => {
@@ -65,7 +54,11 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-locais">
       <td colSpan={5}>
         <div className="form-row-label">Novo local</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="areaPoligono" value={JSON.stringify(pontos)} />
           <div className="inline-form">

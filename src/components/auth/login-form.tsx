@@ -47,7 +47,11 @@ export function LoginForm() {
       {/* `role="alert"` para o leitor de tela anunciar a falha sem a pessoa
           ter de ir procurar o texto — o campo não recebe foco automático
           porque o erro é da combinação, não de um campo específico. */}
-      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
+      {estado.error ? (
+        <div className="form-error" role="alert">
+          {estado.error}
+        </div>
+      ) : null}
 
       <form action={formAction}>
         <div className="field">
@@ -85,7 +89,10 @@ export function LoginForm() {
             <input type="checkbox" name="manterConectado" defaultChecked />
             Manter conectado
           </label>
-          <Link href="/esqueci-senha" style={{ color: "var(--pine-dark)", textDecoration: "none", fontWeight: 500 }}>
+          <Link
+            href="/esqueci-senha"
+            style={{ color: "var(--pine-dark)", textDecoration: "none", fontWeight: 500 }}
+          >
             Esqueci minha senha
           </Link>
         </div>

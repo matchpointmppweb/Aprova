@@ -7,12 +7,14 @@ import { auth } from "@/src/server/auth";
 import { exigirOperadorDePlataforma } from "@/src/server/auth/sessao";
 import { atualizarConta, criarConta } from "@/src/server/repositories/conta";
 import { ProvisionamentoInconsistenteError } from "@/src/server/repositories/provisionamento";
-import type {
-  EstadoAcaoConta,
-  EstadoAcaoCriacaoConta,
-  ValoresNovaConta,
-} from "./conta-estado";
-import { LIMITE_DOCUMENTO, LIMITE_NOME, lerTexto, lerTextoBruto, validarTamanho } from "@/src/lib/texto";
+import type { EstadoAcaoConta, EstadoAcaoCriacaoConta, ValoresNovaConta } from "./conta-estado";
+import {
+  LIMITE_DOCUMENTO,
+  LIMITE_NOME,
+  lerTexto,
+  lerTextoBruto,
+  validarTamanho,
+} from "@/src/lib/texto";
 import { registrarFalha } from "@/src/server/log";
 
 const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente.";
@@ -33,10 +35,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // um P2002 de `usuarios.email` chegaria aqui e viraria, erradamente, "CNPJ já
 // em uso". O target vem ora como lista de campos, ora como nome do índice.
 function alvoDoP2002(erro: unknown): string[] | null {
-  if (
-    !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
-    erro.code !== "P2002"
-  ) {
+  if (!(erro instanceof Prisma.PrismaClientKnownRequestError) || erro.code !== "P2002") {
     return null;
   }
   const alvo = erro.meta?.target;
@@ -61,10 +60,7 @@ function isErroDeCnpjDuplicado(erro: unknown): boolean {
   const alvo = alvoDoP2002(erro);
   if (alvo === null || isErroDeEmailDuplicado(erro)) return false;
   if (!alvo.some((campo) => campo.includes("cnpj"))) {
-    console.error(
-      "[conta] P2002 com alvo inesperado, tratado como CNPJ duplicado:",
-      erro,
-    );
+    console.error("[conta] P2002 com alvo inesperado, tratado como CNPJ duplicado:", erro);
   }
   return true;
 }
@@ -75,9 +71,7 @@ function lerCampos(formData: FormData) {
   // "12.345.678/0001-90" e "12345678000190" (mesmo CNPJ, pontuação
   // diferente) passariam pela constraint como valores distintos.
   const cnpj = lerTextoBruto(formData, "cnpj").replace(/\D/g, "");
-  const planoContratado = String(
-    formData.get("planoContratado") ?? "",
-  ).trim() as PlanoContratado;
+  const planoContratado = String(formData.get("planoContratado") ?? "").trim() as PlanoContratado;
   const status = lerTexto(formData, "status") as StatusConta;
 
   const erros: { field: string; message: string }[] = [];
@@ -100,9 +94,7 @@ function lerCampos(formData: FormData) {
 // editar uma conta não mexe em quem administra ela.
 function lerAdministrador(formData: FormData) {
   const nome = lerTexto(formData, "adminNome");
-  const email = lerTextoBruto(formData, "adminEmail")
-    .trim()
-    .toLowerCase();
+  const email = lerTextoBruto(formData, "adminEmail").trim().toLowerCase();
 
   const erros: { field: string; message: string }[] = [];
   if (!nome) {

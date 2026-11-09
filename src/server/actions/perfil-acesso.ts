@@ -25,9 +25,7 @@ const ERRO_GENERICO = "Não foi possível concluir a operação. Tente novamente
 // da constraint única @@unique([contaId, nome]) para traduzir num erro de
 // validação de campo.
 function isErroDeNomeDuplicado(erro: unknown): boolean {
-  return (
-    erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002"
-  );
+  return erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002";
 }
 
 // Lê, para cada módulo configurável (MODULOS_PERFIL, AD-13 —

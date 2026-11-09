@@ -32,9 +32,7 @@ function unico() {
   return `${Date.now().toString(36)}-${contador}`;
 }
 
-export async function criarConta(
-  opcoes: { nome?: string; status?: StatusConta } = {},
-) {
+export async function criarConta(opcoes: { nome?: string; status?: StatusConta } = {}) {
   const sufixo = unico();
   return db.conta.create({
     data: {
@@ -213,9 +211,7 @@ export async function criarPessoa(contaId: string, opcoes: { nome?: string } = {
 /// Escreve pelo client próprio dos testes (`db`), nunca pelas funções de
 /// repositório sob teste — um defeito na escrita do código de produção não
 /// pode mascarar a si mesmo montando o cenário.
-export async function criarEmissaoCompleta(
-  opcoes: { nomeDaConta?: string } = {},
-) {
+export async function criarEmissaoCompleta(opcoes: { nomeDaConta?: string } = {}) {
   const ambiente = await criarAmbiente({ nomeDaConta: opcoes.nomeDaConta });
   const tipoAtivo = await criarTipoAtivo(ambiente.conta.id);
   const ativo = await criarAtivo(ambiente.conta.id, tipoAtivo.id);

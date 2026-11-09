@@ -194,7 +194,10 @@ export async function editarItemRevisionalAction(
     }
     // Rastro da falha INESPERADA (src/server/log.ts): a resposta ao
     // usuário continua genérica, mas o erro deixa de desaparecer.
-    registrarFalha({ operacao: "editarItemRevisionalAction", contaId: usuarioSessao.contaId }, erro);
+    registrarFalha(
+      { operacao: "editarItemRevisionalAction", contaId: usuarioSessao.contaId },
+      erro,
+    );
     return { ok: false, error: ERRO_GENERICO };
   }
 

@@ -74,9 +74,7 @@ export async function criarConta(dados: {
         OPCOES_DE_TRANSACAO_DE_PROVISIONAMENTO,
       ),
     () => {
-      throw new ProvisionamentoInconsistenteError(
-        "Vínculo preexistente numa conta recém-criada.",
-      );
+      throw new ProvisionamentoInconsistenteError("Vínculo preexistente numa conta recém-criada.");
     },
   );
 }

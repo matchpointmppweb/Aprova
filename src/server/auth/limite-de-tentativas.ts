@@ -75,11 +75,7 @@ export function ipDosCabecalhos(cabecalhos: Headers): string | null {
   return partes.at(-1) ?? null;
 }
 
-async function contarFalhas(
-  tipo: TipoDeTentativa,
-  chave: string,
-  desde: Date,
-): Promise<number> {
+async function contarFalhas(tipo: TipoDeTentativa, chave: string, desde: Date): Promise<number> {
   return prisma.tentativaDeAcesso.count({
     where: { tipo, chave, criadoEm: { gte: desde } },
   });
@@ -137,10 +133,7 @@ export async function registrarFalha(
  * poderia, senão, limpar a própria cota de IP a cada acerto e seguir
  * pulverizando indefinidamente.
  */
-export async function limparFalhas(
-  tipo: TipoDeTentativa,
-  email: string,
-): Promise<void> {
+export async function limparFalhas(tipo: TipoDeTentativa, email: string): Promise<void> {
   try {
     await prisma.tentativaDeAcesso.deleteMany({
       where: { tipo, chave: chaveDeEmail(email) },
@@ -159,9 +152,7 @@ export async function limparFalhas(
  * tabela cresceria para sempre.
  */
 export async function limparTentativasAntigas(): Promise<void> {
-  const maiorJanela = Math.max(
-    ...Object.values(LIMITES).map((limite) => limite.janelaEmMinutos),
-  );
+  const maiorJanela = Math.max(...Object.values(LIMITES).map((limite) => limite.janelaEmMinutos));
   const corte = new Date(Date.now() - maiorJanela * 60 * 1000);
 
   try {

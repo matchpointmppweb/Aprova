@@ -198,11 +198,7 @@ export async function resolverUsuarioAutenticadoPeloVinculo(
   contaAtivaId?: string | null,
 ): Promise<ResolucaoDeVinculo> {
   if (contaAtivaId) {
-    const vinculo = await buscarVinculoUtilizavel(
-      usuarioId,
-      contaAtivaId,
-      statusPermitidos,
-    );
+    const vinculo = await buscarVinculoUtilizavel(usuarioId, contaAtivaId, statusPermitidos);
 
     if (vinculo) {
       return { tipo: "resolvido", usuario: compor(vinculo) };
@@ -225,13 +221,12 @@ export async function resolverUsuarioAutenticadoPeloVinculo(
   // ConvitePendente), não há ambiente utilizável AGORA.
   const [unico] = escolhiveis;
   const acessivel =
-    statusPermitidos.includes(unico.status) &&
-    statusPermitidos.includes(unico.usuario.status);
+    statusPermitidos.includes(unico.status) && statusPermitidos.includes(unico.usuario.status);
 
   return acessivel
-    // A contagem é 1 por construção: `escolhiveis` tem exatamente um item
-    // neste ramo.
-    ? { tipo: "resolvido", usuario: compor(unico, 1) }
+    ? // A contagem é 1 por construção: `escolhiveis` tem exatamente um item
+      // neste ramo.
+      { tipo: "resolvido", usuario: compor(unico, 1) }
     : { tipo: "sem-ambiente" };
 }
 

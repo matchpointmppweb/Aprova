@@ -50,7 +50,13 @@ function Cartao({
       <div className="palette-card-body">
         <span className="pname">{paleta.nome}</span>
         <span className="palette-check">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            aria-hidden="true"
+          >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </span>
@@ -81,7 +87,11 @@ export function PaletaGrid({
     <div className="settings-section">
       <h3>Paleta de cores</h3>
       <p>Selecione uma paleta para aplicar em todo o painel.</p>
-      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
+      {estado.error ? (
+        <div className="form-error" role="alert">
+          {estado.error}
+        </div>
+      ) : null}
       {estado.ok ? <div className="form-success">Paleta atualizada.</div> : null}
       <form action={formAction}>
         <div className="palette-grid">

@@ -34,11 +34,7 @@ export const metadata: Metadata = {
 // o mesmo que protege a listagem — sessão autenticada e `where` por contaId
 // (AD-1): o id de uma emissão de outra conta simplesmente não é encontrado e
 // cai em notFound(), indistinguível de um id inexistente.
-export default async function OrdemDeServicoPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function OrdemDeServicoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const usuarioSessao = await exigirUsuarioAutenticado();
 

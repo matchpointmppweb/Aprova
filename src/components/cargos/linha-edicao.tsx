@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { editarCargoAction } from "@/src/server/actions/cargo";
-import {
-  estadoInicialAcaoCargo,
-  mensagemDeErro,
-} from "@/src/server/actions/cargo-estado";
+import { estadoInicialAcaoCargo, mensagemDeErro } from "@/src/server/actions/cargo-estado";
 import type { CargoListagem } from "./tipos";
 import { LIMITE_DESCRICAO } from "@/src/lib/texto";
 
@@ -28,12 +25,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -53,10 +45,7 @@ export function LinhaEdicao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    editarCargoAction,
-    estadoInicialAcaoCargo,
-  );
+  const [estado, formAction] = useActionState(editarCargoAction, estadoInicialAcaoCargo);
 
   useEffect(() => {
     if (estado.ok) {
@@ -71,7 +60,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-cargos-${cargo.id}`}>
       <td colSpan={3}>
         <div className="form-row-label">Editar cargo · {cargo.descricao}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="cargoId" value={cargo.id} />
           <div className="inline-form">

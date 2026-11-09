@@ -280,9 +280,7 @@ async function referenciasValidas(
   return { erros, itensReaisPorId };
 }
 
-function mapearItensReais(
-  itens: Awaited<ReturnType<typeof listarItensRevisionais>>,
-) {
+function mapearItensReais(itens: Awaited<ReturnType<typeof listarItensRevisionais>>) {
   const mapa = new Map<string, ItemRevisionalReal>();
   for (const item of itens) {
     mapa.set(item.id, {
@@ -340,14 +338,24 @@ function lerItensAvulsos(
     // Sem override: o avulso não veio de um PlanoItemRevisional, então o
     // valor esperado é o padrão do próprio item (calcularValorEsperado já
     // resolve isso com os overrides nulos).
-    avulsos.push({ itemRevisionalId: id, diasOverride: null, kmOverride: null, horasOverride: null });
+    avulsos.push({
+      itemRevisionalId: id,
+      diasOverride: null,
+      kmOverride: null,
+      horasOverride: null,
+    });
   }
 
   return avulsos;
 }
 
 function montarItensNovos(
-  itensDoPlano: { itemRevisionalId: string; diasOverride: number | null; kmOverride: number | null; horasOverride: number | null }[],
+  itensDoPlano: {
+    itemRevisionalId: string;
+    diasOverride: number | null;
+    kmOverride: number | null;
+    horasOverride: number | null;
+  }[],
   itensReaisPorId: Map<string, ItemRevisionalReal>,
   formData: FormData,
 ): DadosItemExecutadoNovo[] {
@@ -726,9 +734,7 @@ async function executarTransicaoStatus(
   let motivo: string | undefined;
   if (opcoes?.exigirMotivo) {
     motivo = lerTexto(formData, "motivo");
-    erros.push(
-      ...validarTamanho(motivo, LIMITE_TEXTO_LONGO, "motivo", "Motivo da reprovação"),
-    );
+    erros.push(...validarTamanho(motivo, LIMITE_TEXTO_LONGO, "motivo", "Motivo da reprovação"));
     if (!motivo) {
       erros.push({ field: "motivo", message: "Informe o motivo da reprovação." });
     }

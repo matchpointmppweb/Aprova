@@ -47,9 +47,7 @@ const scriptAntiFlashModo = `(function(){try{var m=localStorage.getItem(${JSON.s
   VARS_NEUTROS,
 )};var s=document.documentElement.style;for(var i=0;i<vars.length;i++){s.setProperty(vars[i].cssVar,n[vars[i].chave])}}catch(e){}})()`;
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="pt-BR"

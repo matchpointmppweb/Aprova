@@ -156,9 +156,7 @@ function alvoDaConstraint(erro: Prisma.PrismaClientKnownRequestError): string[] 
 // `ativos_contaId_codigo_key`), e qualquer escrita futura dentro desta transação
 // que esbarrasse num deles seria reportada em silêncio como "já tem acesso".
 // Exige os DOIS campos, ou o nome exato do índice.
-export function eConstraintDoVinculo(
-  erro: Prisma.PrismaClientKnownRequestError,
-): boolean {
+export function eConstraintDoVinculo(erro: Prisma.PrismaClientKnownRequestError): boolean {
   const alvo = alvoDaConstraint(erro);
   return (
     (alvo.includes("usuarioId") && alvo.includes("contaId")) ||
@@ -167,9 +165,7 @@ export function eConstraintDoVinculo(
 }
 
 // Unique global de `usuarios.email` (Story 6.3).
-export function eConstraintDeEmail(
-  erro: Prisma.PrismaClientKnownRequestError,
-): boolean {
+export function eConstraintDeEmail(erro: Prisma.PrismaClientKnownRequestError): boolean {
   const alvo = alvoDaConstraint(erro);
   return alvo.includes("email") || alvo.includes("usuarios_email_key");
 }
@@ -201,10 +197,7 @@ export async function comRegrasDeCorrida<T>(
   try {
     return await executar();
   } catch (erro) {
-    if (
-      !(erro instanceof Prisma.PrismaClientKnownRequestError) ||
-      erro.code !== "P2002"
-    ) {
+    if (!(erro instanceof Prisma.PrismaClientKnownRequestError) || erro.code !== "P2002") {
       throw erro;
     }
 
@@ -296,9 +289,7 @@ export async function provisionarContaEm(
     ),
   );
 
-  const perfilAdministrador = perfisCriados.find(
-    (perfil) => perfil.nome === NOME_ADMINISTRADOR,
-  );
+  const perfilAdministrador = perfisCriados.find((perfil) => perfil.nome === NOME_ADMINISTRADOR);
   if (!perfilAdministrador) {
     throw new ProvisionamentoInconsistenteError(
       "A matriz de perfis padrão não contém o perfil Administrador.",
@@ -315,9 +306,7 @@ export async function provisionarContaEm(
   });
 
   if (convite.resultado === "ja-tem-acesso") {
-    throw new ProvisionamentoInconsistenteError(
-      "Vínculo preexistente numa conta recém-criada.",
-    );
+    throw new ProvisionamentoInconsistenteError("Vínculo preexistente numa conta recém-criada.");
   }
 
   return {

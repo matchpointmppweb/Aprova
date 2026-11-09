@@ -397,31 +397,26 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         ],
       });
 
-      const resultado = await atualizarEmissao(
-        cenario.conta.id,
-        criada.id,
-        criada.updatedAt,
-        {
-          ativoId: cenario.ativo.id,
-          planoId: cenario.plano.id,
-          responsavelId: cenario.identidade.id,
-          setor: "Manutencao",
-          dataAgendamento: null,
-          dataInicio: null,
-          dataFim: null,
-          trocouPlano: false,
-          itens: [],
-          itensNovos: [],
-          servicos: [
-            {
-              pessoaId: cenario.pessoa.id,
-              itemRevisionalId: cenario.item.id,
-              modo: "Duracao",
-              duracaoMinutos: 115,
-            },
-          ],
-        },
-      );
+      const resultado = await atualizarEmissao(cenario.conta.id, criada.id, criada.updatedAt, {
+        ativoId: cenario.ativo.id,
+        planoId: cenario.plano.id,
+        responsavelId: cenario.identidade.id,
+        setor: "Manutencao",
+        dataAgendamento: null,
+        dataInicio: null,
+        dataFim: null,
+        trocouPlano: false,
+        itens: [],
+        itensNovos: [],
+        servicos: [
+          {
+            pessoaId: cenario.pessoa.id,
+            itemRevisionalId: cenario.item.id,
+            modo: "Duracao",
+            duracaoMinutos: 115,
+          },
+        ],
+      });
       expect(resultado).toEqual({ ok: true });
 
       const relida = await buscarEmissao(cenario.conta.id, criada.id);
@@ -450,31 +445,26 @@ describe("ServicoEmissao: modo e duração (Story 7.1)", () => {
         servicos: [],
       });
 
-      const resultado = await atualizarEmissao(
-        cenario.conta.id,
-        criada.id,
-        criada.updatedAt,
-        {
-          ativoId: cenario.ativo.id,
-          planoId: cenario.plano.id,
-          responsavelId: cenario.identidade.id,
-          setor: "Manutencao",
-          dataAgendamento: null,
-          dataInicio: null,
-          dataFim: null,
-          trocouPlano: false,
-          itens: [],
-          itensNovos: [],
-          servicos: [
-            {
-              pessoaId: cenario.pessoa.id,
-              itemRevisionalId: cenario.item.id,
-              inicio: null,
-              fim: null,
-            },
-          ],
-        },
-      );
+      const resultado = await atualizarEmissao(cenario.conta.id, criada.id, criada.updatedAt, {
+        ativoId: cenario.ativo.id,
+        planoId: cenario.plano.id,
+        responsavelId: cenario.identidade.id,
+        setor: "Manutencao",
+        dataAgendamento: null,
+        dataInicio: null,
+        dataFim: null,
+        trocouPlano: false,
+        itens: [],
+        itensNovos: [],
+        servicos: [
+          {
+            pessoaId: cenario.pessoa.id,
+            itemRevisionalId: cenario.item.id,
+            inicio: null,
+            fim: null,
+          },
+        ],
+      });
 
       expect(resultado).toEqual({ ok: false, motivo: "servico-incoerente" });
       // A transação abortou por inteiro — nada gravado pela metade (AD-9).
@@ -809,12 +799,9 @@ describe("Emissão: plano e data automáticos (Story 7.5)", () => {
   describe("escolha do plano entre os candidatos (Frente A)", () => {
     async function cenarioAmbiguo() {
       const cenario = await cenarioComSessao();
-      const segundo = await criarPlano(
-        cenario.conta.id,
-        cenario.ativo.id,
-        cenario.identidade.id,
-        { itemRevisionalId: cenario.item.id },
-      );
+      const segundo = await criarPlano(cenario.conta.id, cenario.ativo.id, cenario.identidade.id, {
+        itemRevisionalId: cenario.item.id,
+      });
       return { ...cenario, segundoPlano: segundo };
     }
 

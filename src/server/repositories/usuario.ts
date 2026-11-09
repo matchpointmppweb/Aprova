@@ -135,25 +135,27 @@ export async function listarUsuarios(contaId: string) {
     },
   });
 
-  return vinculos
-    .map((vinculo) => ({
-      ...vinculo.usuario,
-      nome: vinculo.nome,
-      status: vinculo.status,
-      perfilAcesso: vinculo.perfilAcesso,
-    }))
-    // Locale e opções EXPLÍCITOS: sem eles, acentuação e caixa ficariam por
-    // conta do ICU do runtime, e a mesma lista poderia sair em ordens
-    // diferentes entre a máquina de dev e o servidor. `id` como desempate
-    // porque dois homônimos — que esta tela tem todo o direito de ter — sairiam
-    // em ordem não determinística entre requisições.
-    .sort(
-      (a, b) =>
-        a.nome.localeCompare(b.nome, "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }) || a.id.localeCompare(b.id),
-    );
+  return (
+    vinculos
+      .map((vinculo) => ({
+        ...vinculo.usuario,
+        nome: vinculo.nome,
+        status: vinculo.status,
+        perfilAcesso: vinculo.perfilAcesso,
+      }))
+      // Locale e opções EXPLÍCITOS: sem eles, acentuação e caixa ficariam por
+      // conta do ICU do runtime, e a mesma lista poderia sair em ordens
+      // diferentes entre a máquina de dev e o servidor. `id` como desempate
+      // porque dois homônimos — que esta tela tem todo o direito de ter — sairiam
+      // em ordem não determinística entre requisições.
+      .sort(
+        (a, b) =>
+          a.nome.localeCompare(b.nome, "pt-BR", {
+            sensitivity: "base",
+            numeric: true,
+          }) || a.id.localeCompare(b.id),
+      )
+  );
 }
 
 // Convite (Story 6.6): a operação é sobre VÍNCULOS, não sobre cadastros. O
@@ -220,10 +222,7 @@ export async function criarUsuarioConvidado(
 
 // A transação (AD-9) é aberta aqui; o corpo é `convidarEm`, compartilhado com o
 // provisionamento de conta nova (Story 6.7).
-async function executarConvite(
-  contaId: string,
-  dados: DadosConvite,
-): Promise<ResultadoConvite> {
+async function executarConvite(contaId: string, dados: DadosConvite): Promise<ResultadoConvite> {
   return prisma.$transaction((tx) => convidarEm(tx, contaId, dados));
 }
 
@@ -311,10 +310,7 @@ export async function atualizarUsuario(
       // P2025 = a identidade ou o vínculo sumiu entre a leitura e a escrita
       // (alguém removeu a pessoa da conta em paralelo). É exatamente o caso
       // "usuário sem vínculo nesta conta" — false, e não erro genérico.
-      if (
-        erro instanceof Prisma.PrismaClientKnownRequestError &&
-        erro.code === "P2025"
-      ) {
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2025") {
         return false;
       }
       throw erro;
@@ -396,10 +392,7 @@ export async function ativarUsuarioConvidado(usuarioId: string, contaId: string)
 // o status por conta. A identidade também precisa estar `Ativo` porque o
 // acesso exige `Ativo` nos dois lados; contar alguém banido da plataforma como
 // administrador ativo deixaria a conta ficar sem nenhum.
-export async function contarAdministradoresAtivos(
-  contaId: string,
-  db: ExecutorPrisma = prisma,
-) {
+export async function contarAdministradoresAtivos(contaId: string, db: ExecutorPrisma = prisma) {
   return db.vinculoConta.count({
     where: {
       contaId,

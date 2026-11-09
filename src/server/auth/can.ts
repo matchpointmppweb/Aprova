@@ -26,11 +26,7 @@ export async function can(
   acao: AcaoPermissao,
   modulo: Modulo,
 ): Promise<boolean> {
-  const permissao = await buscarPermissaoDoModulo(
-    usuario.perfilAcessoId,
-    usuario.contaId,
-    modulo,
-  );
+  const permissao = await buscarPermissaoDoModulo(usuario.perfilAcessoId, usuario.contaId, modulo);
 
   if (!permissao) {
     return false;

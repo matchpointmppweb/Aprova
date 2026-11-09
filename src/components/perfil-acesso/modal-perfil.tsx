@@ -9,10 +9,7 @@ import {
   criarPerfilAcessoAction,
   editarPerfilAcessoAction,
 } from "@/src/server/actions/perfil-acesso";
-import {
-  estadoInicialAcaoPerfil,
-  mensagemDeErro,
-} from "@/src/server/actions/perfil-acesso-estado";
+import { estadoInicialAcaoPerfil, mensagemDeErro } from "@/src/server/actions/perfil-acesso-estado";
 import type { PerfilAcessoListagem, PermissaoListagem } from "./tipos";
 import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
@@ -24,12 +21,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
   const { pending } = useFormStatus();
   return (
     <div className="modal-footer">
-      <button
-        className="btn btn-ghost"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
       <button className="btn btn-primary" type="submit" disabled={pending}>
@@ -130,7 +122,13 @@ export function ModalPerfil({
         <div className="modal-header">
           <h2>{perfil ? `Editar perfil · ${perfil.nome}` : "Novo perfil de acesso"}</h2>
           <button className="modal-close" type="button" onClick={onFechar}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -199,8 +197,8 @@ export function ModalPerfil({
 
             <div className={`modal-tab-panel${aba === "permissoes" ? "" : " hidden"}`}>
               <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
-                Defina, para cada módulo do sistema, se este perfil pode criar, editar ou
-                excluir registros.
+                Defina, para cada módulo do sistema, se este perfil pode criar, editar ou excluir
+                registros.
               </p>
               <table className="perm-table">
                 <thead>

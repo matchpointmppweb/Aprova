@@ -8,7 +8,14 @@ import { ROTA_CONTAS_PLATAFORMA } from "@/src/lib/rotas";
 
 function ChevIcon() {
   return (
-    <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+    <svg
+      className="chev"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      aria-hidden="true"
+    >
       <path d="M9 6l6 6-6 6" />
     </svg>
   );
@@ -24,9 +31,7 @@ const ROTAS_CONFIGURACOES = ["/usuarios", "/perfil-acesso", "/aparencia"];
 // por prefixo puro — senão uma rota futura como /usuarios-arquivados também
 // acenderia o item "Usuários".
 function ehRotaAtiva(pathname: string, href: string) {
-  return href === "/"
-    ? pathname === "/"
-    : pathname === href || pathname.startsWith(href + "/");
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
 
 // Navegação portada de Mockup.html (#view-app .sidebar, AD-4). "Contas" volta
@@ -34,11 +39,7 @@ function ehRotaAtiva(pathname: string, href: string) {
 // Perfil de acesso), mas CONDICIONADO a `ehOperadorDePlataforma`: no mockup,
 // uma demo estática única, todos os itens apareciam para todos; aqui, quem
 // administra uma conta-cliente não pode enxergá-lo (AD-13).
-export function Sidebar({
-  ehOperadorDePlataforma,
-}: {
-  ehOperadorDePlataforma: boolean;
-}) {
+export function Sidebar({ ehOperadorDePlataforma }: { ehOperadorDePlataforma: boolean }) {
   const pathname = usePathname();
   const [cadastrosAberto, setCadastrosAberto] = useState(true);
   // Configurações nasce fechado por padrão, mas abre automaticamente quando
@@ -56,7 +57,13 @@ export function Sidebar({
           href="/"
           className={`side-item nav-item${ehRotaAtiva(pathname, "/") ? " active" : ""}`}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M3 11l9-8 9 8" />
             <path d="M5 10v10h14V10" />
           </svg>
@@ -71,7 +78,13 @@ export function Sidebar({
           onClick={() => setCadastrosAberto((aberto) => !aberto)}
           aria-expanded={cadastrosAberto}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />
             <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -81,15 +94,60 @@ export function Sidebar({
           <ChevIcon />
         </button>
         <div className={`side-sub${cadastrosAberto ? "" : " hidden"}`}>
-          <Link href="/ativos" className={`side-item nav-item${ehRotaAtiva(pathname, "/ativos") ? " active" : ""}`}>Ativos</Link>
-          <Link href="/tipos" className={`side-item nav-item${ehRotaAtiva(pathname, "/tipos") ? " active" : ""}`}>Tipos</Link>
-          <Link href="/itens-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/itens-revisionais") ? " active" : ""}`}>Itens revisionais</Link>
-          <Link href="/planos-revisionais" className={`side-item nav-item${ehRotaAtiva(pathname, "/planos-revisionais") ? " active" : ""}`}>Planos revisionais</Link>
-          <Link href="/locais" className={`side-item nav-item${ehRotaAtiva(pathname, "/locais") ? " active" : ""}`}>Locais</Link>
-          <Link href="/empresas" className={`side-item nav-item${ehRotaAtiva(pathname, "/empresas") ? " active" : ""}`}>Empresas</Link>
-          <Link href="/cargos" className={`side-item nav-item${ehRotaAtiva(pathname, "/cargos") ? " active" : ""}`}>Cargos</Link>
-          <Link href="/funcoes" className={`side-item nav-item${ehRotaAtiva(pathname, "/funcoes") ? " active" : ""}`}>Funções</Link>
-          <Link href="/pessoas" className={`side-item nav-item${ehRotaAtiva(pathname, "/pessoas") ? " active" : ""}`}>Pessoas</Link>
+          <Link
+            href="/ativos"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/ativos") ? " active" : ""}`}
+          >
+            Ativos
+          </Link>
+          <Link
+            href="/tipos"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/tipos") ? " active" : ""}`}
+          >
+            Tipos
+          </Link>
+          <Link
+            href="/itens-revisionais"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/itens-revisionais") ? " active" : ""}`}
+          >
+            Itens revisionais
+          </Link>
+          <Link
+            href="/planos-revisionais"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/planos-revisionais") ? " active" : ""}`}
+          >
+            Planos revisionais
+          </Link>
+          <Link
+            href="/locais"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/locais") ? " active" : ""}`}
+          >
+            Locais
+          </Link>
+          <Link
+            href="/empresas"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/empresas") ? " active" : ""}`}
+          >
+            Empresas
+          </Link>
+          <Link
+            href="/cargos"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/cargos") ? " active" : ""}`}
+          >
+            Cargos
+          </Link>
+          <Link
+            href="/funcoes"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/funcoes") ? " active" : ""}`}
+          >
+            Funções
+          </Link>
+          <Link
+            href="/pessoas"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/pessoas") ? " active" : ""}`}
+          >
+            Pessoas
+          </Link>
         </div>
       </div>
 
@@ -98,7 +156,13 @@ export function Sidebar({
           href="/emissao"
           className={`side-item nav-item${ehRotaAtiva(pathname, "/emissao") ? " active" : ""}`}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M22 2L11 13" />
             <path d="M22 2l-7 20-4-9-9-4 20-7z" />
           </svg>
@@ -111,7 +175,13 @@ export function Sidebar({
           href="/relatorios"
           className={`side-item nav-item${ehRotaAtiva(pathname, "/relatorios") ? " active" : ""}`}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M3 3v18h18" />
             <path d="M7 15l4-5 3 3 5-7" />
           </svg>
@@ -126,7 +196,13 @@ export function Sidebar({
           onClick={() => setConfigAberto((aberto) => !aberto)}
           aria-expanded={configAberto}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
           </svg>
@@ -134,7 +210,12 @@ export function Sidebar({
           <ChevIcon />
         </button>
         <div className={`side-sub${configAberto ? "" : " hidden"}`}>
-          <Link href="/usuarios" className={`side-item nav-item${ehRotaAtiva(pathname, "/usuarios") ? " active" : ""}`}>Usuários</Link>
+          <Link
+            href="/usuarios"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/usuarios") ? " active" : ""}`}
+          >
+            Usuários
+          </Link>
           {/* Só para operador de plataforma (AD-13) — quem administra uma
               conta-cliente não vê este item. Diferente dos vizinhos, ele leva
               para FORA desta casca: /contas vive em app/(plataforma), que tem
@@ -143,10 +224,22 @@ export function Sidebar({
               A segregação é essa, e o controle de verdade continua sendo
               exigirOperadorDePlataforma() na rota — nunca este link. */}
           {ehOperadorDePlataforma ? (
-            <Link href={ROTA_CONTAS_PLATAFORMA} className="side-item nav-item">Contas</Link>
+            <Link href={ROTA_CONTAS_PLATAFORMA} className="side-item nav-item">
+              Contas
+            </Link>
           ) : null}
-          <Link href="/perfil-acesso" className={`side-item nav-item${ehRotaAtiva(pathname, "/perfil-acesso") ? " active" : ""}`}>Perfil de acesso</Link>
-          <Link href="/aparencia" className={`side-item nav-item${ehRotaAtiva(pathname, "/aparencia") ? " active" : ""}`}>Aparência</Link>
+          <Link
+            href="/perfil-acesso"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/perfil-acesso") ? " active" : ""}`}
+          >
+            Perfil de acesso
+          </Link>
+          <Link
+            href="/aparencia"
+            className={`side-item nav-item${ehRotaAtiva(pathname, "/aparencia") ? " active" : ""}`}
+          >
+            Aparência
+          </Link>
         </div>
       </div>
     </div>

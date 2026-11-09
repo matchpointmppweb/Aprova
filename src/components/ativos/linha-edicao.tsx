@@ -27,12 +27,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -72,7 +67,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-ativos-${ativo.id}`}>
       <td colSpan={7}>
         <div className="form-row-label">Editar ativo · {ativo.codigo}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="ativoId" value={ativo.id} />
           <div className="inline-form">

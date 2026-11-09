@@ -77,7 +77,13 @@ export function TabelaUsuarios({
           disabled={!podeCriar}
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
           Convidar usuário
@@ -86,13 +92,19 @@ export function TabelaUsuarios({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por nome ou e-mail"
-              aria-label="Buscar por nome ou e-mail"
+            aria-label="Buscar por nome ou e-mail"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
@@ -163,7 +175,13 @@ export function TabelaUsuarios({
                             setLinhaAberta((atual) => (atual === usuario.id ? null : usuario.id))
                           }
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
                             <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                           </svg>
                         </button>

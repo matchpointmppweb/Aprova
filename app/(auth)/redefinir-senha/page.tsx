@@ -22,8 +22,8 @@ export default async function RedefinirSenhaPage({
       <div className="login-form">
         <h2>Redefinir senha</h2>
         <div className="form-error">
-          Este link de redefinição de senha é inválido ou expirou. Solicite um
-          novo link na tela de recuperação de senha.
+          Este link de redefinição de senha é inválido ou expirou. Solicite um novo link na tela de
+          recuperação de senha.
         </div>
         <div className="login-foot">
           <a

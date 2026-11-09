@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { editarContaAction } from "@/src/server/actions/conta";
-import {
-  estadoInicialAcaoConta,
-  mensagemDeErro,
-} from "@/src/server/actions/conta-estado";
+import { estadoInicialAcaoConta, mensagemDeErro } from "@/src/server/actions/conta-estado";
 import type { ContaListagem } from "./tipos";
 import { LIMITE_DOCUMENTO, LIMITE_NOME } from "@/src/lib/texto";
 
@@ -21,12 +18,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -62,7 +54,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-contas-${conta.id}`}>
       <td colSpan={6}>
         <div className="form-row-label">Editar conta · {conta.nome}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="contaId" value={conta.id} />
           <div className="inline-form">

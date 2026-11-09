@@ -164,9 +164,7 @@ describe("validarServicos: modo Duracao", () => {
   });
 
   test("o teto exato ainda é aceito", () => {
-    const { erros, servicos } = validarServicos([
-      linha({ horas: `${TETO_DE_MINUTOS / 60}:00` }),
-    ]);
+    const { erros, servicos } = validarServicos([linha({ horas: `${TETO_DE_MINUTOS / 60}:00` })]);
 
     expect(erros).toEqual([]);
     expect(servicos[0]).toMatchObject({ modo: "Duracao", duracaoMinutos: TETO_DE_MINUTOS });
@@ -287,9 +285,7 @@ describe("ida e volta da edição", () => {
   test.each([1, 59, 115, 600, TETO_DE_MINUTOS])(
     "%i minutos sobrevivem a reabrir e salvar",
     (minutos) => {
-      const { erros, servicos } = validarServicos([
-        linha({ horas: formatarMinutos(minutos) }),
-      ]);
+      const { erros, servicos } = validarServicos([linha({ horas: formatarMinutos(minutos) })]);
 
       expect(erros).toEqual([]);
       expect(servicos[0]).toMatchObject({ modo: "Duracao", duracaoMinutos: minutos });
@@ -436,9 +432,9 @@ describe("estado derivado do item", () => {
 
   // Precedência, não soma: quem marcou declarou que terminou.
   test("executado SEM nenhum lançamento é Concluído, nunca Pendente", () => {
-    expect(
-      estadoDerivadoDoItem({ itemRevisionalId: ITEM, executado: true, lancamentos: [] }),
-    ).toBe("concluido");
+    expect(estadoDerivadoDoItem({ itemRevisionalId: ITEM, executado: true, lancamentos: [] })).toBe(
+      "concluido",
+    );
   });
 
   // O ponto: lançamento de OUTRO item não pinta esta linha.

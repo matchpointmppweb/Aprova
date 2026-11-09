@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { editarTipoAtivoAction } from "@/src/server/actions/tipo-ativo";
-import {
-  estadoInicialAcaoTipoAtivo,
-  mensagemDeErro,
-} from "@/src/server/actions/tipo-ativo-estado";
+import { estadoInicialAcaoTipoAtivo, mensagemDeErro } from "@/src/server/actions/tipo-ativo-estado";
 import type { TipoAtivoListagem } from "./tipos";
 import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
@@ -28,12 +25,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -53,10 +45,7 @@ export function LinhaEdicao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    editarTipoAtivoAction,
-    estadoInicialAcaoTipoAtivo,
-  );
+  const [estado, formAction] = useActionState(editarTipoAtivoAction, estadoInicialAcaoTipoAtivo);
 
   useEffect(() => {
     if (estado.ok) {
@@ -71,7 +60,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-tipos-${tipo.id}`}>
       <td colSpan={5}>
         <div className="form-row-label">Editar tipo · {tipo.nome}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="tipoAtivoId" value={tipo.id} />
           <div className="inline-form">
@@ -98,12 +91,7 @@ export function LinhaEdicao({
             </div>
             <div className="f">
               <label htmlFor={`et-status-${tipo.id}`}>Status</label>
-              <select
-                id={`et-status-${tipo.id}`}
-                name="status"
-                required
-                defaultValue={tipo.status}
-              >
+              <select id={`et-status-${tipo.id}`} name="status" required defaultValue={tipo.status}>
                 {OPCOES_STATUS.map((opcao) => (
                   <option key={opcao.value} value={opcao.value}>
                     {opcao.label}

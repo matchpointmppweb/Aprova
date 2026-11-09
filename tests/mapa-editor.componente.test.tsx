@@ -86,9 +86,11 @@ describe("o editor de área funciona pelo teclado", () => {
     render(<Bancada />);
     const usuario = userEvent.setup();
     await usuario.tab();
-    await usuario.keyboard("{Shift>}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}".concat(
-      "{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{/Shift}",
-    ));
+    await usuario.keyboard(
+      "{Shift>}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}".concat(
+        "{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{/Shift}",
+      ),
+    );
     await usuario.keyboard("{Enter}");
 
     const pontos = JSON.parse(screen.getByTestId("pontos").textContent ?? "[]") as PontoMapa[];

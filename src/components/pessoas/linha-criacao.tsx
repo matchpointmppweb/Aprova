@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { criarPessoaAction } from "@/src/server/actions/pessoa";
-import {
-  estadoInicialAcaoPessoa,
-  mensagemDeErro,
-} from "@/src/server/actions/pessoa-estado";
+import { estadoInicialAcaoPessoa, mensagemDeErro } from "@/src/server/actions/pessoa-estado";
 import type { OpcaoReferencia } from "./tipos";
 import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
@@ -23,12 +20,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -51,10 +43,7 @@ export function LinhaCriacao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    criarPessoaAction,
-    estadoInicialAcaoPessoa,
-  );
+  const [estado, formAction] = useActionState(criarPessoaAction, estadoInicialAcaoPessoa);
 
   useEffect(() => {
     if (estado.ok) {
@@ -76,7 +65,11 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-pessoas">
       <td colSpan={6}>
         <div className="form-row-label">Nova pessoa</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

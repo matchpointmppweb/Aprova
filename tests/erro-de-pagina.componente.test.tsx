@@ -25,10 +25,7 @@ describe("a tela de erro", () => {
     // um digest, mas em desenvolvimento ela passa — e uma tela que às vezes
     // vaza detalhe de banco é uma tela que vaza (Boundaries).
     render(
-      <ErroDePagina
-        error={erroFalso('relation "emissoes" does not exist')}
-        reset={() => {}}
-      />,
+      <ErroDePagina error={erroFalso('relation "emissoes" does not exist')} reset={() => {}} />,
     );
 
     expect(document.body.textContent).not.toContain("emissoes");
@@ -69,9 +66,7 @@ describe("a tela de erro", () => {
   });
 
   test("aceita um título próprio por área", () => {
-    render(
-      <ErroDePagina error={erroFalso("x")} reset={() => {}} titulo="Título da área" />,
-    );
+    render(<ErroDePagina error={erroFalso("x")} reset={() => {}} titulo="Título da área" />);
     expect(screen.getByRole("heading", { name: "Título da área" })).toBeInTheDocument();
   });
 });

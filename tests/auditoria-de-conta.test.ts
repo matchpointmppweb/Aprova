@@ -6,7 +6,14 @@ import {
   trocarContaAtivaDaSessao,
 } from "@/src/server/repositories/vinculo-conta";
 
-import { criarAmbiente, criarConta, criarPerfil, criarVinculo, db, limparBanco } from "./setup/fixtures";
+import {
+  criarAmbiente,
+  criarConta,
+  criarPerfil,
+  criarVinculo,
+  db,
+  limparBanco,
+} from "./setup/fixtures";
 
 beforeEach(limparBanco);
 

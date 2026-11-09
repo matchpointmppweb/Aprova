@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { editarPessoaAction } from "@/src/server/actions/pessoa";
-import {
-  estadoInicialAcaoPessoa,
-  mensagemDeErro,
-} from "@/src/server/actions/pessoa-estado";
+import { estadoInicialAcaoPessoa, mensagemDeErro } from "@/src/server/actions/pessoa-estado";
 import type { OpcaoReferencia, PessoaListagem } from "./tipos";
 import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
@@ -23,12 +20,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -56,10 +48,7 @@ export function LinhaEdicao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    editarPessoaAction,
-    estadoInicialAcaoPessoa,
-  );
+  const [estado, formAction] = useActionState(editarPessoaAction, estadoInicialAcaoPessoa);
 
   useEffect(() => {
     if (estado.ok) {
@@ -86,7 +75,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-pessoas-${pessoa.id}`}>
       <td colSpan={6}>
         <div className="form-row-label">Editar pessoa · {pessoa.nome}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="pessoaId" value={pessoa.id} />
           <div className="inline-form">

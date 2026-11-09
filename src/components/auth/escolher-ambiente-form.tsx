@@ -54,8 +54,7 @@ export function EscolherAmbienteForm({ opcoes }: { opcoes: OpcaoDeAmbiente[] }) 
     <div className="login-form">
       <h2>Escolha o ambiente</h2>
       <p className="lede">
-        Seu acesso atende mais de uma conta. Selecione em qual delas você quer
-        entrar agora.
+        Seu acesso atende mais de uma conta. Selecione em qual delas você quer entrar agora.
       </p>
 
       {estado.error ? (

@@ -51,10 +51,7 @@ describe("opcoesDeResponsavel", () => {
   });
 
   test("mantém o responsável JÁ gravado, mesmo inativo", () => {
-    expect(opcoesDeResponsavel(TODOS, INATIVO.id).map((u) => u.id)).toEqual([
-      ATIVO.id,
-      INATIVO.id,
-    ]);
+    expect(opcoesDeResponsavel(TODOS, INATIVO.id).map((u) => u.id)).toEqual([ATIVO.id, INATIVO.id]);
   });
 
   test("não duplica quando o já gravado também está ativo", () => {

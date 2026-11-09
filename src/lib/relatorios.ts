@@ -334,9 +334,7 @@ export function montarServicosPorPessoa(
   };
 }
 
-export function montarEmissoesPorAtivo(
-  emissoes: readonly EmissaoDoRelatorio[],
-): TabelaDoRelatorio {
+export function montarEmissoesPorAtivo(emissoes: readonly EmissaoDoRelatorio[]): TabelaDoRelatorio {
   const agrupado = agruparEmissoesPorAtivo(emissoes);
 
   return {

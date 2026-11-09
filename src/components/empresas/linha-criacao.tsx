@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { criarEmpresaAction } from "@/src/server/actions/empresa";
-import {
-  estadoInicialAcaoEmpresa,
-  mensagemDeErro,
-} from "@/src/server/actions/empresa-estado";
+import { estadoInicialAcaoEmpresa, mensagemDeErro } from "@/src/server/actions/empresa-estado";
 import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
@@ -22,12 +19,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -44,10 +36,7 @@ export function LinhaCriacao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    criarEmpresaAction,
-    estadoInicialAcaoEmpresa,
-  );
+  const [estado, formAction] = useActionState(criarEmpresaAction, estadoInicialAcaoEmpresa);
 
   useEffect(() => {
     if (estado.ok) {
@@ -62,7 +51,11 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-empresas">
       <td colSpan={6}>
         <div className="form-row-label">Nova empresa</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

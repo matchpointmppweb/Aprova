@@ -20,8 +20,22 @@ export function BrandPanel() {
           <line x1="300" y1="0" x2="300" y2="800" />
           <line x1="400" y1="0" x2="400" y2="800" />
         </g>
-        <circle cx="380" cy="140" r="60" fill="none" stroke="rgba(143,203,166,0.35)" strokeWidth="1.5" />
-        <circle cx="90" cy="640" r="90" fill="none" stroke="rgba(143,203,166,0.22)" strokeWidth="1.5" />
+        <circle
+          cx="380"
+          cy="140"
+          r="60"
+          fill="none"
+          stroke="rgba(143,203,166,0.35)"
+          strokeWidth="1.5"
+        />
+        <circle
+          cx="90"
+          cy="640"
+          r="90"
+          fill="none"
+          stroke="rgba(143,203,166,0.22)"
+          strokeWidth="1.5"
+        />
         <path
           d="M60 720 C 90 660, 70 600, 110 560 C 150 520, 140 470, 180 430"
           fill="none"
@@ -40,8 +54,8 @@ export function BrandPanel() {
       <div className="login-brand-mid">
         <h1>Controle de ativos, planos revisionais e emissões em um só lugar.</h1>
         <p>
-          Cadastre ativos, defina planos de revisão e acompanhe cada emissão do
-          início ao encerramento, com rastreabilidade completa.
+          Cadastre ativos, defina planos de revisão e acompanhe cada emissão do início ao
+          encerramento, com rastreabilidade completa.
         </p>
       </div>
       <div className="login-brand-bottom">

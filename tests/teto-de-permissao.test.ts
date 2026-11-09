@@ -292,8 +292,6 @@ describe("o teto do ator é lido escopado pela conta (AD-1)", () => {
 
     expect(await permissoesDoPerfil(contaA.conta.id, contaB.perfil.id)).toEqual([]);
     // E a contraprova: o mesmo perfil, pedido pela conta certa, vem cheio.
-    expect((await permissoesDoPerfil(contaB.conta.id, contaB.perfil.id)).length).toBeGreaterThan(
-      0,
-    );
+    expect((await permissoesDoPerfil(contaB.conta.id, contaB.perfil.id)).length).toBeGreaterThan(0);
   });
 });

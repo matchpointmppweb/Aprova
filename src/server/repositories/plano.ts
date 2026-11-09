@@ -314,10 +314,7 @@ function chaveDeExecucao(ativoId: string, planoId: string, itemRevisionalId: str
 /// Uma consulta só para a conta inteira (ou para um plano, quando a tela pede
 /// um), e não uma por ativo: `resolverAtivosDoPlano` roda na listagem de
 /// Planos e no painel inicial, onde um N+1 por ativo apareceria na hora.
-async function historicoDeExecucao(
-  contaId: string,
-  planoId?: string,
-): Promise<Map<string, Date>> {
+async function historicoDeExecucao(contaId: string, planoId?: string): Promise<Map<string, Date>> {
   const emissoes = await prisma.emissao.findMany({
     where: {
       contaId,
@@ -476,17 +473,11 @@ export async function resolverAtivosDoPlano(
       // o formato da chave.
       const execucoesDesteAtivo = new Map<string, Date>();
       for (const item of plano.itens) {
-        const data = ultimaExecucao.get(
-          chaveDeExecucao(ativo.id, plano.id, item.itemRevisionalId),
-        );
+        const data = ultimaExecucao.get(chaveDeExecucao(ativo.id, plano.id, item.itemRevisionalId));
         if (data) execucoesDesteAtivo.set(item.itemRevisionalId, data);
       }
 
-      const proximaData = calcularProximaData(
-        ativo.createdAt,
-        plano.itens,
-        execucoesDesteAtivo,
-      );
+      const proximaData = calcularProximaData(ativo.createdAt, plano.itens, execucoesDesteAtivo);
       resultado.push({
         ativoId: ativo.id,
         planoId: plano.id,

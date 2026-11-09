@@ -4,10 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { criarTipoAtivoAction } from "@/src/server/actions/tipo-ativo";
-import {
-  estadoInicialAcaoTipoAtivo,
-  mensagemDeErro,
-} from "@/src/server/actions/tipo-ativo-estado";
+import { estadoInicialAcaoTipoAtivo, mensagemDeErro } from "@/src/server/actions/tipo-ativo-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
 
 // useFormStatus só funciona num componente descendente do <form> (não no
@@ -22,12 +19,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -43,10 +35,7 @@ export function LinhaCriacao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    criarTipoAtivoAction,
-    estadoInicialAcaoTipoAtivo,
-  );
+  const [estado, formAction] = useActionState(criarTipoAtivoAction, estadoInicialAcaoTipoAtivo);
 
   useEffect(() => {
     if (estado.ok) {
@@ -61,7 +50,11 @@ export function LinhaCriacao({
     <tr className="form-row" id="create-tipos">
       <td colSpan={5}>
         <div className="form-row-label">Novo tipo</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <div className="inline-form">
             <div className="f">

@@ -61,7 +61,10 @@ export function TabelaLocais({
       <div className="page-head">
         <div>
           <h1>Locais</h1>
-          <p>Plantas, pátios e áreas onde os ativos estão instalados, com a delimitação da área no mapa.</p>
+          <p>
+            Plantas, pátios e áreas onde os ativos estão instalados, com a delimitação da área no
+            mapa.
+          </p>
         </div>
         <button
           className="btn btn-primary"
@@ -69,7 +72,13 @@ export function TabelaLocais({
           disabled={!podeCriar}
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
           Novo local
@@ -78,13 +87,19 @@ export function TabelaLocais({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar por nome ou endereço"
-              aria-label="Buscar por nome ou endereço"
+            aria-label="Buscar por nome ou endereço"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
@@ -93,9 +108,7 @@ export function TabelaLocais({
           className="status-select"
           aria-label="Filtrar por status"
           value={statusFiltro}
-          onChange={(evento) =>
-            setStatusFiltro(evento.target.value as "all" | StatusLocal)
-          }
+          onChange={(evento) => setStatusFiltro(evento.target.value as "all" | StatusLocal)}
         >
           <option value="all">Status: Todos</option>
           <option value="Ativo">Ativo</option>
@@ -155,7 +168,13 @@ export function TabelaLocais({
                             setLinhaAberta((atual) => (atual === local.id ? null : local.id))
                           }
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
                             <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                           </svg>
                         </button>

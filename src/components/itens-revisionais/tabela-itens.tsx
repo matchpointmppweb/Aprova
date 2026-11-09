@@ -117,8 +117,8 @@ export function TabelaItens({
   // sem repetição — é a lista de sugestões, não um cadastro.
   const categoriasUsadas = useMemo(
     () =>
-      [...new Set(itens.map((item) => item.categoria).filter((v): v is string => !!v))].sort((a, b) =>
-        a.localeCompare(b, "pt-BR"),
+      [...new Set(itens.map((item) => item.categoria).filter((v): v is string => !!v))].sort(
+        (a, b) => a.localeCompare(b, "pt-BR"),
       ),
     [itens],
   );
@@ -168,7 +168,9 @@ export function TabelaItens({
       <div className="page-head">
         <div>
           <h1>Itens revisionais</h1>
-          <p>Verificações e tarefas que compõem os planos revisionais, com seu controle de medição.</p>
+          <p>
+            Verificações e tarefas que compõem os planos revisionais, com seu controle de medição.
+          </p>
         </div>
         <button
           className="btn btn-primary"
@@ -176,7 +178,13 @@ export function TabelaItens({
           disabled={!podeCriar}
           onClick={() => setLinhaAberta((atual) => (atual === "create" ? null : "create"))}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
           Novo item
@@ -185,13 +193,19 @@ export function TabelaItens({
 
       <div className="toolbar">
         <div className="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" />
           </svg>
           <input
             placeholder="Buscar item revisional"
-              aria-label="Buscar item revisional"
+            aria-label="Buscar item revisional"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
           />
@@ -265,13 +279,17 @@ export function TabelaItens({
                             setLinhaAberta((atual) => (atual === item.id ? null : item.id))
                           }
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
                             <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                           </svg>
                         </button>
-                        {podeExcluir ? (
-                          <BotaoExcluir item={item} onSucesso={fecharLinha} />
-                        ) : null}
+                        {podeExcluir ? <BotaoExcluir item={item} onSucesso={fecharLinha} /> : null}
                       </div>
                     </td>
                   </tr>

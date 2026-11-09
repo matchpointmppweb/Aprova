@@ -77,9 +77,7 @@ describe("limite por IP (pulverização entre muitos e-mails)", () => {
     for (let i = 0; i < 30; i++) {
       await registrarFalha("login", `alvo-${i}@teste.local`, IP);
     }
-    expect(await tentativaPermitida("login", "novo@teste.local", "198.51.100.2")).toBe(
-      true,
-    );
+    expect(await tentativaPermitida("login", "novo@teste.local", "198.51.100.2")).toBe(true);
   });
 
   test("sem IP identificável, o limite por e-mail continua valendo", async () => {

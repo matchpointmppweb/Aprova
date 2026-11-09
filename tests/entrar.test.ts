@@ -14,8 +14,7 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (nome: string) =>
       cookies.has(nome) ? { name: nome, value: cookies.get(nome) } : undefined,
-    getAll: () =>
-      [...cookies].map(([name, value]) => ({ name, value })),
+    getAll: () => [...cookies].map(([name, value]) => ({ name, value })),
     set: (nome: string, valor: string) => cookies.set(nome, valor),
     delete: (nome: string) => cookies.delete(nome),
   }),

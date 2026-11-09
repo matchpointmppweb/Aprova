@@ -212,9 +212,17 @@ function FormReprovar({
           required
         />
       </div>
-      {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+      {erro ? (
+        <div className="form-error" role="alert">
+          {erro}
+        </div>
+      ) : null}
       <div className="row" style={{ gap: 10, marginTop: 10 }}>
-        <SubmitTransicao label="Confirmar reprovação" pendingLabel="Reprovando..." variante="btn-primary" />
+        <SubmitTransicao
+          label="Confirmar reprovação"
+          pendingLabel="Reprovando..."
+          variante="btn-primary"
+        />
         <CancelarTransicao onCancelar={onCancelar} />
       </div>
     </form>
@@ -270,13 +278,7 @@ function AcoesEmAnalise({
 // bloqueio de itens neste status — Design Notes). Só renderizado em modo
 // edição: uma emissão em criação ainda não tem id/updatedAt persistidos para
 // nenhuma transição operar sobre.
-function BlocoStatus({
-  emissao,
-  onSucesso,
-}: {
-  emissao: EmissaoListagem;
-  onSucesso: () => void;
-}) {
+function BlocoStatus({ emissao, onSucesso }: { emissao: EmissaoListagem; onSucesso: () => void }) {
   const badge = BADGE_POR_STATUS[emissao.status];
 
   return (
@@ -335,7 +337,12 @@ type LinhaItem = {
   itemRevisionalId: string;
   nome: string;
   descricao: string | null;
-  controles: { key: "dias" | "km" | "horas"; label: string; valorEsperado: number | null; campoMedicao: string }[];
+  controles: {
+    key: "dias" | "km" | "horas";
+    label: string;
+    valorEsperado: number | null;
+    campoMedicao: string;
+  }[];
   executadoInicial: boolean;
   medicaoInicial: { dias: number | null; km: number | null; horas: number | null };
   observacaoInicial: string;
@@ -561,7 +568,13 @@ function LinhaItemEmissaoRow({
             disabled={!marcado}
             onClick={() => (aberta ? setAberta(false) : abrirCaixa())}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             Serviço
@@ -605,7 +618,13 @@ function LinhaItemEmissaoRow({
                         aria-label={`Remover lançamento de ${nomeDaPessoa(lancamento.pessoaId)}`}
                         onClick={() => onRemoverLancamento(lancamento.chave)}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          aria-hidden="true"
+                        >
                           <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
                         </svg>
                       </button>
@@ -654,7 +673,11 @@ function LinhaItemEmissaoRow({
               <button className="btn btn-primary btn-sm" type="button" onClick={confirmar}>
                 Adicionar ao serviço
               </button>
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAberta(false)}>
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                onClick={() => setAberta(false)}
+              >
                 Fechar
               </button>
             </div>
@@ -842,8 +865,20 @@ export function LinhaServicoRow({
         {total.tipo === "ok" ? formatarMinutos(total.minutos) : DURACAO_INVALIDA}
       </td>
       <td className="col-acao-sv">
-        <button className="icon-btn" type="button" title="Remover serviço" aria-label="Remover serviço" onClick={onRemover}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <button
+          className="icon-btn"
+          type="button"
+          title="Remover serviço"
+          aria-label="Remover serviço"
+          onClick={onRemover}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
           </svg>
         </button>
@@ -942,7 +977,15 @@ export function ModalEmissao({
       ...atual,
       // Nasce em "Apenas horas", como no mockup: é o lançamento que a story
       // existe para permitir.
-      { chave, pessoaId: "", itemRevisionalId: "", modo: "Duracao", horas: "", inicio: "", fim: "" },
+      {
+        chave,
+        pessoaId: "",
+        itemRevisionalId: "",
+        modo: "Duracao",
+        horas: "",
+        inicio: "",
+        fim: "",
+      },
     ]);
   };
 
@@ -1284,7 +1327,13 @@ export function ModalEmissao({
         <div className="modal-header">
           <h2>{emissao ? `Editar emissão · ${emissao.codigo}` : "Nova emissão"}</h2>
           <button className="modal-close" type="button" onClick={onFechar}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -1334,7 +1383,10 @@ export function ModalEmissao({
           // perderia esse efeito mesmo com a mutação já concluída no
           // servidor (revalidatePath já rodou), deixando o modal com estado
           // visualmente desatualizado.
-          <div className={`modal-tab-panel${aba === "geral" ? "" : " hidden"}`} style={{ padding: "16px 24px 0" }}>
+          <div
+            className={`modal-tab-panel${aba === "geral" ? "" : " hidden"}`}
+            style={{ padding: "16px 24px 0" }}
+          >
             <BlocoStatus emissao={emissao} onSucesso={onSucesso} />
           </div>
         ) : null}
@@ -1431,10 +1483,14 @@ export function ModalEmissao({
                       type="text"
                       readOnly
                       tabIndex={-1}
-                      value={nomeDoPlano ?? (ativoId ? "Nenhum plano aplicável" : "Selecione o ativo")}
+                      value={
+                        nomeDoPlano ?? (ativoId ? "Nenhum plano aplicável" : "Selecione o ativo")
+                      }
                     />
                   )}
-                  <ErroDeCampo mensagem={errosPorCampo.get("planoId") ?? avisoDoPlano ?? undefined} />
+                  <ErroDeCampo
+                    mensagem={errosPorCampo.get("planoId") ?? avisoDoPlano ?? undefined}
+                  />
                 </div>
                 <div className="f">
                   <label htmlFor="emissao-responsavel">Responsável</label>
@@ -1549,8 +1605,8 @@ export function ModalEmissao({
 
             <div className={`modal-tab-panel${aba === "itens" ? "" : " hidden"}`}>
               <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
-                Marque os itens revisionais executados nesta emissão, registre a medição
-                realizada e, se necessário, adicione o serviço executado no item.
+                Marque os itens revisionais executados nesta emissão, registre a medição realizada
+                e, se necessário, adicione o serviço executado no item.
               </p>
 
               {/* Frente A — os dois jeitos de acrescentar item, lado a lado:
@@ -1609,11 +1665,17 @@ export function ModalEmissao({
                     <thead>
                       <tr>
                         <th scope="col" className="col-chk" />
-                        <th scope="col" className="col-item">Item</th>
-                        <th scope="col" className="col-desc">Descrição</th>
+                        <th scope="col" className="col-item">
+                          Item
+                        </th>
+                        <th scope="col" className="col-desc">
+                          Descrição
+                        </th>
                         <th scope="col">Medidores (dias, horas, km)</th>
                         <th scope="col">Observação</th>
-                        <th scope="col" className="col-acao">Serviço</th>
+                        <th scope="col" className="col-acao">
+                          Serviço
+                        </th>
                       </tr>
                     </thead>
                     <tbody id="emissao-itens-list">
@@ -1678,7 +1740,9 @@ export function ModalEmissao({
                       <th scope="col">Lançamento</th>
                       <th scope="col">Início / Horas</th>
                       <th scope="col">Fim</th>
-                      <th scope="col" className="col-total">Total</th>
+                      <th scope="col" className="col-total">
+                        Total
+                      </th>
                       <th scope="col" className="col-acao-sv" />
                     </tr>
                   </thead>
@@ -1721,7 +1785,13 @@ export function ModalEmissao({
                 onClick={adicionarServico}
                 style={{ marginTop: 12 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
                   <path d="M12 5v14M5 12h14" />
                 </svg>
                 Adicionar serviço

@@ -14,10 +14,6 @@ export default function Erro({
   reset: () => void;
 }) {
   return (
-    <ErroDePagina
-      error={error}
-      reset={reset}
-      titulo="Não foi possível carregar seus ambientes"
-    />
+    <ErroDePagina error={error} reset={reset} titulo="Não foi possível carregar seus ambientes" />
   );
 }

@@ -58,9 +58,7 @@ function validarCampos(campos: {
   if (!campos.nome) erros.push({ field: "nome", message: "Informe o nome do ativo." });
   // Teto de tamanho (src/lib/texto.ts): recusa, nunca trunca.
   erros.push(...validarTamanho(campos.nome, LIMITE_NOME, "nome", "Nome"));
-  erros.push(
-    ...validarTamanho(campos.localizacao, LIMITE_DESCRICAO, "localizacao", "Localização"),
-  );
+  erros.push(...validarTamanho(campos.localizacao, LIMITE_DESCRICAO, "localizacao", "Localização"));
   if (!campos.tipoAtivoId) {
     erros.push({ field: "tipoAtivoId", message: "Selecione um tipo." });
   }
@@ -111,10 +109,7 @@ export async function criarAtivoAction(
   const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status, errosDeTexto } =
     lerCampos(formData);
 
-  const erros = [
-    ...validarCampos({ nome, tipoAtivoId, localizacao, status }),
-    ...errosDeTexto,
-  ];
+  const erros = [...validarCampos({ nome, tipoAtivoId, localizacao, status }), ...errosDeTexto];
   if (erros.length > 0) {
     return { ok: false, error: erros };
   }
@@ -175,10 +170,7 @@ export async function editarAtivoAction(
   const { nome, tipoAtivoId, localizacao, empresaId, numeroSerie, status, errosDeTexto } =
     lerCampos(formData);
 
-  const erros = [
-    ...validarCampos({ nome, tipoAtivoId, localizacao, status }),
-    ...errosDeTexto,
-  ];
+  const erros = [...validarCampos({ nome, tipoAtivoId, localizacao, status }), ...errosDeTexto];
   if (!ativoId) erros.push({ field: "ativoId", message: "Ativo inválido." });
   if (erros.length > 0) {
     return { ok: false, error: erros };

@@ -7,7 +7,13 @@ import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
 import { atualizarEmpresa, criarEmpresa } from "@/src/server/repositories/empresa";
 import type { EstadoAcaoEmpresa } from "./empresa-estado";
-import { LIMITE_DOCUMENTO, LIMITE_NOME, LIMITE_TEXTO_LONGO, lerTexto, validarTamanho } from "@/src/lib/texto";
+import {
+  LIMITE_DOCUMENTO,
+  LIMITE_NOME,
+  LIMITE_TEXTO_LONGO,
+  lerTexto,
+  validarTamanho,
+} from "@/src/lib/texto";
 import { registrarFalha } from "@/src/server/log";
 
 const ERRO_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação.";

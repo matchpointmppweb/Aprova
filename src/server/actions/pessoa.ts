@@ -55,10 +55,7 @@ function validarCamposGerais(campos: {
 // de vinculoEResponsavelValidos em src/server/actions/plano.ts: um
 // cargoId/funcaoId de outra conta submetido via request adulterado é
 // rejeitado sem persistir nada (Boundaries/I-O Matrix).
-async function cargoEFuncaoValidos(
-  contaId: string,
-  campos: { cargoId: string; funcaoId: string },
-) {
+async function cargoEFuncaoValidos(contaId: string, campos: { cargoId: string; funcaoId: string }) {
   const [cargos, funcoes] = await Promise.all([listarCargos(contaId), listarFuncoes(contaId)]);
 
   const erros: { field: string; message: string }[] = [];

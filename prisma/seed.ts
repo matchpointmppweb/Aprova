@@ -47,9 +47,7 @@ async function main() {
   // Normalizado como o produto normaliza (actions/usuario.ts,
   // actions/conta.ts): o e-mail é a chave única global da identidade, e semear
   // " Admin@Raiz.local " criaria uma linha que nenhuma busca do login acha.
-  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@raiz.local")
-    .trim()
-    .toLowerCase();
+  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? "admin@raiz.local").trim().toLowerCase();
   const adminSenha = process.env.SEED_ADMIN_SENHA;
   if (!adminSenha) {
     throw new Error(
@@ -146,16 +144,10 @@ async function main() {
     return { conta, perfis };
   }, OPCOES_DE_TRANSACAO_DE_PROVISIONAMENTO);
 
-  console.log(
-    `[seed] Conta, Administrador e ${perfis.length} perfis de acesso criados:`,
-  );
+  console.log(`[seed] Conta, Administrador e ${perfis.length} perfis de acesso criados:`);
   console.log(`[seed]   Conta: ${conta.nome} (${conta.id})`);
-  console.log(
-    `[seed]   Administrador: ${adminEmail} (senha definida via SEED_ADMIN_SENHA)`,
-  );
-  console.log(
-    `[seed]   Perfis: ${perfis.map((perfil) => perfil.nome).join(", ")}`,
-  );
+  console.log(`[seed]   Administrador: ${adminEmail} (senha definida via SEED_ADMIN_SENHA)`);
+  console.log(`[seed]   Perfis: ${perfis.map((perfil) => perfil.nome).join(", ")}`);
 }
 
 main()

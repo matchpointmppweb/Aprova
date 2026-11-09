@@ -31,23 +31,22 @@ function BotaoEnviar() {
 // o envio, e por isso não existe aqui nenhum tratamento de "e-mail não
 // encontrado": esse estado não chega, e não deve chegar.
 export function EsqueciSenhaForm() {
-  const [estado, formAction] = useActionState(
-    solicitarResetSenhaAction,
-    estadoInicialAcaoAuth,
-  );
+  const [estado, formAction] = useActionState(solicitarResetSenhaAction, estadoInicialAcaoAuth);
 
   return (
     <div className="login-form">
       <h2>Esqueci minha senha</h2>
       <p className="lede">
-        Informe seu e-mail corporativo. Se ele estiver cadastrado, enviaremos um
-        link para redefinir sua senha.
+        Informe seu e-mail corporativo. Se ele estiver cadastrado, enviaremos um link para redefinir
+        sua senha.
       </p>
 
-      {estado.error ? <div className="form-error" role="alert">{estado.error}</div> : null}
-      {estado.ok && estado.message ? (
-        <div className="form-success">{estado.message}</div>
+      {estado.error ? (
+        <div className="form-error" role="alert">
+          {estado.error}
+        </div>
       ) : null}
+      {estado.ok && estado.message ? <div className="form-success">{estado.message}</div> : null}
 
       {/* O formulário SOME depois do sucesso, em vez de ficar disponível para
           reenvio. Como a resposta não diz se o e-mail existe, reenviar não
@@ -72,7 +71,10 @@ export function EsqueciSenhaForm() {
       ) : null}
 
       <div className="login-foot">
-        <Link href="/login" style={{ color: "var(--pine-dark)", textDecoration: "none", fontWeight: 500 }}>
+        <Link
+          href="/login"
+          style={{ color: "var(--pine-dark)", textDecoration: "none", fontWeight: 500 }}
+        >
           Voltar para o login
         </Link>
       </div>

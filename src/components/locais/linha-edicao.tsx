@@ -4,10 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { editarLocalAction } from "@/src/server/actions/local";
-import {
-  estadoInicialAcaoLocal,
-  mensagemDeErro,
-} from "@/src/server/actions/local-estado";
+import { estadoInicialAcaoLocal, mensagemDeErro } from "@/src/server/actions/local-estado";
 import { MapaEditor, type PontoMapa } from "./mapa-editor";
 import type { LocalListagem } from "./tipos";
 import { LIMITE_DESCRICAO, LIMITE_NOME } from "@/src/lib/texto";
@@ -29,12 +26,7 @@ function Acoes({ onFechar }: { onFechar: () => void }) {
       <button className="btn btn-primary btn-sm" type="submit" disabled={pending}>
         {pending ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        className="btn btn-ghost btn-sm"
-        type="button"
-        onClick={onFechar}
-        disabled={pending}
-      >
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onFechar} disabled={pending}>
         Cancelar
       </button>
     </div>
@@ -56,10 +48,7 @@ export function LinhaEdicao({
   onFechar: () => void;
   onSucesso: () => void;
 }) {
-  const [estado, formAction] = useActionState(
-    editarLocalAction,
-    estadoInicialAcaoLocal,
-  );
+  const [estado, formAction] = useActionState(editarLocalAction, estadoInicialAcaoLocal);
   const [pontos, setPontos] = useState<PontoMapa[]>(local.areaPoligono ?? []);
 
   useEffect(() => {
@@ -75,7 +64,11 @@ export function LinhaEdicao({
     <tr className="form-row" id={`edit-locais-${local.id}`}>
       <td colSpan={5}>
         <div className="form-row-label">Editar local · {local.nome}</div>
-        {erro ? <div className="form-error" role="alert">{erro}</div> : null}
+        {erro ? (
+          <div className="form-error" role="alert">
+            {erro}
+          </div>
+        ) : null}
         <form action={formAction}>
           <input type="hidden" name="localId" value={local.id} />
           <div className="inline-form">

@@ -5,11 +5,7 @@ import { Prisma, type StatusLocal } from "@prisma/client";
 
 import { can } from "@/src/server/auth/can";
 import { exigirUsuarioAutenticado } from "@/src/server/auth/sessao";
-import {
-  atualizarLocal,
-  criarLocal,
-  type AreaPoligono,
-} from "@/src/server/repositories/local";
+import { atualizarLocal, criarLocal, type AreaPoligono } from "@/src/server/repositories/local";
 import type { EstadoAcaoLocal } from "./local-estado";
 import { LIMITE_DESCRICAO, LIMITE_NOME, lerTexto, validarTamanho } from "@/src/lib/texto";
 import { registrarFalha } from "@/src/server/log";

@@ -200,7 +200,13 @@ export function ModalPlano({
         <div className="modal-header">
           <h2>{plano ? `Editar plano · ${plano.nome}` : "Novo plano revisional"}</h2>
           <button className="modal-close" type="button" onClick={onFechar}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
@@ -330,14 +336,14 @@ export function ModalPlano({
 
             <div className={`modal-tab-panel${aba === "itens" ? "" : " hidden"}`}>
               <p className="muted" style={{ margin: "0 0 12px", fontSize: 13 }}>
-                Selecione os itens revisionais que fazem parte deste plano. Ao marcar um item,
-                você pode ajustar a medição específica para este plano.
+                Selecione os itens revisionais que fazem parte deste plano. Ao marcar um item, você
+                pode ajustar a medição específica para este plano.
               </p>
               <div id="plano-itens-list">
                 {itensExibidos.length === 0 ? (
                   <p className="muted" style={{ fontSize: 13 }}>
-                    Nenhum item revisional cadastrado. Cadastre um item revisional antes de criar
-                    um plano.
+                    Nenhum item revisional cadastrado. Cadastre um item revisional antes de criar um
+                    plano.
                   </p>
                 ) : null}
                 {itensExibidos.map((item) => {

@@ -11,9 +11,7 @@ import { BrandPanel } from "@/src/components/auth/brand-panel";
 //
 // A guarda desta rota (sessão obrigatória, opções revalidadas contra o banco)
 // vive na própria página, que já precisa ler as opções.
-export default function SelecaoLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function SelecaoLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div id="view-login">
       <BrandPanel />

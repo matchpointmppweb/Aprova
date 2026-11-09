@@ -72,14 +72,14 @@ A suíte roda em dois projetos do Vitest, com ambientes incompatíveis entre si.
 A divisão é pela EXTENSÃO do arquivo, então um teste novo cai no projeto certo
 pelo próprio nome.
 
-| | `servidor` | `componente` |
-|---|---|---|
-| arquivos | `tests/**/*.test.ts` | `tests/**/*.componente.test.tsx` |
-| ambiente | Node | jsdom |
-| banco | PostgreSQL efêmero de verdade | nenhum |
-| execução | serial (um banco só) | paralela |
-| custo | ~70s | ~4s |
-| comando | `npm run test:servidor` | `npm run test:componente` |
+|          | `servidor`                    | `componente`                     |
+| -------- | ----------------------------- | -------------------------------- |
+| arquivos | `tests/**/*.test.ts`          | `tests/**/*.componente.test.tsx` |
+| ambiente | Node                          | jsdom                            |
+| banco    | PostgreSQL efêmero de verdade | nenhum                           |
+| execução | serial (um banco só)          | paralela                         |
+| custo    | ~70s                          | ~4s                              |
+| comando  | `npm run test:servidor`       | `npm run test:componente`        |
 
 `npm test` roda os dois.
 
